@@ -1,3 +1,5 @@
+mod fetcher;
+
 use anyhow::Result;
 use tracing::info;
 
