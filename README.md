@@ -19,6 +19,9 @@ in [angrepa](https://github.com/Cyberlandslaget/angrepa).
     - **kriger-ws**: WebSocket server to send real-time data to the web frontend or other consumers.
 - **kriger-cli**: The command line interface (CLI) used to create, test, and deploy exploits.
 
+All server components can be packaged and shipped as a single binary. All server components except `kriger-runner` can
+be all be run in a single instance.
+
 ### Component topology
 
 **Server components**:
@@ -26,7 +29,7 @@ in [angrepa](https://github.com/Cyberlandslaget/angrepa).
 | Component             | Requirements             | Replicas                 |
 |-----------------------|--------------------------|--------------------------|
 | **kriger-controller** | Nats, Kubernetes API     | Exactly one              |
-| **kriger-fetcher**    | Nats, Competition system | At least one             |                 
+| **kriger-fetcher**    | Nats, Competition system | Exactly one              |                 
 | **kriger-metrics**    | Nats                     | At least one / any       |                 
 | **kriger-rest**       | Nats                     | At least one / any       |
 | **kriger-runner**     | Nats, Competition system | At least one per exploit |                 
@@ -41,3 +44,46 @@ in [angrepa](https://github.com/Cyberlandslaget/angrepa).
 | **kriger-frontend** | kriger-rest, kriger-ws | Any      |                 
 
 Replica counts marked with *any* means that the component is deemed to be non-critical for the exploit farm to function.
+
+## Usage
+
+### Installing the CLI
+
+TODO
+
+## Development
+
+A Linux or macOS environment is **highly** recommended. Windows users should consider using WSL.
+
+### Prerequisites
+
+- Rust Toolchain (see [Install Rust](https://www.rust-lang.org/tools/install))
+- [Docker](https://docs.docker.com/engine/install/) with [Compose v2](https://docs.docker.com/compose/install/) *(or
+  other container runtimes with support for Docker Compose files)*
+
+### Running required services
+
+| Service | Port                    |
+|---------|-------------------------|
+| nats    | 4222 (NATS & JetStream) |
+
+**Start services:**
+
+```bash
+docker compose up -d --remove-orphans
+```
+
+**Stop services:**
+
+```bash
+docker compose down
+```
+
+**Nats debugging:**
+
+```bash
+docker run --network kriger_default -e NATS_URL=nats://nats:4222 --rm -it natsio/nats-box
+```
+
+> **Note**: Check `docker network ls` if the network name of the Docker compose project is different from the provided
+> command.

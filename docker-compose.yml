@@ -1,0 +1,9 @@
+# This Docker Compose file is used for development ONLY
+
+services:
+  nats:
+    image: nats:2
+    restart: always
+    command: [ "-js" ]
+    ports:
+      - "127.0.0.1:4222:4222"
