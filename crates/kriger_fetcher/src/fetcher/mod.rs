@@ -1,6 +1,7 @@
-mod enowars;
-mod faust;
-mod statisk;
+pub mod enowars;
+pub mod faust;
+pub mod statisk;
+
 
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};

@@ -13,7 +13,7 @@ pub struct AttackInfo {
 
 #[derive(Deserialize, Debug)]
 pub struct Scoreboard {
-    pub current_tick: i32,
+    pub tick: i32,
 }
 
 /// teamid -> `Vec<flagid>`
@@ -67,7 +67,7 @@ impl Fetcher for FaustFetcher {
             // on cold start: ex. 5 flagids sent for current tick
             // every tick afterwards: just 1 flagid, because 4 others are known
 
-            let current_tick = scoreboard.current_tick;
+            let current_tick = scoreboard.tick;
 
             for (team, flagids) in content.0 {
                 // faust gives an array of the last few flagids here, extract them manually :grimace:
@@ -140,7 +140,7 @@ mod tests {
 
     const SCOREBOARD_JSON: &str = r#"
             {
-                "current_tick": 271
+                "tick": 271
             }
     "#;
 
