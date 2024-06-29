@@ -1,0 +1,28 @@
+[package]
+name = "kriger"
+version = "0.0.1"
+edition = "2021"
+
+[features]
+default = ["controller", "metrics", "rest", "runner", "submitter", "ws", ]
+controller = ["dep:kriger_controller"]
+metrics = ["dep:kriger_metrics"]
+rest = ["dep:kriger_rest"]
+runner = ["dep:kriger_runner"]
+submitter = ["dep:kriger_submitter"]
+ws = ["dep:kriger_ws"]
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { version = "4.5.8", features = ["env", "derive"] }
+clap_derive = "4.5.8"
+futures = { workspace = true }
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+kriger_controller = { path = "../kriger_controller", optional = true }
+kriger_metrics = { path = "../kriger_metrics", optional = true }
+kriger_rest = { path = "../kriger_rest", optional = true }
+kriger_runner = { path = "../kriger_runner", optional = true }
+kriger_submitter = { path = "../kriger_submitter", optional = true }
+kriger_ws = { path = "../kriger_ws", optional = true }

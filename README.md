@@ -18,3 +18,17 @@ in [angrepa](https://github.com/Cyberlandslaget/angrepa).
       metrics exporter.
 - **kriger-cli**: The command line interface (CLI) used to create, test, and deploy exploits.
 
+### Component topology
+
+| Component             | Requirements                             | Replicas                 |
+|-----------------------|------------------------------------------|--------------------------|
+| **kriger-controller** | Nats, Kubernetes API, Competition system | Exactly one              |
+| **kriger-rest**       | Nats                                     | At least one / any       |
+| **kriger-ws**         | Nats                                     | At least one / any       | 
+| **kriger-runner**     | Nats, Competition system                 | At least one per exploit |                 
+| **kriger-submitter**  | Nats, Competition system                 | At least one             |                 
+| **kriger-metrics**    | Nats                                     | At least one / any       |                 
+| **kriger-cli**        | kriger-rest, kriger-ws                   | Any                      |                 
+| **kriger-frontend**   | kriger-rest, kriger-ws                   | Any                      |                 
+
+Replica counts marked with *any* means that the component is deemed to be non-critical for the exploit farm to function.
