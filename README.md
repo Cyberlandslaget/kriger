@@ -51,6 +51,8 @@ Replica counts marked with *any* means that the component is deemed to be non-cr
 
 TODO
 
+### Developing exploits
+
 ## Development
 
 A Linux or macOS environment is **highly** recommended. Windows users should consider using WSL.
@@ -87,3 +89,61 @@ docker run --network kriger_default -e NATS_URL=nats://nats:4222 --rm -it natsio
 
 > **Note**: Check `docker network ls` if the network name of the Docker compose project is different from the provided
 > command.
+
+## Architecture
+
+**Kriger**'s architecture heavily relies
+on [NATS JetStreams](https://docs.nats.io/using-nats/developer/develop_jetstream)
+to provide reliable and fault-tolerant asynchronous messaging. This enables **kriger** to be decoupled and increases its
+quality of service. In short, we gain the following benefits:
+
+- Components can function independently of one another. For example, if the *controller* goes down, most of the
+  system will still function properly.
+- Idempotency is provided
+  with [message deduplication](https://docs.nats.io/using-nats/developer/develop_jetstream/model_deep_dive#message-deduplication).
+  This means that every component can operate statelessly without having to worry about actions that have already been
+  performed.
+- [Message retention](https://docs.nats.io/using-nats/developer/develop_jetstream/model_deep_dive#stream-limits-retention-and-policy)
+  can be controlled and handled automatically by NATS. This means that **kriger** does not need to worry about old
+  exploit schedules or outdated data that are no longer relevant.
+- [Exactly once](https://docs.nats.io/using-nats/developer/develop_jetstream/model_deep_dive#exactly-once-semantics)
+  delivery allows for improved efficiency without sacrificing reliability. Automatic retries and redeliveries are
+  included.
+- [Consumers](https://docs.nats.io/using-nats/developer/develop_jetstream/consumers) allow for robust, scalable, and
+  flexible workload distribution.
+- ... and more!
+
+### Diagrams
+
+**Fetcher, exploit execution, and submission**:
+
+```mermaid
+sequenceDiagram
+    participant nats as NATS
+    participant r as Runner
+    participant s as Submitter
+    participant f as Fetcher
+    participant cs as Competition system
+    loop Every tick
+        f ->> cs: Request attack data (eg. teams.json)
+        cs -->> f: Attack data (network IDs, flag IDs, etc)
+    end
+    f ->> nats: Schedule exploits
+    loop Poll routine based on capacity
+        r ->> nats: Poll schedule
+        nats -->> + r: Receive schedule
+        r -->> nats: Acknowledgement: In progress
+        r ->> r: Execute the exploit
+        r ->> nats: Publish execution result and flag(s)
+        r -->>  - nats: Acknowledgement: Ack/Nak
+    end
+    loop Poll routine based on capacity
+        s ->> nats: Poll flag
+        nats -->> + s: Receive flag
+        s -->> nats: Acknowledgement: In progress
+        s ->> cs: Submit flag
+        cs -->> s: Submission result
+        s ->> nats: Publish submission result
+        s -->>  - nats: Acknowledgement: Ack/Nak/Term
+    end
+```
