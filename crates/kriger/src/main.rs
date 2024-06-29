@@ -15,6 +15,10 @@ async fn main() -> Result<()> {
     if args.components.enable_controller {
         set.spawn(kriger_controller::main());
     }
+    #[cfg(feature = "fetcher")]
+    if args.components.enable_fetcher {
+        set.spawn(kriger_fetcher::main());
+    }
     #[cfg(feature = "metrics")]
     if args.components.enable_metrics {
         set.spawn(kriger_metrics::main());

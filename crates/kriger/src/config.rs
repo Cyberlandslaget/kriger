@@ -22,15 +22,20 @@ pub struct Components {
     #[arg(env, long, action = ArgAction::Set, default_value_t = true)]
     pub enable_controller: bool,
 
+    /// Enable the kriger-fetcher component
+    #[cfg(feature = "fetcher")]
+    #[arg(env, long, action = ArgAction::Set, default_value_t = true)]
+    pub enable_fetcher: bool,
+
+    /// Enable the kriger-metrics component
+    #[cfg(feature = "metrics")]
+    #[arg(env, long, action = ArgAction::Set, default_value_t = true)]
+    pub enable_metrics: bool,
+
     /// Enable the kriger-rest component
     #[cfg(feature = "rest")]
     #[arg(env, long, action = ArgAction::Set, default_value_t = true)]
     pub enable_rest: bool,
-
-    /// Enable the kriger-ws component
-    #[cfg(feature = "ws")]
-    #[arg(env, long, action = ArgAction::Set, default_value_t = false)]
-    pub enable_ws: bool,
 
     /// Enable the kriger-runner component
     #[cfg(feature = "runner")]
@@ -42,8 +47,8 @@ pub struct Components {
     #[arg(env, long, action = ArgAction::Set, default_value_t = true)]
     pub enable_submitter: bool,
 
-    /// Enable the kriger-metrics component
-    #[cfg(feature = "metrics")]
-    #[arg(env, long, action = ArgAction::Set, default_value_t = true)]
-    pub enable_metrics: bool,
+    /// Enable the kriger-ws component
+    #[cfg(feature = "ws")]
+    #[arg(env, long, action = ArgAction::Set, default_value_t = false)]
+    pub enable_ws: bool,
 }

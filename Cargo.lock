@@ -273,6 +273,7 @@ dependencies = [
  "clap_derive",
  "futures",
  "kriger_controller",
+ "kriger_fetcher",
  "kriger_metrics",
  "kriger_rest",
  "kriger_runner",
@@ -285,6 +286,16 @@ dependencies = [
 
 [[package]]
 name = "kriger_controller"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "kriger_fetcher"
 version = "0.0.1"
 dependencies = [
  "anyhow",
