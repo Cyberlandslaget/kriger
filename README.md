@@ -81,6 +81,14 @@ docker compose up -d --remove-orphans
 docker compose down
 ```
 
+### Running kriger
+
+```bash
+cargo run
+```
+
+### Debugging
+
 **Nats debugging:**
 
 ```bash
