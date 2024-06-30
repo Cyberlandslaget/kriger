@@ -15,7 +15,7 @@ pub struct TicksOld(pub HashMap<i32, serde_json::Value>);
 /// All services
 // /// {service_name: {"10.0.0.1": ["a", "b"], "10.0.0.2"}}
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
-pub struct ServiceMap(HashMap<String, Service>);
+pub struct ServiceMap(pub HashMap<String, Service>);
 
 impl ServiceMap {
     /// renames services
@@ -37,7 +37,7 @@ impl ServiceMap {
 /// A service' teams
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct Service {
-    teams: HashMap<String, TeamService>,
+    pub teams: HashMap<String, TeamService>,
 }
 
 /// A teams' instance of a service
@@ -47,7 +47,7 @@ pub struct TeamService {
     // raw json value), but in the case of faust-like ctfs we may have multiple
     // flagids and we dont know which they belong to, so we have to put
     // multiple for the current tick
-    ticks: HashMap<i32, Vec<serde_json::Value>>,
+    pub ticks: HashMap<i32, Vec<serde_json::Value>>,
 }
 
 #[derive(thiserror::Error, Debug)]

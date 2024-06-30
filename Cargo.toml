@@ -3,7 +3,11 @@ members = ["crates/*"]
 resolver = "2"
 
 [workspace.dependencies]
+async-nats = "0.35.1"
 anyhow = "1.0.86"
+chrono = "0.4.38"
+clap = { version = "4.5.8", features = ["env", "derive"] }
+clap_derive = "4.5.8"
 futures = "0.3.30"
 reqwest = { version = "0.12.5", features = ["rustls-tls", "charset", "http2", "json"], default-features = false }
 serde = { version = "1.0.203", features = ["derive"] }

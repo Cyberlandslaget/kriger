@@ -1,6 +1,10 @@
+use std::sync::Arc;
 use anyhow::Result;
 use clap::Parser;
 use tokio::task::JoinSet;
+use tracing::{info, warn};
+use kriger_common::messaging::nats::NatsMessaging;
+use kriger_common::runtime::AppRuntime;
 
 mod config;
 
@@ -9,6 +13,18 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     let args = config::Args::try_parse()?;
 
+    info!("initializing messaging");
+    let messaging = NatsMessaging::new(&args.common.nats_url).await?;
+    
+    // TODO: Move this somewhere else
+    messaging.do_migration().await?;
+
+    let runtime = AppRuntime {
+        config: Arc::new(args.common),
+        messaging: Arc::new(messaging),
+    };
+
+    info!("starting components");
     let mut set = JoinSet::new();
 
     #[cfg(feature = "controller")]
@@ -17,7 +33,7 @@ async fn main() -> Result<()> {
     }
     #[cfg(feature = "fetcher")]
     if args.components.enable_fetcher {
-        set.spawn(kriger_fetcher::main());
+        set.spawn(kriger_fetcher::main(runtime.clone()));
     }
     #[cfg(feature = "metrics")]
     if args.components.enable_metrics {
@@ -29,7 +45,7 @@ async fn main() -> Result<()> {
     }
     #[cfg(feature = "runner")]
     if args.components.enable_runner {
-        set.spawn(kriger_runner::main());
+        set.spawn(kriger_runner::main(runtime.clone()));
     }
     #[cfg(feature = "submitter")]
     if args.components.enable_submitter {
@@ -38,6 +54,10 @@ async fn main() -> Result<()> {
     #[cfg(feature = "ws")]
     if args.components.enable_ws {
         set.spawn(kriger_ws::main());
+    }
+
+    if set.is_empty() {
+        warn!("no components enabled, see --help for a list of components");
     }
 
     while let Some(res) = set.join_next().await {

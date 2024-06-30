@@ -7,10 +7,13 @@ use clap_derive::{Parser, Args};
 pub struct Args {
     /// The path to the configuration file
     #[arg(env, default_value = "config.toml", value_name = "CONFIG_FILE")]
-    pub config: String,
+    pub config_file: String,
 
     #[command(flatten, next_help_heading = "Component selection options")]
     pub components: Components,
+
+    #[command(flatten, next_help_heading = "Common configuration options")]
+    pub common: kriger_common::config::Config,
 }
 
 /// Components

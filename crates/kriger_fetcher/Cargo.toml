@@ -7,6 +7,8 @@ edition = "2021"
 
 [dependencies]
 anyhow = { workspace = true }
+chrono = { workspace = true }
+kriger_common = { path = "../kriger_common" }
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

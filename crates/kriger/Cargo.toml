@@ -15,12 +15,13 @@ ws = ["dep:kriger_ws"]
 
 [dependencies]
 anyhow = { workspace = true }
-clap = { version = "4.5.8", features = ["env", "derive"] }
-clap_derive = "4.5.8"
+clap = { workspace = true }
+clap_derive = { workspace = true }
 futures = { workspace = true }
 tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+kriger_common = { path = "../kriger_common" }
 kriger_controller = { path = "../kriger_controller", optional = true }
 kriger_fetcher = { path = "../kriger_fetcher", optional = true }
 kriger_metrics = { path = "../kriger_metrics", optional = true }
