@@ -111,7 +111,7 @@ kubectl get nodes
 ## Architecture
 
 **Kriger**'s architecture heavily relies
-on [NATS JetStreams](https://docs.nats.io/using-nats/developer/develop_jetstream)
+on [NATS JetStream](https://docs.nats.io/using-nats/developer/develop_jetstream)
 to provide reliable and fault-tolerant asynchronous messaging. This enables **kriger** to be decoupled and increases its
 quality of service. In short, we gain the following benefits:
 
