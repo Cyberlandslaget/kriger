@@ -7,3 +7,24 @@ services:
     command: [ "-js" ]
     ports:
       - "127.0.0.1:4222:4222"
+  k3s:
+    # https://hub.docker.com/r/rancher/k3s/tags
+    image: rancher/k3s:v1.30.2-k3s1
+    restart: always
+    command: [ "server" ]
+    privileged: true
+    tmpfs:
+      - /run
+      - /var/run
+    ulimits:
+      nproc: 65535
+      nofile:
+        soft: 65535
+        hard: 65535
+    environment:
+      K3S_KUBECONFIG_OUTPUT: "/output/kubeconfig"
+      K3S_KUBECONFIG_MODE: "666"
+    volumes:
+      - "./run/k3s/:/output/:Z"
+    ports:
+      - "127.0.0.1:6443:6443"

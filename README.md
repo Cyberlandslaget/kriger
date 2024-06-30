@@ -68,6 +68,7 @@ A Linux or macOS environment is **highly** recommended. Windows users should con
 | Service | Port                    |
 |---------|-------------------------|
 | nats    | 4222 (NATS & JetStream) |
+| k3s     | 6443 (Kubernetes API)   |
 
 **Start services:**
 
@@ -97,6 +98,15 @@ docker run --network kriger_default -e NATS_URL=nats://nats:4222 --rm -it natsio
 
 > **Note**: Check `docker network ls` if the network name of the Docker compose project is different from the provided
 > command.
+
+**Kubernetes (k3s):**
+
+```bash
+export KUBECONFIG="$(pwd)/run/k3s/kubeconfig"
+kubectl get nodes
+```
+
+> **Tips:** Tools like [k9s](https://github.com/derailed/k9s) will make it easier to manage the Kubernetes "cluster".
 
 ## Architecture
 
