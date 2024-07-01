@@ -11,7 +11,8 @@ in [angrepa](https://github.com/Cyberlandslaget/angrepa).
     - **kriger-controller**: Responsible for scheduling exploit runs and provisioning compute for the exploit runners.
     - **kriger-fetcher**: Responsible for fetching various data from the competition system, for example teams.json. The
       fetcher will also persist the received data.
-    - **kriger-metrics**: [OpenMetrics](https://openmetrics.io/)/[Prometheus](https://prometheus.io/)-compatible
+    - **kriger-metrics**: [OpenMetrics](https://openmetrics.io/)/[Prometheus](https://prometheus.io/)-compatible metrics
+      exporter.
     - **kriger-rest**: REST API for the CLI and the web frontend.
     - **kriger-runner**: Responsible for executing the exploits.
     - **kriger-submitter**: Responsible for submitting flags to the competition system.
@@ -20,7 +21,7 @@ in [angrepa](https://github.com/Cyberlandslaget/angrepa).
 - **kriger-cli**: The command line interface (CLI) used to create, test, and deploy exploits.
 
 All server components can be packaged and shipped as a single binary. All server components except `kriger-runner` can
-be all be run in a single instance.
+be run in a single instance.
 
 ### Component topology
 
@@ -137,31 +138,37 @@ quality of service. In short, we gain the following benefits:
 
 ```mermaid
 sequenceDiagram
-    participant nats as NATS
-    participant r as Runner
-    participant s as Submitter
-    participant f as Fetcher
-    participant cs as Competition system
-    loop Every tick
-        f ->> cs: Request attack data (eg. teams.json)
-        cs -->> f: Attack data (network IDs, flag IDs, etc)
-    end
-    f ->> nats: Schedule exploits
-    loop Poll routine based on capacity
-        r ->> nats: Poll schedule
-        nats -->> + r: Receive schedule
-        r -->> nats: Acknowledgement: In progress
-        r ->> r: Execute the exploit
-        r ->> nats: Publish execution result and flag(s)
-        r -->>  - nats: Acknowledgement: Ack/Nak
-    end
-    loop Poll routine based on capacity
-        s ->> nats: Poll flag
-        nats -->> + s: Receive flag
-        s -->> nats: Acknowledgement: In progress
-        s ->> cs: Submit flag
-        cs -->> s: Submission result
-        s ->> nats: Publish submission result
-        s -->>  - nats: Acknowledgement: Ack/Nak/Term
-    end
+  participant c as Controller
+  participant nats as NATS
+  participant r as Runner
+  participant s as Submitter
+  participant f as Fetcher
+  participant cs as Competition system
+  loop Every tick
+    f ->> cs: Request attack data (eg. teams.json)
+    cs -->> f: Attack data (network IDs, flag IDs, etc)
+  end
+  f ->> nats: Push attack data
+  nats ->> c: Watch registered exploits
+  loop Scheduling routine
+    nats -->> c: Attack data
+    c ->> nats: Schedule executions
+  end
+  loop Poll routine based on capacity
+    r ->> nats: Poll schedule
+    nats -->> + r: Receive schedule
+    r -->> nats: Acknowledgement: In progress
+    r ->> r: Execute the exploit
+    r ->> nats: Publish execution result and flag(s)
+    r -->>  - nats: Acknowledgement: Ack/Nak
+  end
+  loop Poll routine based on capacity
+    s ->> nats: Poll flag
+    nats -->> + s: Receive flag
+    s -->> nats: Acknowledgement: In progress
+    s ->> cs: Submit flag
+    cs -->> s: Submission result
+    s ->> nats: Publish submission result
+    s -->>  - nats: Acknowledgement: Ack/Nak/Term
+  end
 ```
