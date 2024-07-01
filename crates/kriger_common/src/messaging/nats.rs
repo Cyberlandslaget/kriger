@@ -1,7 +1,7 @@
 use std::time::Duration;
 use async_nats::jetstream;
 use async_nats::jetstream::{AckKind, Context, stream};
-use async_nats::jetstream::consumer::{DeliverPolicy, ReplayPolicy};
+use async_nats::jetstream::consumer::{AckPolicy, DeliverPolicy, ReplayPolicy};
 use futures::{Stream, StreamExt};
 use serde::de::DeserializeOwned;
 use tracing::{debug, info};
@@ -52,7 +52,9 @@ impl NatsMessaging {
         let store = self.context.get_key_value(bucket).await?;
 
         let consumer = store.stream.create_consumer(
-            jetstream::consumer::pull::OrderedConfig {
+            jetstream::consumer::pull::Config {
+                // Requires all messages to be individually ACK'd
+                ack_policy: AckPolicy::Explicit, // TODO: Make this configurable?
                 replay_policy: ReplayPolicy::Instant,
                 filter_subject: key.map_or(Default::default(), |key| format!("{}{}", store.prefix, key)),
                 deliver_policy,
@@ -117,7 +119,7 @@ impl<T: DeserializeOwned> NatsMessage<T> {
     }
 }
 
-impl<T: DeserializeOwned> Message<T> for NatsMessage<T> {
+impl<T: DeserializeOwned + Sync> Message<T> for NatsMessage<T> {
     fn payload(&self) -> &T {
         &self.payload
     }

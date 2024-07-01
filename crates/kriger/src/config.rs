@@ -14,6 +14,10 @@ pub struct Args {
 
     #[command(flatten, next_help_heading = "Common configuration options")]
     pub common: kriger_common::config::Config,
+
+    #[cfg(feature = "controller")]
+    #[command(flatten, next_help_heading = "Controller configuration options")]
+    pub controller: kriger_controller::config::Config,
 }
 
 /// Components

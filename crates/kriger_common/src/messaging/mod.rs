@@ -30,7 +30,7 @@ pub enum MessagingError {
 
 pub trait Messaging: Clone {
     fn watch_exploit(&self, name: &str) -> impl Future<Output=Result<impl Stream<Item=Result<impl Message<model::Exploit>, MessagingError>>, MessagingError>>;
-    
+
     fn watch_exploits(&self) -> impl Future<Output=Result<impl Stream<Item=Result<impl Message<model::Exploit>, MessagingError>>, MessagingError>>;
 }
 
@@ -38,14 +38,14 @@ pub trait Message<T: Sized> {
     fn payload(&self) -> &T;
 
     /// Acknowledges a message was completely handled.
-    fn ack(&self) -> impl Future<Output=Result<(), MessagingError>>;
+    fn ack(&self) -> impl Future<Output=Result<(), MessagingError>> + Send;
 
     /// Signals that the message will not be processed now and processing can move onto the next message, NAK’d message will be retried.
-    fn nak(&self) -> impl Future<Output=Result<(), MessagingError>>;
+    fn nak(&self) -> impl Future<Output=Result<(), MessagingError>> + Send;
 
     /// When sent before the AckWait period indicates that work is ongoing and the period should be extended by another equal to AckWait.
-    fn progress(&self) -> impl Future<Output=Result<(), MessagingError>>;
+    fn progress(&self) -> impl Future<Output=Result<(), MessagingError>> + Send;
 
     /// Instructs the server to stop redelivery of a message without acknowledging it as successfully processed.
-    fn term(&self) -> impl Future<Output=Result<(), MessagingError>>;
+    fn term(&self) -> impl Future<Output=Result<(), MessagingError>> + Send;
 }

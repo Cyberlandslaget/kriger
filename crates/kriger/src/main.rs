@@ -15,7 +15,7 @@ async fn main() -> Result<()> {
 
     info!("initializing messaging");
     let messaging = NatsMessaging::new(&args.common.nats_url).await?;
-    
+
     // TODO: Move this somewhere else
     messaging.do_migration().await?;
 
@@ -29,7 +29,7 @@ async fn main() -> Result<()> {
 
     #[cfg(feature = "controller")]
     if args.components.enable_controller {
-        set.spawn(kriger_controller::main());
+        set.spawn(kriger_controller::main(runtime.clone(), args.controller));
     }
     #[cfg(feature = "fetcher")]
     if args.components.enable_fetcher {

@@ -2,13 +2,15 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Exploit {
-    name: String,
-    enabled: bool,
-    service: String,
-    container: ExploitContainer,
+    pub name: String,
+    pub enabled: bool,
+    pub service: String,
+    pub replicas: i32,
+    pub container: ExploitContainer,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ExploitContainer {
-    image: String,
+    pub image: String,
+    // TODO: Add resource limits
 }
