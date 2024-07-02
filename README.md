@@ -54,6 +54,10 @@ TODO
 
 ### Developing exploits
 
+See [anatomy of an exploit](crates/kriger_runner/README.md#anatomy-of-an-exploit).
+
+TODO
+
 ## Development
 
 A Linux or macOS environment is **highly** recommended. Windows users should consider using WSL.
@@ -132,43 +136,74 @@ quality of service. In short, we gain the following benefits:
   flexible workload distribution.
 - ... and more!
 
+### JetStream streams & K/V buckets
+
+The *metrics* component is not explicitly listed as a consumer, but it'll consume most messages and key/value streams.
+
+**Streams:**
+
+| Stream     | Subject                            | Description                              | Producer  | Consumer(s) |
+|------------|------------------------------------|------------------------------------------|-----------|-------------|
+| executions | executions.{exploit name}.request  | Schedules a start of an exploit          | scheduler | runner      |      
+| executions | executions.{exploit name}.complete | Signifies the completion of an execution | runner    |             |
+
+**Key/Value:**
+
+| Bucket   | Key                                   | Description                 | Data owner / data handling pattern            | Consumer (s) |
+|----------|---------------------------------------|-----------------------------|-----------------------------------------------|--------------|
+| exploits | {name}                                | Exploit manifests           | rest. Optimistic concurrency control.         | controller   |   
+| flags    | {exploit}.{team net id}.{flag}.submit | Flags submitted by exploits | runner, rest. Optimistic concurrency control. | submitter    | 
+| flags    | {flag}.result                         | Flag submission results     | Submitter                                     |              | 
+
+*\*Base64 encoding is used for segments with unpredictable names.*
+
+> **Note**: Subject to change.
+
 ### Diagrams
 
 **Fetcher, exploit execution, and submission**:
 
 ```mermaid
 sequenceDiagram
-  participant c as Controller
-  participant nats as NATS
-  participant r as Runner
-  participant s as Submitter
-  participant f as Fetcher
-  participant cs as Competition system
-  loop Every tick
-    f ->> cs: Request attack data (eg. teams.json)
-    cs -->> f: Attack data (network IDs, flag IDs, etc)
-  end
-  f ->> nats: Push attack data
-  nats ->> c: Watch registered exploits
-  loop Scheduling routine
-    nats -->> c: Attack data
-    c ->> nats: Schedule executions
-  end
-  loop Poll routine based on capacity
-    r ->> nats: Poll schedule
-    nats -->> + r: Receive schedule
-    r -->> nats: Acknowledgement: In progress
-    r ->> r: Execute the exploit
-    r ->> nats: Publish execution result and flag(s)
-    r -->>  - nats: Acknowledgement: Ack/Nak
-  end
-  loop Poll routine based on capacity
-    s ->> nats: Poll flag
-    nats -->> + s: Receive flag
-    s -->> nats: Acknowledgement: In progress
-    s ->> cs: Submit flag
-    cs -->> s: Submission result
-    s ->> nats: Publish submission result
-    s -->>  - nats: Acknowledgement: Ack/Nak/Term
-  end
+    participant c as Controller
+    participant nats as NATS
+    participant r as Runner
+    participant s as Submitter
+    participant f as Fetcher
+    participant cs as Competition system
+    loop Every tick
+        f ->> cs: Request attack data (eg. teams.json)
+        cs -->> f: Attack data (network IDs, flag IDs, etc)
+    end
+    f ->> nats: Push attack data
+    nats ->> c: Watch registered exploits
+    loop Scheduling routine
+        nats -->> c: Attack data
+        c ->> nats: Schedule executions
+    end
+    loop Poll routine based on capacity
+        r ->> nats: Poll schedule
+        nats -->> + r: Receive schedule
+        r -->> nats: Acknowledgement: In progress
+        r ->> r: Execute the exploit
+        r ->> nats: Publish execution result and flag(s)
+        r -->>  - nats: Acknowledgement: Ack/Nak
+    end
+    loop Poll routine based on capacity
+        s ->> nats: Poll flag
+        nats -->> + s: Receive flag
+        s -->> nats: Acknowledgement: In progress
+        s ->> cs: Submit flag
+        cs -->> s: Submission result
+        s ->> nats: Publish submission result
+        s -->>  - nats: Acknowledgement: Ack/Nak/Term
+    end
 ```
+
+## Terminologies
+
+| Name            | Explanation                                                                                                                 |
+|-----------------|-----------------------------------------------------------------------------------------------------------------------------|
+| Exploit         | A script or a program that exploits a vulnerable service to retrieve flags.                                                 |
+| Execution       | A single run of an exploit. An execution will be run against the desired target.                                            |
+| Team network ID | A publicly-known persistent ID associated with a team. The identity of the team isn't necessarily known or tied to this ID. |
