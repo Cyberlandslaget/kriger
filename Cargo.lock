@@ -1058,8 +1058,11 @@ name = "kriger_runner"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "clap",
+ "clap_derive",
  "futures",
  "kriger_common",
+ "num_cpus",
  "tokio",
  "tracing",
  "tracing-subscriber",

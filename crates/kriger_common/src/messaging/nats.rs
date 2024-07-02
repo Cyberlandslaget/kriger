@@ -22,12 +22,13 @@ impl NatsMessaging {
     pub async fn do_migration(&self) -> anyhow::Result<()> {
         info!("creating jetstream streams");
 
-        debug!("creating execution_schedule stream");
+        debug!("creating executions_wq stream");
+
         self.context.create_stream(stream::Config {
-            name: "execution_schedule".to_string(),
-            retention: stream::RetentionPolicy::WorkQueue,
-            subjects: vec!["execution_schedule.>".to_string()],
+            name: "executions_wq".to_string(),
+            subjects: vec!["executions.*.request".to_string()],
             discard: stream::DiscardPolicy::Old,
+            // Important: this will provide idempotency for execution requests 
             duplicate_window: Duration::from_secs(6 * 60), // TODO: Use data from config
             max_age: Duration::from_secs(6 * 60), // TODO: Use data from config
             ..Default::default()
@@ -45,13 +46,43 @@ impl NatsMessaging {
         Ok(())
     }
 
+    async fn subscribe_stream<T>(&self, stream: stream::Stream, consumer_config: jetstream::consumer::pull::Config) -> Result<impl Stream<Item=Result<NatsMessage<T>, MessagingError>>, MessagingError>
+    where
+        T: Sized + DeserializeOwned,
+    {
+        let consumer = stream.create_consumer(consumer_config).await?;
+        let messages = consumer.messages().await?;
+        Ok(messages.map(|res| {
+            NatsMessage::<T>::from(res?)
+        }))
+    }
+
+    async fn subscribe<T>(&self, stream_name: &str, durable_name: Option<String>, filter_subject: Option<String>) -> Result<impl Stream<Item=Result<NatsMessage<T>, MessagingError>>, MessagingError>
+    where
+        T: Sized + DeserializeOwned,
+    {
+        let stream = self.context.get_stream(stream_name).await?;
+        self.subscribe_stream(
+            stream,
+            jetstream::consumer::pull::Config {
+                durable_name,
+                // Requires all messages to be individually ACK'd
+                ack_policy: AckPolicy::Explicit, // TODO: Make this configurable?
+                replay_policy: ReplayPolicy::Instant,
+                filter_subject: filter_subject.unwrap_or_default(),
+                deliver_policy: DeliverPolicy::New,
+                ..Default::default()
+            },
+        ).await
+    }
+
     async fn watch<T>(&self, bucket: &str, key: Option<&str>, deliver_policy: DeliverPolicy) -> Result<impl Stream<Item=Result<NatsMessage<T>, MessagingError>>, MessagingError>
     where
         T: Sized + DeserializeOwned,
     {
         let store = self.context.get_key_value(bucket).await?;
-
-        let consumer = store.stream.create_consumer(
+        self.subscribe_stream(
+            store.stream,
             jetstream::consumer::pull::Config {
                 // Requires all messages to be individually ACK'd
                 ack_policy: AckPolicy::Explicit, // TODO: Make this configurable?
@@ -59,12 +90,8 @@ impl NatsMessaging {
                 filter_subject: key.map_or(Default::default(), |key| format!("{}{}", store.prefix, key)),
                 deliver_policy,
                 ..Default::default()
-            }
-        ).await?;
-        let messages = consumer.messages().await?;
-        Ok(messages.map(|res| {
-            NatsMessage::<T>::from(res?)
-        }))
+            },
+        ).await
     }
 
     async fn watch_all<T>(&self, bucket: &str) -> Result<impl Stream<Item=Result<NatsMessage<T>, MessagingError>>, MessagingError>
@@ -103,6 +130,14 @@ impl Messaging for NatsMessaging {
 
     async fn watch_exploits(&self) -> Result<impl Stream<Item=Result<impl Message<model::Exploit>, MessagingError>>, MessagingError> {
         self.watch_all("exploits").await
+    }
+
+    async fn subscribe_execution_requests(&self, exploit_name: &str) -> Result<impl Stream<Item=Result<impl Message<model::ExecutionRequest>, MessagingError>>, MessagingError> {
+        self.subscribe(
+            "executions_wq",
+            Some(format!("exploit:{exploit_name}")),
+            Some(format!("executions.{exploit_name}.request")),
+        ).await
     }
 }
 

@@ -22,6 +22,8 @@ pub enum MessagingError {
     NatsWatchError(#[from] async_nats::jetstream::kv::WatchError),
     #[error("nats watcher error")]
     NatsWatcherError(#[from] async_nats::jetstream::kv::WatcherError),
+    #[error("nats get stream error")]
+    NatsGetStreamError(#[from] async_nats::jetstream::context::GetStreamError),
     #[error("serde_json serialization error")]
     SerdeJson(#[from] serde_json::Error),
     #[error("generic error")]
@@ -32,6 +34,8 @@ pub trait Messaging: Clone {
     fn watch_exploit(&self, name: &str) -> impl Future<Output=Result<impl Stream<Item=Result<impl Message<model::Exploit>, MessagingError>>, MessagingError>>;
 
     fn watch_exploits(&self) -> impl Future<Output=Result<impl Stream<Item=Result<impl Message<model::Exploit>, MessagingError>>, MessagingError>>;
+
+    fn subscribe_execution_requests(&self, exploit_name: &str) -> impl Future<Output=Result<impl Stream<Item=Result<impl Message<model::ExecutionRequest>, MessagingError>>, MessagingError>>;
 }
 
 pub trait Message<T: Sized> {

@@ -144,7 +144,7 @@ The *metrics* component is not explicitly listed as a consumer, but it'll consum
 
 | Stream     | Subject                            | Description                              | Producer  | Consumer(s) |
 |------------|------------------------------------|------------------------------------------|-----------|-------------|
-| executions | executions.{exploit name}.request  | Schedules a start of an exploit          | scheduler | runner      |      
+| executions | executions.{exploit name}.request  | Requests an execution of an exploit      | scheduler | runner      |      
 | executions | executions.{exploit name}.complete | Signifies the completion of an execution | runner    |             |
 
 **Key/Value:**

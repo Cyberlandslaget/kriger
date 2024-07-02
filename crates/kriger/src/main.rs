@@ -45,7 +45,7 @@ async fn main() -> Result<()> {
     }
     #[cfg(feature = "runner")]
     if args.components.enable_runner {
-        set.spawn(kriger_runner::main(runtime.clone()));
+        set.spawn(kriger_runner::main(runtime.clone(), args.runner));
     }
     #[cfg(feature = "submitter")]
     if args.components.enable_submitter {

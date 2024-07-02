@@ -18,6 +18,10 @@ pub struct Args {
     #[cfg(feature = "controller")]
     #[command(flatten, next_help_heading = "Controller configuration options")]
     pub controller: kriger_controller::config::Config,
+
+    #[cfg(feature = "runner")]
+    #[command(flatten, next_help_heading = "Runner configuration options")]
+    pub runner: kriger_runner::config::Config,
 }
 
 /// Components
