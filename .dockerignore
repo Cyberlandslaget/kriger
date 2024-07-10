@@ -1,0 +1,12 @@
+/.devcontainer
+/.git
+/.github
+/.idea
+/data
+/run
+/target
+.dockerignore
+.gitignore
+docker-compose.yml
+Dockerfile
+README.md
