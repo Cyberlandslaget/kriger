@@ -43,7 +43,7 @@ pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
     Ok(())
 }
 
-async fn handle_message(deployments: &Api<Deployment>, message: impl Message<Exploit>) -> Result<()> {
+async fn handle_message(deployments: &Api<Deployment>, message: impl Message<Payload=Exploit>) -> Result<()> {
     let exploit = message.payload();
     info!("reconciling exploit: {}", exploit.name);
     message.progress().await?;

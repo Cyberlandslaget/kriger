@@ -1,5 +1,6 @@
 use std::fmt::{Debug};
 use std::future::Future;
+use async_trait::async_trait;
 
 use futures::Stream;
 
@@ -31,25 +32,28 @@ pub enum MessagingError {
 }
 
 pub trait Messaging: Clone {
-    fn watch_exploit(&self, name: &str) -> impl Future<Output=Result<impl Stream<Item=Result<impl Message<model::Exploit>, MessagingError>>, MessagingError>>;
+    fn watch_exploit(&self, name: &str) -> impl Future<Output=Result<impl Stream<Item=Result<impl Message<Payload=model::Exploit>, MessagingError>>, MessagingError>>;
 
-    fn watch_exploits(&self) -> impl Future<Output=Result<impl Stream<Item=Result<impl Message<model::Exploit>, MessagingError>>, MessagingError>>;
+    fn watch_exploits(&self) -> impl Future<Output=Result<impl Stream<Item=Result<impl Message<Payload=model::Exploit>, MessagingError>>, MessagingError>>;
 
-    fn subscribe_execution_requests(&self, exploit_name: &str) -> impl Future<Output=Result<impl Stream<Item=Result<impl Message<model::ExecutionRequest>, MessagingError>>, MessagingError>>;
+    fn subscribe_execution_requests(&self, exploit_name: &str) -> impl Future<Output=Result<impl Stream<Item=Result<impl Message<Payload=model::ExecutionRequest>, MessagingError>>, MessagingError>>;
 }
 
-pub trait Message<T: Sized> {
-    fn payload(&self) -> &T;
+#[async_trait]
+pub trait Message {
+    type Payload: Send;
+
+    fn payload(&self) -> &Self::Payload;
 
     /// Acknowledges a message was completely handled.
-    fn ack(&self) -> impl Future<Output=Result<(), MessagingError>> + Send;
+    async fn ack(&self) -> Result<(), MessagingError>;
 
     /// Signals that the message will not be processed now and processing can move onto the next message, NAK’d message will be retried.
-    fn nak(&self) -> impl Future<Output=Result<(), MessagingError>> + Send;
+    async fn nak(&self) -> Result<(), MessagingError>;
 
     /// When sent before the AckWait period indicates that work is ongoing and the period should be extended by another equal to AckWait.
-    fn progress(&self) -> impl Future<Output=Result<(), MessagingError>> + Send;
+    async fn progress(&self) -> Result<(), MessagingError>;
 
     /// Instructs the server to stop redelivery of a message without acknowledging it as successfully processed.
-    fn term(&self) -> impl Future<Output=Result<(), MessagingError>> + Send;
+    async fn term(&self) -> Result<(), MessagingError>;
 }

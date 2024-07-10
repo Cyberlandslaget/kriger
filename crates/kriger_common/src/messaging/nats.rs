@@ -2,6 +2,7 @@ use std::time::Duration;
 use async_nats::jetstream;
 use async_nats::jetstream::{AckKind, Context, stream};
 use async_nats::jetstream::consumer::{AckPolicy, DeliverPolicy, ReplayPolicy};
+use async_trait::async_trait;
 use futures::{Stream, StreamExt};
 use serde::de::DeserializeOwned;
 use tracing::{debug, info};
@@ -52,6 +53,9 @@ impl NatsMessaging {
     {
         let consumer = stream.create_consumer(consumer_config).await?;
         let messages = consumer.messages().await?;
+        // TODO: Nak/Term messages that failed to parse
+        // This shouldn't really happen though. Regardless, NATS will automatically redeliver the
+        // message once the AckWait period has been exceeded.
         Ok(messages.map(|res| {
             NatsMessage::<T>::from(res?)
         }))
@@ -124,15 +128,15 @@ impl NatsMessaging {
 }
 
 impl Messaging for NatsMessaging {
-    async fn watch_exploit(&self, name: &str) -> Result<impl Stream<Item=Result<impl Message<model::Exploit>, MessagingError>>, MessagingError> {
+    async fn watch_exploit(&self, name: &str) -> Result<impl Stream<Item=Result<impl Message<Payload=model::Exploit>, MessagingError>>, MessagingError> {
         self.watch_key("exploits", name).await
     }
 
-    async fn watch_exploits(&self) -> Result<impl Stream<Item=Result<impl Message<model::Exploit>, MessagingError>>, MessagingError> {
+    async fn watch_exploits(&self) -> Result<impl Stream<Item=Result<impl Message<Payload=model::Exploit>, MessagingError>>, MessagingError> {
         self.watch_all("exploits").await
     }
 
-    async fn subscribe_execution_requests(&self, exploit_name: &str) -> Result<impl Stream<Item=Result<impl Message<model::ExecutionRequest>, MessagingError>>, MessagingError> {
+    async fn subscribe_execution_requests(&self, exploit_name: &str) -> Result<impl Stream<Item=Result<impl Message<Payload=model::ExecutionRequest>, MessagingError>>, MessagingError> {
         self.subscribe(
             "executions_wq",
             Some(format!("exploit:{exploit_name}")),
@@ -154,7 +158,11 @@ impl<T: DeserializeOwned> NatsMessage<T> {
     }
 }
 
-impl<T: DeserializeOwned + Sync> Message<T> for NatsMessage<T> {
+// The usage of async_trait is required here to make the trait object-safe.
+#[async_trait]
+impl<T: DeserializeOwned + Send + Sync> Message for NatsMessage<T> {
+    type Payload = T;
+
     fn payload(&self) -> &T {
         &self.payload
     }
