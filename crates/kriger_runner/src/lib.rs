@@ -13,9 +13,9 @@ use tokio::spawn;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tracing::{debug, info, warn};
 
-const ENV_EXPLOIT_NAME: &'static str = "EXPLOIT_NAME";
+const ENV_EXPLOIT_NAME: &'static str = "EXPLOIT";
 const ENV_IP_ADDRESS: &'static str = "IP";
-const ENV_FLAG_ID: &'static str = "FLAG_ID";
+const ENV_FLAG_HINT: &'static str = "HINT";
 
 struct Job {
     request: Box<dyn Message<Payload = ExecutionRequest> + Send>,
@@ -67,8 +67,9 @@ async fn execute(
     let mut command = tokio::process::Command::new(exploit_command);
     command.env(ENV_EXPLOIT_NAME, exploit_name);
     command.env(ENV_IP_ADDRESS, &request.ip_address);
-    if let Some(flag_id) = &request.flag_id {
-        command.env(ENV_FLAG_ID, flag_id);
+    if let Some(flag_hint) = &request.flag_hint {
+        let value = serde_json::to_string(flag_hint).context("unable to serialize flag hint")?;
+        command.env(ENV_FLAG_HINT, value);
     }
     command.stdin(Stdio::null());
 

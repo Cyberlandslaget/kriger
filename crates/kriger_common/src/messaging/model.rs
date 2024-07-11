@@ -19,8 +19,8 @@ pub struct ExploitContainer {
 pub struct ExecutionRequest {
     #[serde(rename = "a")]
     pub ip_address: String,
-    #[serde(rename = "i")]
-    pub flag_id: Option<String>,
+    #[serde(rename = "h")]
+    pub flag_hint: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

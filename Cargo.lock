@@ -1124,6 +1124,7 @@ dependencies = [
  "futures",
  "kriger_common",
  "num_cpus",
+ "serde_json",
  "tokio",
  "tracing",
  "tracing-subscriber",
