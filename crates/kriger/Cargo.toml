@@ -4,7 +4,7 @@ version = "0.0.1"
 edition = "2021"
 
 [features]
-default = ["server-all"]
+default = ["server-all", "cli"]
 server = []
 server-all = ["server", "controller", "fetcher", "metrics", "rest", "runner", "scheduler", "submitter", "ws"]
 controller = ["dep:kriger_controller", "server"]
@@ -15,12 +15,14 @@ runner = ["dep:kriger_runner", "server"]
 scheduler = ["dep:kriger_scheduler", "server"]
 submitter = ["dep:kriger_submitter", "server"]
 ws = ["dep:kriger_ws", "server"]
+cli = ["dep:indicatif"]
 
 [dependencies]
 clap.workspace = true
 clap_derive.workspace = true
 color-eyre.workspace = true
 futures.workspace = true
+indicatif = { version = "0.17.8", optional = true }
 tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros"] }
 tracing.workspace = true
 tracing-subscriber.workspace = true
@@ -33,3 +35,5 @@ kriger_runner = { path = "../kriger_runner", optional = true }
 kriger_scheduler = { path = "../kriger_scheduler", optional = true }
 kriger_submitter = { path = "../kriger_submitter", optional = true }
 kriger_ws = { path = "../kriger_ws", optional = true }
+serde.workspace = true
+toml = "0.8.14"

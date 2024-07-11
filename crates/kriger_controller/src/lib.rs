@@ -54,7 +54,7 @@ async fn handle_message(
     message: impl Message<Payload = Exploit>,
 ) -> Result<()> {
     let exploit = message.payload();
-    info!("reconciling exploit: {}", exploit.name);
+    info!("reconciling exploit: {}", exploit.manifest.name);
     message.progress().await?;
     match reconcile(&deployments, exploit).await {
         Ok(..) => {
@@ -63,7 +63,7 @@ async fn handle_message(
         Err(err) => {
             warn!(
                 "reconciliation error for exploit: {}: {:?}",
-                exploit.name, err
+                exploit.manifest.name, err
             );
             message.nak().await?;
         }
@@ -73,10 +73,10 @@ async fn handle_message(
 
 async fn reconcile(deployments: &Api<Deployment>, exploit: &Exploit) -> Result<()> {
     let mut labels = BTreeMap::<String, String>::new();
-    labels.insert("exploit".to_string(), exploit.name.clone());
+    labels.insert("exploit".to_string(), exploit.manifest.name.clone());
 
     let spec = DeploymentSpec {
-        replicas: Some(exploit.replicas),
+        replicas: Some(exploit.manifest.replicas),
         selector: LabelSelector {
             match_labels: Some(labels.clone()),
             ..Default::default()
@@ -89,7 +89,7 @@ async fn reconcile(deployments: &Api<Deployment>, exploit: &Exploit) -> Result<(
             spec: Some(PodSpec {
                 containers: vec![Container {
                     name: "exploit".to_string(),
-                    image: Some(exploit.container.image.clone()),
+                    image: Some(exploit.image.clone()),
                     ..Default::default()
                 }],
                 ..Default::default()
@@ -100,7 +100,7 @@ async fn reconcile(deployments: &Api<Deployment>, exploit: &Exploit) -> Result<(
     };
     let deployment = Deployment {
         metadata: ObjectMeta {
-            name: Some(exploit.name.clone()),
+            name: Some(exploit.manifest.name.clone()),
             labels: Some(labels.clone()),
             ..Default::default()
         },
@@ -113,9 +113,9 @@ async fn reconcile(deployments: &Api<Deployment>, exploit: &Exploit) -> Result<(
     };
 
     deployments
-        .patch(&exploit.name, &patch_params, &Patch::Apply(deployment))
+        .patch(&exploit.manifest.name, &patch_params, &Patch::Apply(deployment))
         .await?;
-    info!("created a deployment for exploit: {}", &exploit.name);
+    info!("created a deployment for exploit: {}", &exploit.manifest.name);
 
     Ok(())
 }

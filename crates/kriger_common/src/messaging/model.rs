@@ -14,16 +14,16 @@ pub struct CompetitionConfig {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Exploit {
-    pub name: String,
-    pub enabled: bool,
-    pub service: String,
-    pub replicas: i32,
-    pub container: ExploitContainer,
+    pub manifest: ExploitManifest,
+    pub image: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ExploitContainer {
-    pub image: String,
+pub struct ExploitManifest {
+    pub name: String,
+    pub service: String,
+    pub replicas: i32,
+    pub enabled: bool,
     // TODO: Add resource limits
 }
 

@@ -14,4 +14,7 @@ pub(crate) enum Commands {
     /// Run the server components
     #[cfg(feature = "server")]
     Server(crate::server::args::Args),
+    /// Deploy an exploit
+    #[cfg(feature = "cli")]
+    Deploy(crate::cli::args::Deploy),
 }
