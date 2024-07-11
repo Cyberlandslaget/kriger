@@ -1,7 +1,8 @@
 # https://github.com/astral-sh/uv/pkgs/container/uv
 FROM ghcr.io/astral-sh/uv:0.2.24 as uv
 
-FROM python:3.12-slim-bullseye
+# Note that we SHOULD NOT use the slim variant due to some Python packages relying on native compilation (eg. gcc)
+FROM python:3.12-bullseye
 WORKDIR /exploit
 
 # Disable stdout/stderr buffering. See https://docs.python.org/3/using/cmdline.html#cmdoption-u
