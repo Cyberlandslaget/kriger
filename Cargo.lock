@@ -1050,6 +1050,7 @@ dependencies = [
  "anyhow",
  "async-nats",
  "async-trait",
+ "chrono",
  "clap",
  "clap_derive",
  "futures",

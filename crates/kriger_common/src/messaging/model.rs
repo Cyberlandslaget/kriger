@@ -1,6 +1,18 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct CompetitionConfig {
+    /// The start time of the competition in UTC
+    pub start: chrono::DateTime<chrono::Utc>,
+    /// Tick/round length in seconds
+    pub tick: u32,
+    /// Tick offset in ticks. This is usually 0.
+    pub tick_offset: i32,
+    /// The validity of flags in rounds
+    pub flag_validity: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Exploit {
     pub name: String,
     pub enabled: bool,
