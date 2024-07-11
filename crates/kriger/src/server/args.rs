@@ -17,6 +17,10 @@ pub(crate) struct Args {
     #[cfg(feature = "runner")]
     #[command(flatten, next_help_heading = "Runner configuration options")]
     pub runner: kriger_runner::config::Config,
+
+    #[cfg(feature = "ws")]
+    #[command(flatten, next_help_heading = "WebSocket server configuration options")]
+    pub ws: kriger_ws::config::Config,
 }
 
 /// Components

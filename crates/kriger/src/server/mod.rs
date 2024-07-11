@@ -52,7 +52,7 @@ pub(crate) async fn main(args: args::Args) -> Result<()> {
     }
     #[cfg(feature = "ws")]
     if args.components.enable_ws || args.components.single {
-        set.spawn(kriger_ws::main());
+        set.spawn(kriger_ws::main(runtime.clone(), args.ws));
     }
 
     if set.is_empty() {

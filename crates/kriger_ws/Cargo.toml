@@ -6,7 +6,14 @@ edition = "2021"
 [features]
 
 [dependencies]
-anyhow = { workspace = true }
-tokio = { workspace = true }
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
+anyhow.workspace = true
+clap.workspace = true
+clap_derive.workspace = true
+fastwebsockets = { version = "0.8.0", features = ["upgrade"] }
+http-body-util = "0.1.2"
+hyper = { workspace = true, features = ["server", "http1", "http2"] }
+hyper-util = { workspace = true, features = ["tokio", "server", "http1", "http2"] }
+kriger_common = { path = "../kriger_common" }
+tokio = { workspace = true, features = ["rt", "net"] }
+tracing.workspace = true
+tracing-subscriber.workspace = true
