@@ -17,14 +17,14 @@ const ENV_EXPLOIT_NAME: &'static str = "EXPLOIT_NAME";
 const ENV_IP_ADDRESS: &'static str = "IP";
 const ENV_FLAG_ID: &'static str = "FLAG_ID";
 
-struct Job<'a> {
-    request: Box<dyn Message<Payload = ExecutionRequest> + Send + 'a>,
+struct Job {
+    request: Box<dyn Message<Payload = ExecutionRequest> + Send>,
     _permit: OwnedSemaphorePermit,
 }
 
 async fn worker(
     idx: usize,
-    rx: Receiver<Job<'_>>,
+    rx: Receiver<Job>,
     exploit_name: &str,
     exploit_command: String,
     exploit_args: Option<String>,
@@ -95,9 +95,8 @@ pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
         .context("runner: the runner-exploit-command option is undefined")?;
 
     info!("subscribing to execution requests for exploit: {exploit_name}");
-    let messaging = Box::new(runtime.messaging);
-    // FIXME: Is there a way to avoid leak?
-    let mut stream = Box::leak(messaging)
+    let mut stream = runtime
+        .messaging
         .subscribe_execution_requests(exploit_name)
         .await
         .context("unable to subscribe to execution requests")?;

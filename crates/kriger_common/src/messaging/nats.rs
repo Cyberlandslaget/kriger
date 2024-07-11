@@ -215,7 +215,7 @@ impl<T: DeserializeOwned> NatsMessage<T> {
 
 // The usage of async_trait is required here to make the trait object-safe.
 #[async_trait]
-impl<T: DeserializeOwned + Send + Sync> Message for NatsMessage<T> {
+impl<T: DeserializeOwned + Send + Sync + 'static> Message for NatsMessage<T> {
     type Payload = T;
 
     fn payload(&self) -> &T {
