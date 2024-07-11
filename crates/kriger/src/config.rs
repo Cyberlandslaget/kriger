@@ -1,5 +1,5 @@
 use clap::ArgAction;
-use clap_derive::{Parser, Args};
+use clap_derive::{Args, Parser};
 
 /// An exploit farm for attack/defense CTFs
 #[derive(Parser, Debug)]

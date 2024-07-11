@@ -1,6 +1,6 @@
-use std::sync::Arc;
 use crate::config::Config;
 use crate::messaging::nats::NatsMessaging;
+use std::sync::Arc;
 
 /// Common state for components
 #[derive(Clone)]

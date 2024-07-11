@@ -2,9 +2,8 @@ pub mod enowars;
 pub mod faust;
 pub mod statisk;
 
-
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 pub struct ServiceOld(pub HashMap<String, TicksOld>);
@@ -66,4 +65,3 @@ pub trait Fetcher {
     /// "backup" raw get all ips
     async fn ips(&self) -> Result<Vec<String>, FetcherError>;
 }
-

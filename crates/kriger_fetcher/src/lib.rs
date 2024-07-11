@@ -1,10 +1,10 @@
 mod fetcher;
 
 use anyhow::Result;
-use tokio::{time};
-use tokio::time::MissedTickBehavior;
-use tracing::{info};
 use kriger_common::runtime::AppRuntime;
+use tokio::time;
+use tokio::time::MissedTickBehavior;
+use tracing::info;
 
 pub async fn main(runtime: AppRuntime) -> Result<()> {
     info!("starting data fetcher");

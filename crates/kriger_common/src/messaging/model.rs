@@ -54,4 +54,3 @@ pub struct FlagSubmissionResult {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum FlagSubmissionStatus {}
-

@@ -78,7 +78,7 @@ impl Fetcher for FaustFetcher {
                         continue;
                     }
                 }
-                    .to_owned();
+                .to_owned();
 
                 let team = team.parse::<i32>().unwrap();
                 let team = self.format.replace("{x}", &format!("{}", team));

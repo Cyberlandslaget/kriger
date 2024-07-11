@@ -1,10 +1,10 @@
-use std::sync::Arc;
 use anyhow::Result;
 use clap::Parser;
-use tokio::task::JoinSet;
-use tracing::{info, warn};
 use kriger_common::messaging::nats::NatsMessaging;
 use kriger_common::runtime::AppRuntime;
+use std::sync::Arc;
+use tokio::task::JoinSet;
+use tracing::{info, warn};
 
 mod config;
 

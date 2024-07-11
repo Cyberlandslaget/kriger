@@ -1,12 +1,12 @@
-use std::time::Duration;
+use crate::messaging::{model, Message, Messaging, MessagingError};
 use async_nats::jetstream;
-use async_nats::jetstream::{AckKind, Context, stream};
 use async_nats::jetstream::consumer::{AckPolicy, DeliverPolicy, ReplayPolicy};
+use async_nats::jetstream::{stream, AckKind, Context};
 use async_trait::async_trait;
 use futures::{Stream, StreamExt};
 use serde::de::DeserializeOwned;
+use std::time::Duration;
 use tracing::{debug, info};
-use crate::messaging::{Message, Messaging, MessagingError, model};
 
 #[derive(Clone)]
 pub struct NatsMessaging {
@@ -16,7 +16,7 @@ pub struct NatsMessaging {
 impl NatsMessaging {
     pub async fn new<S: AsRef<str>>(nats_url: S) -> anyhow::Result<Self> {
         Ok(Self {
-            context: create_jetstream_context(nats_url).await?
+            context: create_jetstream_context(nats_url).await?,
         })
     }
 
@@ -25,29 +25,37 @@ impl NatsMessaging {
 
         debug!("creating executions_wq stream");
 
-        self.context.create_stream(stream::Config {
-            name: "executions_wq".to_string(),
-            subjects: vec!["executions.*.request".to_string()],
-            discard: stream::DiscardPolicy::Old,
-            // Important: this will provide idempotency for execution requests 
-            duplicate_window: Duration::from_secs(6 * 60), // TODO: Use data from config
-            max_age: Duration::from_secs(6 * 60), // TODO: Use data from config
-            ..Default::default()
-        }).await?;
+        self.context
+            .create_stream(stream::Config {
+                name: "executions_wq".to_string(),
+                subjects: vec!["executions.*.request".to_string()],
+                discard: stream::DiscardPolicy::Old,
+                // Important: this will provide idempotency for execution requests
+                duplicate_window: Duration::from_secs(6 * 60), // TODO: Use data from config
+                max_age: Duration::from_secs(6 * 60),          // TODO: Use data from config
+                ..Default::default()
+            })
+            .await?;
 
         info!("creating kev/value buckets");
 
         debug!("creating exploits bucket");
-        self.context.create_key_value(jetstream::kv::Config {
-            bucket: "exploits".to_string(),
-            ..Default::default()
-        }).await?;
+        self.context
+            .create_key_value(jetstream::kv::Config {
+                bucket: "exploits".to_string(),
+                ..Default::default()
+            })
+            .await?;
 
         info!("nats migration complete");
         Ok(())
     }
 
-    async fn subscribe_stream<T>(&self, stream: stream::Stream, consumer_config: jetstream::consumer::pull::Config) -> Result<impl Stream<Item=Result<NatsMessage<T>, MessagingError>>, MessagingError>
+    async fn subscribe_stream<T>(
+        &self,
+        stream: stream::Stream,
+        consumer_config: jetstream::consumer::pull::Config,
+    ) -> Result<impl Stream<Item = Result<NatsMessage<T>, MessagingError>>, MessagingError>
     where
         T: Sized + DeserializeOwned,
     {
@@ -56,12 +64,15 @@ impl NatsMessaging {
         // TODO: Nak/Term messages that failed to parse
         // This shouldn't really happen though. Regardless, NATS will automatically redeliver the
         // message once the AckWait period has been exceeded.
-        Ok(messages.map(|res| {
-            NatsMessage::<T>::from(res?)
-        }))
+        Ok(messages.map(|res| NatsMessage::<T>::from(res?)))
     }
 
-    async fn subscribe<T>(&self, stream_name: &str, durable_name: Option<String>, filter_subject: Option<String>) -> Result<impl Stream<Item=Result<NatsMessage<T>, MessagingError>>, MessagingError>
+    async fn subscribe<T>(
+        &self,
+        stream_name: &str,
+        durable_name: Option<String>,
+        filter_subject: Option<String>,
+    ) -> Result<impl Stream<Item = Result<NatsMessage<T>, MessagingError>>, MessagingError>
     where
         T: Sized + DeserializeOwned,
     {
@@ -77,10 +88,16 @@ impl NatsMessaging {
                 deliver_policy: DeliverPolicy::New,
                 ..Default::default()
             },
-        ).await
+        )
+        .await
     }
 
-    async fn watch<T>(&self, bucket: &str, key: Option<&str>, deliver_policy: DeliverPolicy) -> Result<impl Stream<Item=Result<NatsMessage<T>, MessagingError>>, MessagingError>
+    async fn watch<T>(
+        &self,
+        bucket: &str,
+        key: Option<&str>,
+        deliver_policy: DeliverPolicy,
+    ) -> Result<impl Stream<Item = Result<NatsMessage<T>, MessagingError>>, MessagingError>
     where
         T: Sized + DeserializeOwned,
     {
@@ -91,35 +108,55 @@ impl NatsMessaging {
                 // Requires all messages to be individually ACK'd
                 ack_policy: AckPolicy::Explicit, // TODO: Make this configurable?
                 replay_policy: ReplayPolicy::Instant,
-                filter_subject: key.map_or(Default::default(), |key| format!("{}{}", store.prefix, key)),
+                filter_subject: key
+                    .map_or(Default::default(), |key| format!("{}{}", store.prefix, key)),
                 deliver_policy,
                 ..Default::default()
             },
-        ).await
+        )
+        .await
     }
 
-    async fn watch_all<T>(&self, bucket: &str) -> Result<impl Stream<Item=Result<NatsMessage<T>, MessagingError>>, MessagingError>
+    async fn watch_all<T>(
+        &self,
+        bucket: &str,
+    ) -> Result<impl Stream<Item = Result<NatsMessage<T>, MessagingError>>, MessagingError>
     where
         T: Sized + DeserializeOwned,
     {
-        self.watch_all_with_deliver_policy(bucket, DeliverPolicy::All).await
+        self.watch_all_with_deliver_policy(bucket, DeliverPolicy::All)
+            .await
     }
 
-    async fn watch_all_with_deliver_policy<T>(&self, bucket: &str, deliver_policy: DeliverPolicy) -> Result<impl Stream<Item=Result<NatsMessage<T>, MessagingError>>, MessagingError>
+    async fn watch_all_with_deliver_policy<T>(
+        &self,
+        bucket: &str,
+        deliver_policy: DeliverPolicy,
+    ) -> Result<impl Stream<Item = Result<NatsMessage<T>, MessagingError>>, MessagingError>
     where
         T: Sized + DeserializeOwned,
     {
         self.watch(bucket, None, deliver_policy).await
     }
 
-    async fn watch_key<T>(&self, bucket: &str, key: &str) -> Result<impl Stream<Item=Result<NatsMessage<T>, MessagingError>>, MessagingError>
+    async fn watch_key<T>(
+        &self,
+        bucket: &str,
+        key: &str,
+    ) -> Result<impl Stream<Item = Result<NatsMessage<T>, MessagingError>>, MessagingError>
     where
         T: Sized + DeserializeOwned,
     {
-        self.watch_key_with_deliver_policy(bucket, key, DeliverPolicy::Last).await
+        self.watch_key_with_deliver_policy(bucket, key, DeliverPolicy::Last)
+            .await
     }
 
-    async fn watch_key_with_deliver_policy<T>(&self, bucket: &str, key: &str, deliver_policy: DeliverPolicy) -> Result<impl Stream<Item=Result<NatsMessage<T>, MessagingError>>, MessagingError>
+    async fn watch_key_with_deliver_policy<T>(
+        &self,
+        bucket: &str,
+        key: &str,
+        deliver_policy: DeliverPolicy,
+    ) -> Result<impl Stream<Item = Result<NatsMessage<T>, MessagingError>>, MessagingError>
     where
         T: Sized + DeserializeOwned,
     {
@@ -128,20 +165,38 @@ impl NatsMessaging {
 }
 
 impl Messaging for NatsMessaging {
-    async fn watch_exploit(&self, name: &str) -> Result<impl Stream<Item=Result<impl Message<Payload=model::Exploit>, MessagingError>>, MessagingError> {
+    async fn watch_exploit(
+        &self,
+        name: &str,
+    ) -> Result<
+        impl Stream<Item = Result<impl Message<Payload = model::Exploit>, MessagingError>>,
+        MessagingError,
+    > {
         self.watch_key("exploits", name).await
     }
 
-    async fn watch_exploits(&self) -> Result<impl Stream<Item=Result<impl Message<Payload=model::Exploit>, MessagingError>>, MessagingError> {
+    async fn watch_exploits(
+        &self,
+    ) -> Result<
+        impl Stream<Item = Result<impl Message<Payload = model::Exploit>, MessagingError>>,
+        MessagingError,
+    > {
         self.watch_all("exploits").await
     }
 
-    async fn subscribe_execution_requests(&self, exploit_name: &str) -> Result<impl Stream<Item=Result<impl Message<Payload=model::ExecutionRequest>, MessagingError>>, MessagingError> {
+    async fn subscribe_execution_requests(
+        &self,
+        exploit_name: &str,
+    ) -> Result<
+        impl Stream<Item = Result<impl Message<Payload = model::ExecutionRequest>, MessagingError>>,
+        MessagingError,
+    > {
         self.subscribe(
             "executions_wq",
             Some(format!("exploit:{exploit_name}")),
             Some(format!("executions.{exploit_name}.request")),
-        ).await
+        )
+        .await
     }
 }
 
@@ -193,4 +248,3 @@ async fn create_jetstream_context<S: AsRef<str>>(nats_url: S) -> anyhow::Result<
     let ctx = jetstream::new(client);
     Ok(ctx)
 }
-

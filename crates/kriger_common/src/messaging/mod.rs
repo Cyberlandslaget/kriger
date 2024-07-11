@@ -1,6 +1,6 @@
-use std::fmt::{Debug};
-use std::future::Future;
 use async_trait::async_trait;
+use std::fmt::Debug;
+use std::future::Future;
 
 use futures::Stream;
 
@@ -32,11 +32,34 @@ pub enum MessagingError {
 }
 
 pub trait Messaging: Clone {
-    fn watch_exploit(&self, name: &str) -> impl Future<Output=Result<impl Stream<Item=Result<impl Message<Payload=model::Exploit>, MessagingError>>, MessagingError>>;
+    fn watch_exploit(
+        &self,
+        name: &str,
+    ) -> impl Future<
+        Output = Result<
+            impl Stream<Item = Result<impl Message<Payload = model::Exploit>, MessagingError>>,
+            MessagingError,
+        >,
+    >;
 
-    fn watch_exploits(&self) -> impl Future<Output=Result<impl Stream<Item=Result<impl Message<Payload=model::Exploit>, MessagingError>>, MessagingError>>;
+    fn watch_exploits(
+        &self,
+    ) -> impl Future<
+        Output = Result<
+            impl Stream<Item = Result<impl Message<Payload = model::Exploit>, MessagingError>>,
+            MessagingError,
+        >,
+    >;
 
-    fn subscribe_execution_requests(&self, exploit_name: &str) -> impl Future<Output=Result<impl Stream<Item=Result<impl Message<Payload=model::ExecutionRequest>, MessagingError>>, MessagingError>>;
+    fn subscribe_execution_requests(
+        &self,
+        exploit_name: &str,
+    ) -> impl Future<
+        Output = Result<
+            impl Stream<Item = Result<impl Message<Payload = model::ExecutionRequest>, MessagingError>>,
+            MessagingError,
+        >,
+    >;
 }
 
 #[async_trait]
