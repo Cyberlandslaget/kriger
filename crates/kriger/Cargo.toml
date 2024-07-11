@@ -4,14 +4,16 @@ version = "0.0.1"
 edition = "2021"
 
 [features]
-default = ["controller", "fetcher", "metrics", "rest", "runner", "submitter", "ws", ]
-controller = ["dep:kriger_controller"]
-fetcher = ["dep:kriger_fetcher"]
-metrics = ["dep:kriger_metrics"]
-rest = ["dep:kriger_rest"]
-runner = ["dep:kriger_runner"]
-submitter = ["dep:kriger_submitter"]
-ws = ["dep:kriger_ws"]
+default = ["server-all"]
+server = []
+server-all = ["server", "controller", "fetcher", "metrics", "rest", "runner", "submitter", "ws"]
+controller = ["dep:kriger_controller", "server"]
+fetcher = ["dep:kriger_fetcher", "server"]
+metrics = ["dep:kriger_metrics", "server"]
+rest = ["dep:kriger_rest", "server"]
+runner = ["dep:kriger_runner", "server"]
+submitter = ["dep:kriger_submitter", "server"]
+ws = ["dep:kriger_ws", "server"]
 
 [dependencies]
 anyhow = { workspace = true }

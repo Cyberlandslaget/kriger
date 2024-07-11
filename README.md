@@ -43,8 +43,10 @@ docker compose down
 
 ### Running kriger
 
+Run the server components:
+
 ```bash
-cargo run
+cargo run server ---single
 ```
 
 ### Debugging
