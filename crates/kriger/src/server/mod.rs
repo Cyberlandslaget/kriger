@@ -44,7 +44,7 @@ pub(crate) async fn main(args: args::Args) -> Result<()> {
     }
     #[cfg(feature = "scheduler")]
     if args.components.enable_scheduler || args.components.single {
-        set.spawn(kriger_scheduler::main());
+        set.spawn(kriger_scheduler::main(runtime.clone()));
     }
     #[cfg(feature = "submitter")]
     if args.components.enable_submitter || args.components.single {

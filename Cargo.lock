@@ -1194,7 +1194,9 @@ dependencies = [
 name = "kriger_scheduler"
 version = "0.0.1"
 dependencies = [
+ "chrono",
  "color-eyre",
+ "kriger_common",
  "tokio",
  "tracing",
  "tracing-subscriber",

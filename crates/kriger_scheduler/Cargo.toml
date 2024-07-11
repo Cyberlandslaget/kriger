@@ -6,7 +6,9 @@ edition = "2021"
 [features]
 
 [dependencies]
+chrono.workspace = true
 color-eyre.workspace = true
+kriger_common.path = "../kriger_common"
 tokio.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
