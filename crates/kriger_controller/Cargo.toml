@@ -6,13 +6,13 @@ edition = "2021"
 [features]
 
 [dependencies]
-anyhow = { workspace = true }
-clap = { workspace = true }
-clap_derive = { workspace = true }
-futures = { workspace = true }
+clap.workspace = true
+clap_derive.workspace = true
+color-eyre.workspace = true
+futures.workspace = true
 k8s-openapi = { version = "0.22.0", features = ["latest"] }
 kriger_common = { path = "../kriger_common" }
 kube = "0.92.1"
-tokio = { workspace = true }
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use color_eyre::eyre::Result;
 use kriger_common::messaging::nats::NatsMessaging;
 use kriger_common::runtime::AppRuntime;
 use std::sync::Arc;

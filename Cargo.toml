@@ -5,10 +5,10 @@ resolver = "2"
 [workspace.dependencies]
 async-nats = "0.35.1"
 async-trait = "0.1.81"
-anyhow = "1.0.86"
 chrono = "0.4.38"
 clap = { version = "4.5.8", features = ["env", "derive"] }
 clap_derive = "4.5.8"
+color-eyre = "0.6.3"
 futures = "0.3.30"
 hyper = "1.4.1"
 hyper-util = "0.1.6"

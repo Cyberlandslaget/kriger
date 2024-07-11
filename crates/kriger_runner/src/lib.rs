@@ -1,8 +1,8 @@
 pub mod config;
 
 use crate::config::Config;
-use anyhow::{bail, Context, Result};
 use async_channel::Receiver;
+use color_eyre::eyre::{bail, Context, ContextCompat, Result};
 use futures::StreamExt;
 use kriger_common::messaging::model::ExecutionRequest;
 use kriger_common::messaging::{Message, Messaging};
@@ -88,10 +88,10 @@ pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
 
     let exploit_name = config
         .runner_exploit
-        .context("runner: the runner-exploit option is undefined")?;
+        .context("the runner-exploit option is undefined")?;
     let exploit_command = config
         .runner_exploit_command
-        .context("runner: the runner-exploit-command option is undefined")?;
+        .context("the runner-exploit-command option is undefined")?;
 
     info!("subscribing to execution requests for exploit: {exploit_name}");
     let mut stream = runtime

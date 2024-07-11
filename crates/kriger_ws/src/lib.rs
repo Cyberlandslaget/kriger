@@ -1,7 +1,7 @@
 pub mod config;
 
 use crate::config::Config;
-use anyhow::{bail, Context, Result};
+use color_eyre::eyre::{bail, Context, Result};
 use fastwebsockets::{upgrade, OpCode, WebSocketError};
 use http_body_util::Empty;
 use hyper::body::{Bytes, Incoming};

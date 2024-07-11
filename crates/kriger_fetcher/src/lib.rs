@@ -1,6 +1,6 @@
 mod fetcher;
 
-use anyhow::Result;
+use color_eyre::eyre::Result;
 use kriger_common::runtime::AppRuntime;
 use tokio::time;
 use tokio::time::MissedTickBehavior;

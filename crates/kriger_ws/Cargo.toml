@@ -6,9 +6,9 @@ edition = "2021"
 [features]
 
 [dependencies]
-anyhow.workspace = true
 clap.workspace = true
 clap_derive.workspace = true
+color-eyre.workspace = true
 fastwebsockets = { version = "0.8.0", features = ["upgrade"] }
 http-body-util = "0.1.2"
 hyper = { workspace = true, features = ["server", "http1", "http2"] }

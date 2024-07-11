@@ -14,13 +14,13 @@ pub struct NatsMessaging {
 }
 
 impl NatsMessaging {
-    pub async fn new<S: AsRef<str>>(nats_url: S) -> anyhow::Result<Self> {
+    pub async fn new<S: AsRef<str>>(nats_url: S) -> color_eyre::eyre::Result<Self> {
         Ok(Self {
             context: create_jetstream_context(nats_url).await?,
         })
     }
 
-    pub async fn do_migration(&self) -> anyhow::Result<()> {
+    pub async fn do_migration(&self) -> color_eyre::eyre::Result<()> {
         info!("creating jetstream streams");
 
         debug!("creating executions_wq stream");
@@ -243,7 +243,7 @@ impl<T: DeserializeOwned + Send + Sync + 'static> Message for NatsMessage<T> {
     }
 }
 
-async fn create_jetstream_context<S: AsRef<str>>(nats_url: S) -> anyhow::Result<Context> {
+async fn create_jetstream_context<S: AsRef<str>>(nats_url: S) -> color_eyre::eyre::Result<Context> {
     let client = async_nats::connect(nats_url.as_ref()).await?;
     let ctx = jetstream::new(client);
     Ok(ctx)

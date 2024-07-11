@@ -17,13 +17,13 @@ submitter = ["dep:kriger_submitter", "server"]
 ws = ["dep:kriger_ws", "server"]
 
 [dependencies]
-anyhow = { workspace = true }
-clap = { workspace = true }
-clap_derive = { workspace = true }
-futures = { workspace = true }
+clap.workspace = true
+clap_derive.workspace = true
+color-eyre.workspace = true
+futures.workspace = true
 tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros"] }
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
+tracing.workspace = true
+tracing-subscriber.workspace = true
 kriger_common = { path = "../kriger_common" }
 kriger_controller = { path = "../kriger_controller", optional = true }
 kriger_fetcher = { path = "../kriger_fetcher", optional = true }
