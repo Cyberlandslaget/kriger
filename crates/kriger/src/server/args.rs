@@ -52,6 +52,11 @@ pub(crate) struct Components {
     #[arg(env, long)]
     pub enable_runner: bool,
 
+    /// Enable the kriger-scheduler component
+    #[cfg(feature = "scheduler")]
+    #[arg(env, long)]
+    pub enable_scheduler: bool,
+
     /// Enable the kriger-submitter component
     #[cfg(feature = "submitter")]
     #[arg(env, long)]

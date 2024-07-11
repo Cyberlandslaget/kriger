@@ -1,0 +1,12 @@
+[package]
+name = "kriger_scheduler"
+version = "0.0.1"
+edition = "2021"
+
+[features]
+
+[dependencies]
+anyhow = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }

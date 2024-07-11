@@ -6,12 +6,13 @@ edition = "2021"
 [features]
 default = ["server-all"]
 server = []
-server-all = ["server", "controller", "fetcher", "metrics", "rest", "runner", "submitter", "ws"]
+server-all = ["server", "controller", "fetcher", "metrics", "rest", "runner", "scheduler", "submitter", "ws"]
 controller = ["dep:kriger_controller", "server"]
 fetcher = ["dep:kriger_fetcher", "server"]
 metrics = ["dep:kriger_metrics", "server"]
 rest = ["dep:kriger_rest", "server"]
 runner = ["dep:kriger_runner", "server"]
+scheduler = ["dep:kriger_scheduler", "server"]
 submitter = ["dep:kriger_submitter", "server"]
 ws = ["dep:kriger_ws", "server"]
 
@@ -29,5 +30,6 @@ kriger_fetcher = { path = "../kriger_fetcher", optional = true }
 kriger_metrics = { path = "../kriger_metrics", optional = true }
 kriger_rest = { path = "../kriger_rest", optional = true }
 kriger_runner = { path = "../kriger_runner", optional = true }
+kriger_scheduler = { path = "../kriger_scheduler", optional = true }
 kriger_submitter = { path = "../kriger_submitter", optional = true }
 kriger_ws = { path = "../kriger_ws", optional = true }
