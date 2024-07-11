@@ -25,7 +25,7 @@ struct Job {
 async fn worker(
     idx: usize,
     rx: Receiver<Job>,
-    exploit_name: &str,
+    exploit_name: String,
     exploit_command: String,
     exploit_args: Option<String>,
 ) -> Result<()> {
@@ -85,11 +85,9 @@ async fn execute(
 pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
     info!("starting runner");
 
-    let exploit_name = Box::leak(Box::new(
-        config
-            .runner_exploit
-            .context("runner: the runner-exploit option is undefined")?,
-    ));
+    let exploit_name = config
+        .runner_exploit
+        .context("runner: the runner-exploit option is undefined")?;
     let exploit_command = config
         .runner_exploit_command
         .context("runner: the runner-exploit-command option is undefined")?;
@@ -97,7 +95,7 @@ pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
     info!("subscribing to execution requests for exploit: {exploit_name}");
     let mut stream = runtime
         .messaging
-        .subscribe_execution_requests(exploit_name)
+        .subscribe_execution_requests(&exploit_name)
         .await
         .context("unable to subscribe to execution requests")?;
 
@@ -115,7 +113,7 @@ pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
         spawn(worker(
             i,
             r,
-            exploit_name,
+            exploit_name.clone(),
             exploit_command.clone(),
             config.runner_exploit_args.clone(),
         ));
