@@ -38,7 +38,7 @@ async fn worker(
         job.request.progress().await.context("unable to ack")?;
         match execute(
             job.request.payload(),
-            exploit_name,
+            &exploit_name,
             &exploit_command,
             exploit_args.as_deref(),
         )
