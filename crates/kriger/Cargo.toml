@@ -15,9 +15,10 @@ runner = ["dep:kriger_runner", "server"]
 scheduler = ["dep:kriger_scheduler", "server"]
 submitter = ["dep:kriger_submitter", "server"]
 ws = ["dep:kriger_ws", "server"]
-cli = ["dep:indicatif"]
+cli = ["dep:indicatif", "dep:bollard", "dep:tar"]
 
 [dependencies]
+bollard = { version = "0.16.1", features = ["buildkit"], optional = true }
 clap.workspace = true
 clap_derive.workspace = true
 color-eyre.workspace = true
@@ -36,4 +37,5 @@ kriger_scheduler = { path = "../kriger_scheduler", optional = true }
 kriger_submitter = { path = "../kriger_submitter", optional = true }
 kriger_ws = { path = "../kriger_ws", optional = true }
 serde.workspace = true
+tar = { version = "0.4.41", optional = true }
 toml = "0.8.14"
