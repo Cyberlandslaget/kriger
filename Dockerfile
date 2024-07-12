@@ -20,6 +20,6 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=$SCCACHE_DIR,sharing=locked \
     cargo build --release
 
-FROM gcr.io/distroless/cc-debian12
+FROM gcr.io/distroless/cc-debian12:nonroot
 COPY --from=builder /app/target/release/kriger /usr/bin/kriger
 ENTRYPOINT ["/usr/bin/kriger"]
