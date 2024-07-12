@@ -14,6 +14,10 @@ pub(crate) struct Args {
     #[command(flatten, next_help_heading = "Controller configuration options")]
     pub controller: kriger_controller::config::Config,
 
+    #[cfg(feature = "rest")]
+    #[command(flatten, next_help_heading = "REST API server configuration options")]
+    pub rest: kriger_rest::config::Config,
+
     #[cfg(feature = "runner")]
     #[command(flatten, next_help_heading = "Runner configuration options")]
     pub runner: kriger_runner::config::Config,

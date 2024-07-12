@@ -5,6 +5,7 @@ resolver = "2"
 [workspace.dependencies]
 async-nats = "0.35.1"
 async-trait = "0.1.81"
+axum = "0.7.5"
 chrono = "0.4.38"
 clap = { version = "4.5.8", features = ["env", "derive"] }
 clap_derive = "4.5.8"

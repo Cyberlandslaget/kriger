@@ -36,7 +36,7 @@ pub(crate) async fn main(args: args::Args) -> Result<()> {
     }
     #[cfg(feature = "rest")]
     if args.components.enable_rest || args.components.single {
-        set.spawn(kriger_rest::main());
+        set.spawn(kriger_rest::main(runtime.clone(), args.rest));
     }
     #[cfg(feature = "runner")]
     if args.components.enable_runner {
