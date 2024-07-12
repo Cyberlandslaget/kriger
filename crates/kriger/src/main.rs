@@ -12,7 +12,14 @@ mod server;
 async fn main() -> Result<()> {
     color_eyre::install()?;
     tracing_subscriber::fmt::init();
-    let main_args = args::Args::try_parse()?;
+    let main_args = match args::Args::try_parse() {
+        Ok(args) => args,
+        Err(err) => {
+            // eyre will format this in an unwanted way
+            eprintln!("{err}");
+            return Ok(());
+        }
+    };
 
     match main_args.command {
         #[cfg(feature = "server")]
