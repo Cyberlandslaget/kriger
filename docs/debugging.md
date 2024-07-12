@@ -25,12 +25,12 @@ docker run --network kriger_default -e NATS_URL=nats://nats:4222 --rm -it natsio
     "replicas": 1,
     "enabled": true
   },
-  "image": "traefik/whoami"
+  "image": "r.o99.no/kriger-exploits/test"
 }
 ```
 
 ```bash
-nats kv put exploits exploits.test '{"manifest":{"name":"test","service":"Service 1 Checker 1","replicas":1,"enabled":true},"image":"traefik/whoami"}'
+nats kv put exploits exploits.test '{"manifest":{"name":"test","service":"Service 1 Checker 1","replicas":1,"enabled":true},"image":"r.o99.no/kriger-exploits/test"}'
 ```
 
 #### Runner Testing

@@ -1,0 +1,4 @@
+mirrors:
+  r.o99.no:
+    endpoint:
+      - "http://registry:5000"

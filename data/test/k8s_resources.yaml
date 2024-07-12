@@ -2,3 +2,28 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: kriger-exploits
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nats
+  namespace: kriger-exploits
+spec:
+  type: ClusterIP
+  ports:
+    - port: 4222
+      targetPort: nats
+---
+# FIXME: For some reason Endpoints *work*, but not EndpointSlices.
+# EndpointSlices is the recommended replacement for Endpoints.
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: nats
+  namespace: kriger-exploits
+subsets:
+  - addresses:
+      - ip: 172.30.100.10
+    ports:
+      - port: 4222
+
