@@ -5,8 +5,8 @@ use async_channel::Receiver;
 use color_eyre::eyre::{bail, Context, ContextCompat, Result};
 use futures::StreamExt;
 use kriger_common::messaging::model::ExecutionRequest;
+use kriger_common::messaging::nats::NatsMessaging;
 use kriger_common::messaging::{Message, Messaging};
-use kriger_common::runtime::AppRuntime;
 use std::process::Stdio;
 use std::sync::Arc;
 use tokio::spawn;
@@ -27,7 +27,7 @@ async fn worker(
     rx: Receiver<Job>,
     exploit_name: String,
     exploit_command: String,
-    exploit_args: Option<String>,
+    exploit_args: Vec<String>,
 ) -> Result<()> {
     loop {
         // The channel has most likely been closed
@@ -40,7 +40,7 @@ async fn worker(
             job.request.payload(),
             &exploit_name,
             &exploit_command,
-            exploit_args.as_deref(),
+            &exploit_args,
         )
         .await
         {
@@ -60,7 +60,7 @@ async fn execute(
     request: &ExecutionRequest,
     exploit_name: &str,
     exploit_command: &str,
-    exploit_args: Option<&str>,
+    exploit_args: &Vec<String>,
 ) -> Result<()> {
     info!("processing request: {request:?}");
 
@@ -72,10 +72,7 @@ async fn execute(
         command.env(ENV_FLAG_HINT, value);
     }
     command.stdin(Stdio::null());
-
-    if let Some(args) = exploit_args {
-        command.args(args.split(' '));
-    }
+    command.args(exploit_args);
 
     let mut child = command.spawn().context("unable to spawn child")?;
     child.wait().await.context("unable to wait for child")?;
@@ -83,24 +80,20 @@ async fn execute(
     Ok(())
 }
 
-pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
-    info!("starting runner");
+pub async fn main(config: Config) -> Result<()> {
+    info!("initializing messaging");
+    let messaging = NatsMessaging::new(&config.nats_url).await?;
 
-    let exploit_name = config
-        .runner_exploit
-        .context("the runner-exploit option is undefined")?;
-    let exploit_command = config
-        .runner_exploit_command
-        .context("the runner-exploit-command option is undefined")?;
-
-    info!("subscribing to execution requests for exploit: {exploit_name}");
-    let mut stream = runtime
-        .messaging
-        .subscribe_execution_requests(&exploit_name)
+    info!(
+        "subscribing to execution requests for exploit: {}",
+        &config.exploit
+    );
+    let mut stream = messaging
+        .subscribe_execution_requests(&config.exploit)
         .await
         .context("unable to subscribe to execution requests")?;
 
-    let worker_count = config.runner_workers.unwrap_or_else(|| 2 * num_cpus::get());
+    let worker_count = config.workers.unwrap_or_else(|| 2 * num_cpus::get());
     let semaphore = Arc::new(Semaphore::new(worker_count));
     info!("using a maximum of {worker_count} workers");
 
@@ -114,9 +107,9 @@ pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
         spawn(worker(
             i,
             r,
-            exploit_name.clone(),
-            exploit_command.clone(),
-            config.runner_exploit_args.clone(),
+            config.exploit.clone(),
+            config.command.clone(),
+            config.args.clone(),
         ));
     }
 

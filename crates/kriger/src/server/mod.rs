@@ -38,10 +38,6 @@ pub(crate) async fn main(args: args::Args) -> Result<()> {
     if args.components.enable_rest || args.components.single {
         set.spawn(kriger_rest::main(runtime.clone(), args.rest));
     }
-    #[cfg(feature = "runner")]
-    if args.components.enable_runner {
-        set.spawn(kriger_runner::main(runtime.clone(), args.runner));
-    }
     #[cfg(feature = "scheduler")]
     if args.components.enable_scheduler || args.components.single {
         set.spawn(kriger_scheduler::main(runtime.clone()));

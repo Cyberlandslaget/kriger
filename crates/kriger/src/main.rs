@@ -24,6 +24,8 @@ async fn main() -> Result<()> {
     match main_args.command {
         #[cfg(feature = "server")]
         args::Commands::Server(args) => server::main(args).await,
+        #[cfg(feature = "server")]
+        args::Commands::Runner(args) => kriger_runner::main(args).await,
         #[cfg(feature = "cli")]
         args::Commands::Deploy(args) => cli::deploy::main(args).await,
     }

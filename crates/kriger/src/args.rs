@@ -14,6 +14,9 @@ pub(crate) enum Commands {
     /// Run the server components
     #[cfg(feature = "server")]
     Server(crate::server::args::Args),
+    /// Run the runner component
+    #[cfg(feature = "server")]
+    Runner(kriger_runner::config::Config),
     /// Deploy an exploit
     #[cfg(feature = "cli")]
     Deploy(crate::cli::args::Deploy),
