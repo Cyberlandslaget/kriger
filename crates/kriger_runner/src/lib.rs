@@ -50,7 +50,7 @@ async fn worker(
             }
             Ok(..) => {
                 job.request.ack().await.context("unable to ack")?;
-                info!("execution succeeded (worker {idx})")
+                debug!("execution succeeded (worker {idx})")
             }
         }
     }
@@ -62,7 +62,7 @@ async fn execute(
     exploit_command: &str,
     exploit_args: &Vec<String>,
 ) -> Result<()> {
-    info!("processing request: {request:?}");
+    debug!("processing request: {request:?}");
 
     let mut command = tokio::process::Command::new(exploit_command);
     command.env(ENV_EXPLOIT_NAME, exploit_name);
