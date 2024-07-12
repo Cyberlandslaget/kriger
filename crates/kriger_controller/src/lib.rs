@@ -4,7 +4,7 @@ use crate::config::Config;
 use color_eyre::eyre::{Context, Result};
 use futures::StreamExt;
 use k8s_openapi::api::apps::v1::{Deployment, DeploymentSpec};
-use k8s_openapi::api::core::v1::{Container, PodSpec, PodTemplateSpec};
+use k8s_openapi::api::core::v1::{Container, EnvVar, PodSpec, PodTemplateSpec};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta};
 use kriger_common::messaging::model::Exploit;
 use kriger_common::messaging::{AckPolicy, Bucket, DeliverPolicy, Message, Messaging};
@@ -47,7 +47,13 @@ pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
     while let Some(res) = exploits_stream.next().await {
         match res {
             Ok(message) => {
-                if let Err(err) = handle_message(&deployments, message).await {
+                if let Err(err) = handle_message(
+                    &deployments,
+                    message,
+                    config.controller_nats_svc_url.clone(),
+                )
+                .await
+                {
                     warn!("unable to handle message: {err:?}");
                 }
             }
@@ -61,11 +67,12 @@ pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
 async fn handle_message(
     deployments: &Api<Deployment>,
     message: impl Message<Payload = Exploit>,
+    nats_url: String,
 ) -> Result<()> {
     let exploit = message.payload();
     info!("reconciling exploit: {}", exploit.manifest.name);
     message.progress().await?;
-    match reconcile(&deployments, exploit).await {
+    match reconcile(&deployments, exploit, nats_url).await {
         Ok(..) => {
             message.ack().await?;
         }
@@ -80,7 +87,11 @@ async fn handle_message(
     Ok(())
 }
 
-async fn reconcile(deployments: &Api<Deployment>, exploit: &Exploit) -> Result<()> {
+async fn reconcile(
+    deployments: &Api<Deployment>,
+    exploit: &Exploit,
+    nats_url: String,
+) -> Result<()> {
     let mut labels = BTreeMap::<String, String>::new();
     labels.insert("exploit".to_string(), exploit.manifest.name.clone());
 
@@ -99,6 +110,18 @@ async fn reconcile(deployments: &Api<Deployment>, exploit: &Exploit) -> Result<(
                 containers: vec![Container {
                     name: "exploit".to_string(),
                     image: Some(exploit.image.clone()),
+                    env: Some(vec![
+                        EnvVar {
+                            name: "EXPLOIT".to_string(),
+                            value: Some(exploit.manifest.name.clone()),
+                            ..Default::default()
+                        },
+                        EnvVar {
+                            name: "NATS_URL".to_string(),
+                            value: Some(nats_url),
+                            ..Default::default()
+                        },
+                    ]),
                     ..Default::default()
                 }],
                 ..Default::default()

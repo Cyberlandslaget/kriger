@@ -1,4 +1,3 @@
-use clap::ArgAction;
 use clap_derive::Parser;
 
 #[derive(Parser, Debug)]
@@ -6,8 +5,10 @@ use clap_derive::Parser;
 #[group(skip)]
 pub struct Config {
     /// The Kubernetes namespace to schedule exploits in
-    #[arg(
-        env, long, action = ArgAction::Set, default_value = "kriger-exploits"
-    )]
+    #[arg(env, long, default_value = "kriger-exploits")]
     pub controller_exploit_namespace: String,
+
+    /// The NATS service URL to pass to exploit runners
+    #[arg(env, long, default_value = "nats://nats:4222")]
+    pub controller_nats_svc_url: String,
 }

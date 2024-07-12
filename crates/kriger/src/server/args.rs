@@ -18,10 +18,6 @@ pub(crate) struct Args {
     #[command(flatten, next_help_heading = "REST API server configuration options")]
     pub rest: kriger_rest::config::Config,
 
-    #[cfg(feature = "runner")]
-    #[command(flatten, next_help_heading = "Runner configuration options")]
-    pub runner: kriger_runner::config::Config,
-
     #[cfg(feature = "ws")]
     #[command(flatten, next_help_heading = "WebSocket server configuration options")]
     pub ws: kriger_ws::config::Config,
