@@ -26,5 +26,6 @@ services:
       K3S_KUBECONFIG_MODE: "666"
     volumes:
       - "./run/k3s/:/output/:Z"
+      - "./data/test/k8s_resources.yaml:/var/lib/rancher/k3s/server/manifests/kriger.yaml:roZ"
     ports:
       - "127.0.0.1:6443:6443"

@@ -10,6 +10,8 @@ in [angrepa](https://github.com/Cyberlandslaget/angrepa).
 - [User Guide](docs/user.md)
 - [Writing Exploits](docs/exploits.md)
 - [Architecture](docs/architecture.md)
+- [Emergency](docs/emergency.md)
+- [Debugging](docs/debugging.md)
 
 ## Development
 
@@ -48,25 +50,6 @@ Run the server components:
 ```bash
 cargo run server ---single
 ```
-
-### Debugging
-
-**Nats debugging:**
-
-```bash
-docker run --network kriger_default -e NATS_URL=nats://nats:4222 --rm -it natsio/nats-box
-```
-
-> **Note**: Check `docker network ls` if the network name of the Docker compose project is different from the provided
-> command.
-
-**Kubernetes (k3s):**
-
-```bash
-kubectl get nodes
-```
-
-> **Tips:** Tools like [k9s](https://github.com/derailed/k9s) will make it easier to manage the Kubernetes "cluster".
 
 ## Terminologies
 
