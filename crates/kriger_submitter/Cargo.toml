@@ -9,4 +9,3 @@ edition = "2021"
 color-eyre.workspace = true
 tokio.workspace = true
 tracing.workspace = true
-tracing-subscriber.workspace = true

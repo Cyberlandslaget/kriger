@@ -15,4 +15,3 @@ kriger_common = { path = "../kriger_common" }
 kube = "0.92.1"
 tokio.workspace = true
 tracing.workspace = true
-tracing-subscriber.workspace = true

@@ -16,4 +16,3 @@ hyper-util = { workspace = true, features = ["tokio", "server", "http1", "http2"
 kriger_common = { path = "../kriger_common" }
 tokio = { workspace = true, features = ["rt", "net"] }
 tracing.workspace = true
-tracing-subscriber.workspace = true

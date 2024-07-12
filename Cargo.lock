@@ -1508,7 +1508,6 @@ dependencies = [
  "kube",
  "tokio",
  "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
@@ -1524,7 +1523,6 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
- "tracing-subscriber",
  "warp",
 ]
 
@@ -1535,7 +1533,6 @@ dependencies = [
  "color-eyre",
  "tokio",
  "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
@@ -1549,7 +1546,6 @@ dependencies = [
  "kriger_common",
  "tokio",
  "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
@@ -1566,7 +1562,6 @@ dependencies = [
  "serde_json",
  "tokio",
  "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
@@ -1578,7 +1573,6 @@ dependencies = [
  "kriger_common",
  "tokio",
  "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
@@ -1588,7 +1582,6 @@ dependencies = [
  "color-eyre",
  "tokio",
  "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
@@ -1605,7 +1598,6 @@ dependencies = [
  "kriger_common",
  "tokio",
  "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
