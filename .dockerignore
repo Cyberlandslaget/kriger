@@ -3,6 +3,8 @@
 /.github
 /.idea
 /data
+/docs
+/frontend
 /run
 /target
 .dockerignore
