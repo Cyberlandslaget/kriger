@@ -7,11 +7,12 @@ use k8s_openapi::api::apps::v1::{Deployment, DeploymentSpec};
 use k8s_openapi::api::core::v1::{Container, PodSpec, PodTemplateSpec};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta};
 use kriger_common::messaging::model::Exploit;
-use kriger_common::messaging::{Message, Messaging};
+use kriger_common::messaging::{AckPolicy, Bucket, DeliverPolicy, Message, Messaging};
 use kriger_common::runtime::AppRuntime;
 use kube::api::{Patch, PatchParams};
 use kube::{Api, Client};
 use std::collections::BTreeMap;
+use tokio::pin;
 use tracing::{info, warn};
 
 pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
@@ -27,13 +28,21 @@ pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
 
     // TODO: Handle deleted exploits?
 
+    let exploits = runtime
+        .messaging
+        .exploits()
+        .await
+        .context("unable to retrieve exploits bucket")?;
+
     // This watches for new exploits and exploit updates. Upon startup, the consumer will receive a
     // replay of all exploits, allowing the controller to reconcile exploits that may've been missed.
-    let mut exploits_stream = runtime
-        .messaging
-        .watch_exploits()
+    // Technically, we can use a durable consumer here, but this approach allows us to quickly fix
+    // provisioning issue with the underlying orchestration platform.
+    let exploits_stream = exploits
+        .watch_all::<Exploit>(AckPolicy::Explicit, DeliverPolicy::Last)
         .await
         .context("unable to watch exploits")?;
+    pin!(exploits_stream);
 
     while let Some(res) = exploits_stream.next().await {
         match res {
@@ -113,9 +122,16 @@ async fn reconcile(deployments: &Api<Deployment>, exploit: &Exploit) -> Result<(
     };
 
     deployments
-        .patch(&exploit.manifest.name, &patch_params, &Patch::Apply(deployment))
+        .patch(
+            &exploit.manifest.name,
+            &patch_params,
+            &Patch::Apply(deployment),
+        )
         .await?;
-    info!("created a deployment for exploit: {}", &exploit.manifest.name);
+    info!(
+        "created a deployment for exploit: {}",
+        &exploit.manifest.name
+    );
 
     Ok(())
 }

@@ -1,12 +1,34 @@
-use crate::messaging::{model, Message, Messaging, MessagingError};
+use crate::messaging;
+use crate::messaging::{model, Bucket, Message, Messaging, MessagingError};
 use async_nats::jetstream;
 use async_nats::jetstream::consumer::{AckPolicy, DeliverPolicy, ReplayPolicy};
+use async_nats::jetstream::kv::Store;
 use async_nats::jetstream::{stream, AckKind, Context};
 use async_trait::async_trait;
 use futures::{Stream, StreamExt};
 use serde::de::DeserializeOwned;
 use std::time::Duration;
 use tracing::{debug, info};
+
+impl Into<AckPolicy> for messaging::AckPolicy {
+    fn into(self) -> AckPolicy {
+        match self {
+            messaging::AckPolicy::Explicit => AckPolicy::Explicit,
+            messaging::AckPolicy::None => AckPolicy::None,
+        }
+    }
+}
+
+impl Into<DeliverPolicy> for messaging::DeliverPolicy {
+    fn into(self) -> DeliverPolicy {
+        match self {
+            messaging::DeliverPolicy::All => DeliverPolicy::All,
+            messaging::DeliverPolicy::Last => DeliverPolicy::Last,
+            messaging::DeliverPolicy::New => DeliverPolicy::New,
+            messaging::DeliverPolicy::LastPerSubject => DeliverPolicy::LastPerSubject,
+        }
+    }
+}
 
 #[derive(Clone)]
 pub struct NatsMessaging {
@@ -51,22 +73,6 @@ impl NatsMessaging {
         Ok(())
     }
 
-    async fn subscribe_stream<T>(
-        &self,
-        stream: stream::Stream,
-        consumer_config: jetstream::consumer::pull::Config,
-    ) -> Result<impl Stream<Item = Result<NatsMessage<T>, MessagingError>>, MessagingError>
-    where
-        T: Sized + DeserializeOwned,
-    {
-        let consumer = stream.create_consumer(consumer_config).await?;
-        let messages = consumer.messages().await?;
-        // TODO: Nak/Term messages that failed to parse
-        // This shouldn't really happen though. Regardless, NATS will automatically redeliver the
-        // message once the AckWait period has been exceeded.
-        Ok(messages.map(|res| NatsMessage::<T>::from(res?)))
-    }
-
     async fn subscribe<T>(
         &self,
         stream_name: &str,
@@ -77,8 +83,8 @@ impl NatsMessaging {
         T: Sized + DeserializeOwned,
     {
         let stream = self.context.get_stream(stream_name).await?;
-        self.subscribe_stream(
-            stream,
+        subscribe_stream(
+            &stream,
             jetstream::consumer::pull::Config {
                 durable_name,
                 // Requires all messages to be individually ACK'd
@@ -91,97 +97,70 @@ impl NatsMessaging {
         )
         .await
     }
+}
 
+#[derive(Clone)]
+struct NatsBucket {
+    store: Store,
+}
+
+impl NatsBucket {
     async fn watch<T>(
         &self,
-        bucket: &str,
         key: Option<&str>,
+        ack_policy: AckPolicy,
         deliver_policy: DeliverPolicy,
     ) -> Result<impl Stream<Item = Result<NatsMessage<T>, MessagingError>>, MessagingError>
     where
         T: Sized + DeserializeOwned,
     {
-        let store = self.context.get_key_value(bucket).await?;
-        self.subscribe_stream(
-            store.stream,
+        subscribe_stream(
+            &self.store.stream,
             jetstream::consumer::pull::Config {
-                // Requires all messages to be individually ACK'd
-                ack_policy: AckPolicy::Explicit, // TODO: Make this configurable?
                 replay_policy: ReplayPolicy::Instant,
-                filter_subject: key
-                    .map_or(Default::default(), |key| format!("{}{}", store.prefix, key)),
+                filter_subject: key.map_or(Default::default(), |key| {
+                    format!("{}{}", &self.store.prefix, key)
+                }),
+                ack_policy,
                 deliver_policy,
                 ..Default::default()
             },
         )
         .await
     }
+}
+
+impl Bucket for NatsBucket {
+    async fn watch_key<T>(
+        &self,
+        key: &str,
+        ack_policy: messaging::AckPolicy,
+        deliver_policy: messaging::DeliverPolicy,
+    ) -> Result<impl Stream<Item = Result<impl Message<Payload = T>, MessagingError>>, MessagingError>
+    where
+        T: DeserializeOwned + Send + Sync + 'static,
+    {
+        self.watch(Some(key), ack_policy.into(), deliver_policy.into())
+            .await
+    }
 
     async fn watch_all<T>(
         &self,
-        bucket: &str,
-    ) -> Result<impl Stream<Item = Result<NatsMessage<T>, MessagingError>>, MessagingError>
+        ack_policy: messaging::AckPolicy,
+        deliver_policy: messaging::DeliverPolicy,
+    ) -> Result<impl Stream<Item = Result<impl Message<Payload = T>, MessagingError>>, MessagingError>
     where
-        T: Sized + DeserializeOwned,
+        T: DeserializeOwned + Send + Sync + 'static,
     {
-        self.watch_all_with_deliver_policy(bucket, DeliverPolicy::All)
+        self.watch(None, ack_policy.into(), deliver_policy.into())
             .await
-    }
-
-    async fn watch_all_with_deliver_policy<T>(
-        &self,
-        bucket: &str,
-        deliver_policy: DeliverPolicy,
-    ) -> Result<impl Stream<Item = Result<NatsMessage<T>, MessagingError>>, MessagingError>
-    where
-        T: Sized + DeserializeOwned,
-    {
-        self.watch(bucket, None, deliver_policy).await
-    }
-
-    async fn watch_key<T>(
-        &self,
-        bucket: &str,
-        key: &str,
-    ) -> Result<impl Stream<Item = Result<NatsMessage<T>, MessagingError>>, MessagingError>
-    where
-        T: Sized + DeserializeOwned,
-    {
-        self.watch_key_with_deliver_policy(bucket, key, DeliverPolicy::Last)
-            .await
-    }
-
-    async fn watch_key_with_deliver_policy<T>(
-        &self,
-        bucket: &str,
-        key: &str,
-        deliver_policy: DeliverPolicy,
-    ) -> Result<impl Stream<Item = Result<NatsMessage<T>, MessagingError>>, MessagingError>
-    where
-        T: Sized + DeserializeOwned,
-    {
-        self.watch(bucket, Some(key), deliver_policy).await
     }
 }
 
 impl Messaging for NatsMessaging {
-    async fn watch_exploit(
-        &self,
-        name: &str,
-    ) -> Result<
-        impl Stream<Item = Result<impl Message<Payload = model::Exploit>, MessagingError>>,
-        MessagingError,
-    > {
-        self.watch_key("exploits", name).await
-    }
-
-    async fn watch_exploits(
-        &self,
-    ) -> Result<
-        impl Stream<Item = Result<impl Message<Payload = model::Exploit>, MessagingError>>,
-        MessagingError,
-    > {
-        self.watch_all("exploits").await
+    async fn exploits(&self) -> Result<impl Bucket, MessagingError> {
+        let store = self.context.get_key_value("exploits").await?;
+        Ok(NatsBucket { store })
     }
 
     async fn subscribe_execution_requests(
@@ -247,4 +226,19 @@ async fn create_jetstream_context<S: AsRef<str>>(nats_url: S) -> color_eyre::eyr
     let client = async_nats::connect(nats_url.as_ref()).await?;
     let ctx = jetstream::new(client);
     Ok(ctx)
+}
+
+async fn subscribe_stream<T>(
+    stream: &stream::Stream,
+    consumer_config: jetstream::consumer::pull::Config,
+) -> Result<impl Stream<Item = Result<NatsMessage<T>, MessagingError>>, MessagingError>
+where
+    T: Sized + DeserializeOwned,
+{
+    let consumer = stream.create_consumer(consumer_config).await?;
+    let messages = consumer.messages().await?;
+    // TODO: Nak/Term messages that failed to parse
+    // This shouldn't really happen though. Regardless, NATS will automatically redeliver the
+    // message once the AckWait period has been exceeded.
+    Ok(messages.map(|res| NatsMessage::<T>::from(res?)))
 }

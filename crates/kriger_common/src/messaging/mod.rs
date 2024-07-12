@@ -3,9 +3,22 @@ use std::fmt::Debug;
 use std::future::Future;
 
 use futures::Stream;
+use serde::de::DeserializeOwned;
 
 pub mod model;
 pub mod nats;
+
+pub enum AckPolicy {
+    Explicit,
+    None,
+}
+
+pub enum DeliverPolicy {
+    All,
+    Last,
+    New,
+    LastPerSubject,
+}
 
 #[derive(thiserror::Error, Debug)]
 pub enum MessagingError {
@@ -32,24 +45,7 @@ pub enum MessagingError {
 }
 
 pub trait Messaging: Clone {
-    fn watch_exploit(
-        &self,
-        name: &str,
-    ) -> impl Future<
-        Output = Result<
-            impl Stream<Item = Result<impl Message<Payload = model::Exploit>, MessagingError>>,
-            MessagingError,
-        >,
-    >;
-
-    fn watch_exploits(
-        &self,
-    ) -> impl Future<
-        Output = Result<
-            impl Stream<Item = Result<impl Message<Payload = model::Exploit>, MessagingError>>,
-            MessagingError,
-        >,
-    >;
+    fn exploits(&self) -> impl Future<Output = Result<impl Bucket, MessagingError>>;
 
     fn subscribe_execution_requests(
         &self,
@@ -62,9 +58,38 @@ pub trait Messaging: Clone {
     >;
 }
 
+pub trait Bucket: Clone {
+    fn watch_key<T>(
+        &self,
+        key: &str,
+        ack_policy: AckPolicy,
+        deliver_policy: DeliverPolicy,
+    ) -> impl Future<
+        Output = Result<
+            impl Stream<Item = Result<impl Message<Payload = T>, MessagingError>> + Send,
+            MessagingError,
+        >,
+    > + Send
+    where
+        T: DeserializeOwned + Send + Sync + 'static;
+
+    fn watch_all<T>(
+        &self,
+        ack_policy: AckPolicy,
+        deliver_policy: DeliverPolicy,
+    ) -> impl Future<
+        Output = Result<
+            impl Stream<Item = Result<impl Message<Payload = T>, MessagingError>> + Send,
+            MessagingError,
+        >,
+    > + Send
+    where
+        T: DeserializeOwned + Send + Sync + 'static;
+}
+
 // Assuming that this trait can be 'static. If not, remove bound here and fix lifetime issues in kriger_runner::main.
 #[async_trait]
-pub trait Message: 'static {
+pub trait Message: Send + 'static {
     type Payload: Send;
 
     fn payload(&self) -> &Self::Payload;
