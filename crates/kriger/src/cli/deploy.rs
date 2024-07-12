@@ -1,13 +1,18 @@
+use std::time::Duration;
+
 use bollard::image::{BuildImageOptions, BuilderVersion};
 use bollard::models::BuildInfo;
 use bollard::secret::BuildInfoAux;
 use bollard::Docker;
 use color_eyre::Result;
+use console::style;
 use futures::StreamExt;
+use indicatif::ProgressBar;
 use tokio::fs;
+use tokio::time::Instant;
 
-use crate::cli::args;
 use crate::cli::model::ExploitManifest;
+use crate::cli::{args, emoji, format_duration_secs, log};
 
 async fn read_exploit_manifest() -> Result<ExploitManifest> {
     let raw = fs::read("exploit.toml").await?;
@@ -16,17 +21,8 @@ async fn read_exploit_manifest() -> Result<ExploitManifest> {
     Ok(toml::from_str(toml)?)
 }
 
-pub(crate) async fn main(args: args::Deploy) -> Result<()> {
-    let manifest = match read_exploit_manifest().await {
-        Ok(manifest) => manifest,
-        Err(err) => {
-            println!("unable to read the exploit manifest (exploit.toml)");
-            return Err(err);
-        }
-    };
-    println!("\u{1F680} Preparing to deploy {}", &manifest.exploit.name);
-
-    let docker = Docker::connect_with_local_defaults()?;
+async fn build_image(docker: &Docker) -> Result<()> {
+    let start = Instant::now();
 
     let opt = BuildImageOptions {
         t: "kriger-exploit:test",
@@ -45,9 +41,17 @@ pub(crate) async fn main(args: args::Deploy) -> Result<()> {
     tar.finish()?;
     let tar = tar.into_inner()?;
 
-    println!("\u{1F528} Building... (ctx: {} B)", &tar.len());
+    let progress = ProgressBar::new_spinner();
+    progress.enable_steady_tick(Duration::from_millis(130));
+
+    progress.set_message(format!(
+        "{} Building... (ctx: {} B)",
+        emoji::HAMMER,
+        &tar.len()
+    ));
 
     // FIXME: Currently "broken": https://github.com/fussybeaver/bollard/issues/428
+    // TODO: Retrieve the final image digest and return an error if the build failed
     let mut stream = docker.build_image(opt, None, Some(tar.into()));
     while let Some(res) = stream.next().await {
         match res {
@@ -56,20 +60,55 @@ pub(crate) async fn main(args: args::Deploy) -> Result<()> {
                 ..
             }) => {
                 for v in status.vertexes {
-                    println!("{}: {:?}", &v.name, &v.completed);
+                    log(
+                        &progress,
+                        format!("{}: {:?}", style(&v.name).blue(), &v.completed),
+                    );
                     if !v.error.is_empty() {
-                        println!("  -> {}", &v.error);
+                        log(
+                            &progress,
+                            format!("  {} {}", style("->").blue(), style(&v.error).red()),
+                        );
                     }
                 }
             }
             Ok(msg) => {
-                println!("{msg:?}");
+                log(&progress, format!("{msg:?}"));
             }
             Err(err) => {
-                println!("{err}");
+                log(&progress, format!("{err}"));
             }
         }
     }
+
+    progress.finish_and_clear();
+
+    let elapsed = start.elapsed();
+    println!(
+        "  {} Built in {}",
+        emoji::SPARKLES,
+        style(format_duration_secs(&elapsed)).bold().green()
+    );
+
+    Ok(())
+}
+
+pub(crate) async fn main(args: args::Deploy) -> Result<()> {
+    let manifest = match read_exploit_manifest().await {
+        Ok(manifest) => manifest,
+        Err(err) => {
+            println!("unable to read the exploit manifest (exploit.toml)");
+            return Err(err);
+        }
+    };
+    println!(
+        "  {} Preparing to deploy {}",
+        emoji::ROCKET,
+        style(&manifest.exploit.name).green().bold()
+    );
+
+    let docker = Docker::connect_with_local_defaults()?;
+    build_image(&docker).await?;
 
     Ok(())
 }

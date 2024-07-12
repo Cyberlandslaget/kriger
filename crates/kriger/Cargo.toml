@@ -15,14 +15,16 @@ runner = ["dep:kriger_runner", "server"]
 scheduler = ["dep:kriger_scheduler", "server"]
 submitter = ["dep:kriger_submitter", "server"]
 ws = ["dep:kriger_ws", "server"]
-cli = ["dep:indicatif", "dep:bollard", "dep:tar"]
+cli = ["dep:indicatif", "dep:bollard", "dep:tar", "dep:console", "dep:humantime"]
 
 [dependencies]
 bollard = { version = "0.16.1", features = ["buildkit"], optional = true }
 clap.workspace = true
 clap_derive.workspace = true
 color-eyre.workspace = true
+console = { version = "0.15.8", optional = true }
 futures.workspace = true
+humantime = { version = "2.1.0", optional = true }
 indicatif = { version = "0.17.8", optional = true }
 tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros"] }
 tracing.workspace = true
