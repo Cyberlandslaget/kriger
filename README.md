@@ -52,6 +52,12 @@ Run the server components:
 cargo run server ---single
 ```
 
+Run the runner component:
+
+```bash
+RUST_LOG=debug cargo run runner --exploit test -- bash -c 'echo FLAG_$(openssl rand -base64 18)'
+```
+
 ### Building Images Locally
 
 Run the following command in the project's root directory:

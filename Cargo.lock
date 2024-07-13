@@ -1553,14 +1553,17 @@ name = "kriger_runner"
 version = "0.0.1"
 dependencies = [
  "async-channel",
+ "base64 0.22.1",
  "clap",
  "clap_derive",
  "color-eyre",
  "futures",
  "kriger_common",
  "num_cpus",
+ "regex",
  "serde_json",
  "tokio",
+ "tokio-stream",
  "tracing",
 ]
 

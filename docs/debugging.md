@@ -23,7 +23,7 @@ docker run --network kriger_default -e NATS_URL=nats://nats:4222 --rm -it natsio
   "tick": 120,
   "tick_start": 0,
   "flag_validity": 5,
-  "flag_format": "FLAG_\\w+"
+  "flag_format": "FLAG_[^ ]+"
 }
 ```
 
@@ -34,7 +34,7 @@ nats kv put config competition '{
   "tick": 120,
   "tick_start": 0,
   "flag_validity": 5,
-  "flag_format": "FLAG_\\w+"
+  "flag_format": "FLAG_[^ ]+"
 }'
 ```
 

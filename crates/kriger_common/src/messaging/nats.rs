@@ -2,11 +2,12 @@ use crate::messaging;
 use crate::messaging::{Bucket, Message, Messaging, MessagingError};
 use async_nats::jetstream;
 use async_nats::jetstream::consumer::{AckPolicy, DeliverPolicy, ReplayPolicy};
-use async_nats::jetstream::kv::Store;
+use async_nats::jetstream::kv::{CreateErrorKind, Store};
 use async_nats::jetstream::{stream, AckKind, Context};
 use async_trait::async_trait;
 use futures::{Stream, StreamExt};
 use serde::de::DeserializeOwned;
+use serde::Serialize;
 use std::time::Duration;
 use tracing::{debug, info};
 
@@ -64,13 +65,19 @@ impl NatsMessaging {
         debug!("creating exploits bucket");
         self.context
             .create_key_value(jetstream::kv::Config {
+                bucket: "config".to_string(),
+                ..Default::default()
+            })
+            .await?;
+        self.context
+            .create_key_value(jetstream::kv::Config {
                 bucket: "exploits".to_string(),
                 ..Default::default()
             })
             .await?;
         self.context
             .create_key_value(jetstream::kv::Config {
-                bucket: "config".to_string(),
+                bucket: "flags".to_string(),
                 ..Default::default()
             })
             .await?;
@@ -146,6 +153,33 @@ impl Bucket for NatsBucket {
         self.watch(None, ack_policy.into(), deliver_policy.into())
             .await
     }
+
+    async fn put<T>(&self, key: &str, body: &T) -> Result<(), MessagingError>
+    where
+        T: Serialize + Send + Sync,
+    {
+        self.store
+            .put(key, serde_json::to_vec(body)?.into())
+            .await?;
+        Ok(())
+    }
+
+    async fn create<T>(&self, key: &str, body: &T) -> Result<(), MessagingError>
+    where
+        T: Serialize + Send + Sync,
+    {
+        let res = self
+            .store
+            .create(key, serde_json::to_vec(body)?.into())
+            .await;
+        if let Err(err) = res {
+            return match err.kind() {
+                CreateErrorKind::AlreadyExists => Err(MessagingError::KeyValueConflictError),
+                _ => Err(err.into()),
+            };
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone)]
@@ -187,6 +221,11 @@ impl Messaging for NatsMessaging {
 
     async fn exploits(&self) -> Result<impl Bucket, MessagingError> {
         let store = self.context.get_key_value("exploits").await?;
+        Ok(NatsBucket { store })
+    }
+
+    async fn flags(&self) -> Result<impl Bucket, MessagingError> {
+        let store = self.context.get_key_value("flags").await?;
         Ok(NatsBucket { store })
     }
 
@@ -256,6 +295,8 @@ where
     let messages = consumer.messages().await?;
     // TODO: Nak/Term messages that failed to parse
     // This shouldn't really happen though. Regardless, NATS will automatically redeliver the
-    // message once the AckWait period has been exceeded.
+    // message once the AckWait period has been exceeded. However, these messages can overwhelm
+    // a consumer (by exceeding its pending messages limit) which will cause it to hang until the
+    // AckWait period has been exceeded.
     Ok(messages.map(|res| NatsMessage::<T>::from(res?)))
 }

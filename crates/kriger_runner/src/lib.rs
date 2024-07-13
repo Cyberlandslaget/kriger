@@ -1,92 +1,73 @@
 pub mod config;
+mod runner;
 
 use crate::config::Config;
-use async_channel::Receiver;
+use crate::runner::{Job, Runner, RunnerCallback};
+use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine};
 use color_eyre::eyre::{bail, Context, ContextCompat, Result};
 use futures::StreamExt;
-use kriger_common::messaging::model::ExecutionRequest;
+use kriger_common::messaging::model::{CompetitionConfig, ExecutionRequest, Flag};
 use kriger_common::messaging::nats::NatsMessaging;
-use kriger_common::messaging::{AckPolicy, DeliverPolicy, Message, Messaging, Stream};
-use std::process::Stdio;
+use kriger_common::messaging::{
+    AckPolicy, Bucket, DeliverPolicy, Messaging, MessagingError, Stream,
+};
+use regex::Regex;
+use std::str;
 use std::sync::Arc;
-use tokio::sync::{OwnedSemaphorePermit, Semaphore};
+use tokio::sync::Semaphore;
 use tokio::{pin, spawn};
 use tracing::{debug, info, warn};
 
-const ENV_EXPLOIT_NAME: &'static str = "EXPLOIT";
-const ENV_IP_ADDRESS: &'static str = "IP";
-const ENV_FLAG_HINT: &'static str = "HINT";
-
-struct Job {
-    request: Box<dyn Message<Payload = ExecutionRequest> + Send>,
-    _permit: OwnedSemaphorePermit,
+#[derive(Clone)]
+struct RunnerCallbackImpl<T: Bucket> {
+    flags: Box<T>,
 }
 
-async fn worker(
-    idx: usize,
-    rx: Receiver<Job>,
-    exploit_name: String,
-    exploit_command: String,
-    exploit_args: Vec<String>,
-) -> Result<()> {
-    loop {
-        // The channel has most likely been closed
-        let job = rx.recv().await.context("unable to receive job")?;
-
-        // TODO: Check how NATS handle retries for progress and nak
-        // We may not want to terminate the worker if ack or nak fails
-        job.request.progress().await.context("unable to ack")?;
-        match execute(
-            job.request.payload(),
-            &exploit_name,
-            &exploit_command,
-            &exploit_args,
-        )
-        .await
-        {
-            Err(err) => {
-                job.request.nak().await.context("unable to nak")?;
-                warn!("execution failed: {err:?} (worker {idx})")
-            }
-            Ok(..) => {
-                job.request.ack().await.context("unable to ack")?;
-                debug!("execution succeeded (worker {idx})")
-            }
+impl<T: Bucket> RunnerCallback for RunnerCallbackImpl<T> {
+    async fn on_flag(&self, request: &ExecutionRequest, flag: &str) -> Result<()> {
+        let encoded_flag = STANDARD_NO_PAD.encode(flag.as_bytes());
+        let payload = Flag {
+            team_id: request.team_id.clone(),
+            service: None,
+            exploit: None,
+        };
+        let res = self.flags.create(&encoded_flag, &payload).await;
+        if let Err(MessagingError::KeyValueConflictError) = res {
+            // This means that the flag has already been submitted. We don't need to treat it as
+            // an error.
+            debug!("the flag `{flag}` already exists, ignoring");
+            return Ok(());
         }
+
+        // Propagate other error
+        res?;
+
+        Ok(())
     }
 }
 
-async fn execute(
-    request: &ExecutionRequest,
-    exploit_name: &str,
-    exploit_command: &str,
-    exploit_args: &Vec<String>,
-) -> Result<()> {
-    debug!("processing request: {request:?}");
-
-    let mut command = tokio::process::Command::new(exploit_command);
-    command.env(ENV_EXPLOIT_NAME, exploit_name);
-    command.env(ENV_IP_ADDRESS, &request.ip_address);
-    if let Some(flag_hint) = &request.flag_hint {
-        let value = serde_json::to_string(flag_hint).context("unable to serialize flag hint")?;
-        command.env(ENV_FLAG_HINT, value);
-    }
-    command.stdin(Stdio::null());
-    command.args(exploit_args);
-
-    let mut child = command.spawn().context("unable to spawn child")?;
-    child.wait().await.context("unable to wait for child")?;
-
-    Ok(())
-}
-
-pub async fn main(config: Config) -> Result<()> {
+pub async fn main(args: Config) -> Result<()> {
     info!("initializing messaging");
-    let messaging = NatsMessaging::new(&config.nats_url).await?;
+    let messaging = NatsMessaging::new(&args.nats_url).await?;
 
+    let config_bucket = messaging
+        .config()
+        .await
+        .context("unable to retrieve the config bucket")?;
+
+    // TODO: Provide a more elegant way to retrieve this and add support for live reload
+    let competition_config = config_bucket
+        .get::<CompetitionConfig>("competition")
+        .await
+        .context("unable to retrieve the competition config")?
+        .context("the competition config does not exist")?;
+    let flag_format = Regex::new(&competition_config.flag_format)
+        .context("unable to parse the flag format regex")?;
+
+    info!("using the flag format: `{flag_format}`");
     info!(
         "subscribing to execution requests for exploit: {}",
-        &config.exploit
+        &args.exploit
     );
     let executions_wq = messaging
         .executions_wq()
@@ -94,8 +75,8 @@ pub async fn main(config: Config) -> Result<()> {
         .context("unable to get the execution work queue")?;
     let stream = executions_wq
         .subscribe(
-            Some(format!("exploit:{}", &config.exploit)),
-            Some(format!("executions.{}.request", &config.exploit)),
+            Some(format!("exploit:{}", &args.exploit)),
+            Some(format!("executions.{}.request", args.exploit)),
             AckPolicy::Explicit,
             DeliverPolicy::New,
         )
@@ -103,24 +84,32 @@ pub async fn main(config: Config) -> Result<()> {
         .context("unable to subscribe to execution requests")?;
     pin!(stream);
 
-    let worker_count = config.workers.unwrap_or_else(|| 2 * num_cpus::get());
+    let worker_count = args.workers.unwrap_or_else(|| 2 * num_cpus::get());
     let semaphore = Arc::new(Semaphore::new(worker_count));
     info!("using a maximum of {worker_count} workers");
 
     let (tx, rx) = async_channel::bounded::<Job>(worker_count);
 
+    let runner = Runner {
+        job_rx: rx,
+        exploit_name: args.exploit,
+        exploit_command: args.command,
+        exploit_args: args.args,
+        flag_format,
+    };
+
+    let callback = RunnerCallbackImpl {
+        flags: Box::new(
+            messaging
+                .flags()
+                .await
+                .context("unable to retrieve the flags bucket")?,
+        ),
+    };
+
     for i in 0..worker_count {
         // TODO: Support cancellation tokens
-        let r = rx.clone();
-
-        // Cloning here has a negligible impact to the memory usage
-        spawn(worker(
-            i,
-            r,
-            config.exploit.clone(),
-            config.command.clone(),
-            config.args.clone(),
-        ));
+        spawn(runner.clone().worker(i, callback.clone()));
     }
 
     loop {

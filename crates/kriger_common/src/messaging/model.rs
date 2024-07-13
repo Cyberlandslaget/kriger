@@ -35,6 +35,10 @@ pub struct ExecutionRequest {
     pub ip_address: String,
     #[serde(rename = "h")]
     pub flag_hint: Option<serde_json::Value>,
+    /// The Team ID that this execution is targeted towards. This should only be optional for
+    /// manual/emergency runs.
+    #[serde(rename = "t")]
+    pub team_id: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
