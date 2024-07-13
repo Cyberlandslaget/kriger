@@ -5,11 +5,13 @@ pub struct CompetitionConfig {
     /// The start time of the competition in UTC
     pub start: chrono::DateTime<chrono::Utc>,
     /// Tick/round length in seconds
-    pub tick: u32,
-    /// Tick offset in ticks. This is usually 0.
-    pub tick_offset: i32,
+    pub tick: u64,
+    /// The start tick in ticks. This is usually 0.
+    pub tick_start: i32,
     /// The validity of flags in rounds
     pub flag_validity: u32,
+    /// The regular expression for the flag format
+    pub flag_format: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -66,3 +68,12 @@ pub struct FlagSubmissionResult {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum FlagSubmissionStatus {}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Tick {
+    #[serde(rename = "i")]
+    pub tick: i32,
+    /// Milliseconds since Unix Epoch in UTC
+    #[serde(rename = "t")]
+    pub timestamp: i32,
+}

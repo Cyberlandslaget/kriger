@@ -1,5 +1,5 @@
 use crate::messaging;
-use crate::messaging::{model, Bucket, Message, Messaging, MessagingError};
+use crate::messaging::{Bucket, Message, Messaging, MessagingError};
 use async_nats::jetstream;
 use async_nats::jetstream::consumer::{AckPolicy, DeliverPolicy, ReplayPolicy};
 use async_nats::jetstream::kv::Store;
@@ -68,34 +68,15 @@ impl NatsMessaging {
                 ..Default::default()
             })
             .await?;
+        self.context
+            .create_key_value(jetstream::kv::Config {
+                bucket: "config".to_string(),
+                ..Default::default()
+            })
+            .await?;
 
         info!("nats migration complete");
         Ok(())
-    }
-
-    async fn subscribe<T>(
-        &self,
-        stream_name: &str,
-        durable_name: Option<String>,
-        filter_subject: Option<String>,
-    ) -> Result<impl Stream<Item = Result<NatsMessage<T>, MessagingError>>, MessagingError>
-    where
-        T: Sized + DeserializeOwned,
-    {
-        let stream = self.context.get_stream(stream_name).await?;
-        subscribe_stream(
-            &stream,
-            jetstream::consumer::pull::Config {
-                durable_name,
-                // Requires all messages to be individually ACK'd
-                ack_policy: AckPolicy::Explicit, // TODO: Make this configurable?
-                replay_policy: ReplayPolicy::Instant,
-                filter_subject: filter_subject.unwrap_or_default(),
-                deliver_policy: DeliverPolicy::New,
-                ..Default::default()
-            },
-        )
-        .await
     }
 }
 
@@ -131,6 +112,16 @@ impl NatsBucket {
 }
 
 impl Bucket for NatsBucket {
+    async fn get<T>(&self, key: &str) -> Result<Option<T>, MessagingError>
+    where
+        T: DeserializeOwned + Send + Sync + 'static,
+    {
+        match self.store.get(key).await? {
+            Some(bytes) => Ok(serde_json::from_slice(bytes.as_ref())?),
+            None => Ok(None),
+        }
+    }
+
     async fn watch_key<T>(
         &self,
         key: &str,
@@ -157,25 +148,51 @@ impl Bucket for NatsBucket {
     }
 }
 
+#[derive(Clone)]
+struct NatsStream {
+    stream: stream::Stream,
+}
+
+impl messaging::Stream for NatsStream {
+    async fn subscribe<T>(
+        &self,
+        durable_name: Option<String>,
+        filter_subject: Option<String>,
+        ack_policy: messaging::AckPolicy,
+        deliver_policy: messaging::DeliverPolicy,
+    ) -> Result<impl Stream<Item = Result<NatsMessage<T>, MessagingError>>, MessagingError>
+    where
+        T: DeserializeOwned + Send + Sync + 'static,
+    {
+        subscribe_stream(
+            &self.stream,
+            jetstream::consumer::pull::Config {
+                durable_name,
+                replay_policy: ReplayPolicy::Instant,
+                filter_subject: filter_subject.unwrap_or_default(),
+                ack_policy: ack_policy.into(),
+                deliver_policy: deliver_policy.into(),
+                ..Default::default()
+            },
+        )
+        .await
+    }
+}
+
 impl Messaging for NatsMessaging {
+    async fn config(&self) -> Result<impl Bucket, MessagingError> {
+        let store = self.context.get_key_value("config").await?;
+        Ok(NatsBucket { store })
+    }
+
     async fn exploits(&self) -> Result<impl Bucket, MessagingError> {
         let store = self.context.get_key_value("exploits").await?;
         Ok(NatsBucket { store })
     }
 
-    async fn subscribe_execution_requests(
-        &self,
-        exploit_name: &str,
-    ) -> Result<
-        impl Stream<Item = Result<impl Message<Payload = model::ExecutionRequest>, MessagingError>>,
-        MessagingError,
-    > {
-        self.subscribe(
-            "executions_wq",
-            Some(format!("exploit:{exploit_name}")),
-            Some(format!("executions.{exploit_name}.request")),
-        )
-        .await
+    async fn executions_wq(&self) -> Result<impl messaging::Stream, MessagingError> {
+        let stream = self.context.get_stream("executions_wq").await?;
+        Ok(NatsStream { stream })
     }
 }
 

@@ -6,11 +6,11 @@ use color_eyre::eyre::{bail, Context, ContextCompat, Result};
 use futures::StreamExt;
 use kriger_common::messaging::model::ExecutionRequest;
 use kriger_common::messaging::nats::NatsMessaging;
-use kriger_common::messaging::{Message, Messaging};
+use kriger_common::messaging::{AckPolicy, DeliverPolicy, Message, Messaging, Stream};
 use std::process::Stdio;
 use std::sync::Arc;
-use tokio::spawn;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
+use tokio::{pin, spawn};
 use tracing::{debug, info, warn};
 
 const ENV_EXPLOIT_NAME: &'static str = "EXPLOIT";
@@ -88,10 +88,20 @@ pub async fn main(config: Config) -> Result<()> {
         "subscribing to execution requests for exploit: {}",
         &config.exploit
     );
-    let mut stream = messaging
-        .subscribe_execution_requests(&config.exploit)
+    let executions_wq = messaging
+        .executions_wq()
+        .await
+        .context("unable to get the execution work queue")?;
+    let stream = executions_wq
+        .subscribe(
+            Some(format!("exploit:{}", &config.exploit)),
+            Some(format!("executions.{}.request", &config.exploit)),
+            AckPolicy::Explicit,
+            DeliverPolicy::New,
+        )
         .await
         .context("unable to subscribe to execution requests")?;
+    pin!(stream);
 
     let worker_count = config.workers.unwrap_or_else(|| 2 * num_cpus::get());
     let semaphore = Arc::new(Semaphore::new(worker_count));

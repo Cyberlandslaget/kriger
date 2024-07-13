@@ -1,9 +1,10 @@
-use async_trait::async_trait;
 use std::fmt::Debug;
 use std::future::Future;
 
-use futures::Stream;
+use async_trait::async_trait;
 use serde::de::DeserializeOwned;
+
+use crate::messaging::nats::NatsMessage;
 
 pub mod model;
 pub mod nats;
@@ -24,6 +25,8 @@ pub enum DeliverPolicy {
 pub enum MessagingError {
     #[error("nats kv error")]
     NatsKeyValueError(#[from] async_nats::jetstream::context::KeyValueError),
+    #[error("nats kv entry error")]
+    NatsKeyValueEntryError(#[from] async_nats::jetstream::kv::EntryError),
     #[error("nats consumer error")]
     NatsConsumerError(#[from] async_nats::jetstream::stream::ConsumerError),
     #[error("nats stream error")]
@@ -45,20 +48,18 @@ pub enum MessagingError {
 }
 
 pub trait Messaging: Clone {
+    fn config(&self) -> impl Future<Output = Result<impl Bucket, MessagingError>>;
+
     fn exploits(&self) -> impl Future<Output = Result<impl Bucket, MessagingError>>;
 
-    fn subscribe_execution_requests(
-        &self,
-        exploit_name: &str,
-    ) -> impl Future<
-        Output = Result<
-            impl Stream<Item = Result<impl Message<Payload = model::ExecutionRequest>, MessagingError>>,
-            MessagingError,
-        >,
-    >;
+    fn executions_wq(&self) -> impl Future<Output = Result<impl Stream, MessagingError>>;
 }
 
 pub trait Bucket: Clone {
+    fn get<T>(&self, key: &str) -> impl Future<Output = Result<Option<T>, MessagingError>> + Send
+    where
+        T: DeserializeOwned + Send + Sync + 'static;
+
     fn watch_key<T>(
         &self,
         key: &str,
@@ -66,7 +67,7 @@ pub trait Bucket: Clone {
         deliver_policy: DeliverPolicy,
     ) -> impl Future<
         Output = Result<
-            impl Stream<Item = Result<impl Message<Payload = T>, MessagingError>> + Send,
+            impl futures::Stream<Item = Result<impl Message<Payload = T>, MessagingError>> + Send,
             MessagingError,
         >,
     > + Send
@@ -79,10 +80,27 @@ pub trait Bucket: Clone {
         deliver_policy: DeliverPolicy,
     ) -> impl Future<
         Output = Result<
-            impl Stream<Item = Result<impl Message<Payload = T>, MessagingError>> + Send,
+            impl futures::Stream<Item = Result<impl Message<Payload = T>, MessagingError>> + Send,
             MessagingError,
         >,
     > + Send
+    where
+        T: DeserializeOwned + Send + Sync + 'static;
+}
+
+pub trait Stream: Clone {
+    fn subscribe<T>(
+        &self,
+        durable_name: Option<String>,
+        filter_subject: Option<String>,
+        ack_policy: AckPolicy,
+        deliver_policy: DeliverPolicy,
+    ) -> impl Future<
+        Output = Result<
+            impl futures::Stream<Item = Result<NatsMessage<T>, MessagingError>>,
+            MessagingError,
+        >,
+    >
     where
         T: DeserializeOwned + Send + Sync + 'static;
 }
