@@ -4,7 +4,7 @@ use crate::config::Config;
 use color_eyre::eyre::{Context, Result};
 use futures::StreamExt;
 use k8s_openapi::api::apps::v1::{Deployment, DeploymentSpec};
-use k8s_openapi::api::core::v1::{Capabilities, Container, EnvVar, PodSecurityContext, PodSpec, PodTemplateSpec, SecurityContext};
+use k8s_openapi::api::core::v1::{Capabilities, Container, EnvVar, PodSpec, PodTemplateSpec, ResourceRequirements, SecurityContext};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta};
 use kriger_common::messaging::model::Exploit;
 use kriger_common::messaging::{AckPolicy, Bucket, DeliverPolicy, Message, Messaging};
@@ -12,6 +12,7 @@ use kriger_common::runtime::AppRuntime;
 use kube::api::{Patch, PatchParams};
 use kube::{Api, Client};
 use std::collections::BTreeMap;
+use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
 use tokio::pin;
 use tracing::{info, warn};
 
@@ -50,7 +51,7 @@ pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
                 if let Err(err) = handle_message(
                     &deployments,
                     message,
-                    config.controller_nats_svc_url.clone(),
+                    &config,
                 )
                     .await
                 {
@@ -67,12 +68,12 @@ pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
 async fn handle_message(
     deployments: &Api<Deployment>,
     message: impl Message<Payload=Exploit>,
-    nats_url: String,
+    config: &Config,
 ) -> Result<()> {
     let exploit = message.payload();
     info!("reconciling exploit: {}", exploit.manifest.name);
     message.progress().await?;
-    match reconcile(&deployments, exploit, nats_url).await {
+    match reconcile(&deployments, exploit, config).await {
         Ok(..) => {
             message.ack().await?;
         }
@@ -90,7 +91,7 @@ async fn handle_message(
 async fn reconcile(
     deployments: &Api<Deployment>,
     exploit: &Exploit,
-    nats_url: String,
+    config: &Config,
 ) -> Result<()> {
     let mut labels = BTreeMap::<String, String>::new();
     labels.insert("exploit".to_string(), exploit.manifest.name.clone());
@@ -108,7 +109,7 @@ async fn reconcile(
         },
         EnvVar {
             name: "NATS_URL".to_string(),
-            value: Some(nats_url),
+            value: Some(config.controller_nats_svc_url.clone()),
             ..Default::default()
         },
     ];
@@ -119,6 +120,19 @@ async fn reconcile(
             value: Some(workers.to_string()),
             ..Default::default()
         });
+    }
+
+    let mut requests = BTreeMap::new();
+    let mut limits = BTreeMap::new();
+    if config.controller_resource_limits {
+        if let Some(cpu_request) = exploit.manifest.resources.cpu_request.clone() {
+            requests.insert("cpu".to_string(), Quantity(cpu_request));
+        }
+        if let Some(mem_request) = exploit.manifest.resources.mem_request.clone() {
+            requests.insert("memory".to_string(), Quantity(mem_request));
+        }
+        limits.insert("cpu".to_string(), Quantity(exploit.manifest.resources.cpu_limit.clone()));
+        limits.insert("memory".to_string(), Quantity(exploit.manifest.resources.cpu_limit.clone()));
     }
 
     let spec = DeploymentSpec {
@@ -137,6 +151,11 @@ async fn reconcile(
                     name: "exploit".to_string(),
                     image: Some(exploit.image.clone()),
                     env: Some(env),
+                    resources: Some(ResourceRequirements {
+                        claims: None,
+                        requests: Some(requests),
+                        limits: Some(limits),
+                    }),
                     security_context: Some(SecurityContext {
                         allow_privilege_escalation: Some(false),
                         capabilities: Some(Capabilities {

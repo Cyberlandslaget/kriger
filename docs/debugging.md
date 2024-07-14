@@ -27,7 +27,6 @@ docker run --network kriger_default -e NATS_URL=nats://nats:4222 --rm -it natsio
 }
 ```
 
-
 ```bash
 nats kv put config competition '{
   "start": "2024-01-01T08:00:00Z",
@@ -45,15 +44,19 @@ nats kv put config competition '{
   "manifest": {
     "name": "test",
     "service": "Service 1 Checker 1",
-    "replicas": 1,
-    "enabled": true
+    "replicas": 4,
+    "enabled": true,
+    "resources": {
+      "cpu_limit": "1",
+      "mem_limit": "512M"
+    }
   },
   "image": "r.o99.no/kriger-exploits/test"
 }
 ```
 
 ```bash
-nats kv put exploits exploits.test '{"manifest":{"name":"test","service":"Service 1 Checker 1","replicas":1,"enabled":true},"image":"r.o99.no/kriger-exploits/test"}'
+nats kv put exploits exploits.test '{"manifest":{"name":"test","service":"Service 1 Checker 1","replicas":4,"enabled":true,"resources":{"cpu_limit":"1","mem_limit":"512M"}},"image":"r.o99.no/kriger-exploits/test"}'
 ```
 
 #### Runner Testing

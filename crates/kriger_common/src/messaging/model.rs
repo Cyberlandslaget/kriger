@@ -27,7 +27,15 @@ pub struct ExploitManifest {
     pub replicas: i32,
     pub workers: Option<i32>,
     pub enabled: bool,
-    // TODO: Add resource limits
+    pub resources: ExploitResources,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ExploitResources {
+    pub cpu_request: Option<String>,
+    pub mem_request: Option<String>,
+    pub cpu_limit: String,
+    pub mem_limit: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
