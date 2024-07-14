@@ -7,5 +7,11 @@ edition = "2021"
 
 [dependencies]
 color-eyre.workspace = true
+kriger_common.path = "../kriger_common"
+rand.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true

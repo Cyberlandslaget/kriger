@@ -1597,6 +1597,12 @@ name = "kriger_submitter"
 version = "0.0.1"
 dependencies = [
  "color-eyre",
+ "kriger_common",
+ "rand",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror",
  "tokio",
  "tracing",
 ]

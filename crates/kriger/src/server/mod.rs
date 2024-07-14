@@ -44,7 +44,7 @@ pub(crate) async fn main(args: args::Args) -> Result<()> {
     }
     #[cfg(feature = "submitter")]
     if args.components.enable_submitter || args.components.single {
-        set.spawn(kriger_submitter::main());
+        set.spawn(kriger_submitter::main(runtime.clone()));
     }
     #[cfg(feature = "ws")]
     if args.components.enable_ws || args.components.single {

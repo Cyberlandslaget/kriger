@@ -80,7 +80,18 @@ pub struct FlagSubmissionResult {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub enum FlagSubmissionStatus {}
+#[repr(u8)]
+pub enum FlagSubmissionStatus {
+    Ok = 1,
+    Duplicate = 2,
+    Own = 3,
+    Old = 4,
+    Invalid = 5,
+    /// Server refused flag. Pre- or post-competition.
+    /// Submitters should retry this status.
+    Error = 6,
+    Unknown(String) = 7,
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Tick {
