@@ -4,7 +4,7 @@ use crate::config::Config;
 use color_eyre::eyre::{Context, Result};
 use futures::StreamExt;
 use k8s_openapi::api::apps::v1::{Deployment, DeploymentSpec};
-use k8s_openapi::api::core::v1::{Container, EnvVar, PodSpec, PodTemplateSpec};
+use k8s_openapi::api::core::v1::{Capabilities, Container, EnvVar, PodSecurityContext, PodSpec, PodTemplateSpec, SecurityContext};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta};
 use kriger_common::messaging::model::Exploit;
 use kriger_common::messaging::{AckPolicy, Bucket, DeliverPolicy, Message, Messaging};
@@ -52,7 +52,7 @@ pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
                     message,
                     config.controller_nats_svc_url.clone(),
                 )
-                .await
+                    .await
                 {
                     warn!("unable to handle message: {err:?}");
                 }
@@ -66,7 +66,7 @@ pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
 
 async fn handle_message(
     deployments: &Api<Deployment>,
-    message: impl Message<Payload = Exploit>,
+    message: impl Message<Payload=Exploit>,
     nats_url: String,
 ) -> Result<()> {
     let exploit = message.payload();
@@ -95,6 +95,32 @@ async fn reconcile(
     let mut labels = BTreeMap::<String, String>::new();
     labels.insert("exploit".to_string(), exploit.manifest.name.clone());
 
+    let mut env = vec![
+        EnvVar {
+            name: "EXPLOIT".to_string(),
+            value: Some(exploit.manifest.name.clone()),
+            ..Default::default()
+        },
+        EnvVar {
+            name: "SERVICE".to_string(),
+            value: Some(exploit.manifest.service.clone()),
+            ..Default::default()
+        },
+        EnvVar {
+            name: "NATS_URL".to_string(),
+            value: Some(nats_url),
+            ..Default::default()
+        },
+    ];
+
+    if let Some(workers) = &exploit.manifest.workers {
+        env.push(EnvVar {
+            name: "WORKERS".to_string(),
+            value: Some(workers.to_string()),
+            ..Default::default()
+        });
+    }
+
     let spec = DeploymentSpec {
         replicas: Some(exploit.manifest.replicas),
         selector: LabelSelector {
@@ -110,20 +136,19 @@ async fn reconcile(
                 containers: vec![Container {
                     name: "exploit".to_string(),
                     image: Some(exploit.image.clone()),
-                    env: Some(vec![
-                        EnvVar {
-                            name: "EXPLOIT".to_string(),
-                            value: Some(exploit.manifest.name.clone()),
-                            ..Default::default()
-                        },
-                        EnvVar {
-                            name: "NATS_URL".to_string(),
-                            value: Some(nats_url),
-                            ..Default::default()
-                        },
-                    ]),
+                    env: Some(env),
+                    security_context: Some(SecurityContext {
+                        allow_privilege_escalation: Some(false),
+                        capabilities: Some(Capabilities {
+                            add: None,
+                            drop: Some(vec!["ALL".to_string()]),
+                        }),
+                        ..Default::default()
+                    }),
                     ..Default::default()
                 }],
+                automount_service_account_token: Some(false),
+                enable_service_links: Some(false),
                 ..Default::default()
             }),
             ..Default::default()

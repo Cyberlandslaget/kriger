@@ -25,6 +25,7 @@ pub struct ExploitManifest {
     pub name: String,
     pub service: String,
     pub replicas: i32,
+    pub workers: Option<i32>,
     pub enabled: bool,
     // TODO: Add resource limits
 }
@@ -48,7 +49,7 @@ pub struct ExecutionResult {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Flag {
+pub struct FlagSubmission {
     /// The network id of the team that the flag was retrieved from
     #[serde(rename = "t")]
     pub team_id: Option<String>,

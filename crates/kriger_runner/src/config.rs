@@ -8,6 +8,10 @@ pub struct Config {
     #[arg(env, long, default_value = "nats://127.0.0.1:4222")]
     pub nats_url: String,
 
+    /// The name of the service that the runner will be exploiting
+    #[arg(env, long)]
+    pub service: Option<String>,
+
     /// The name of the exploit that the runner will be responsible for
     #[arg(env, long)]
     pub exploit: String,

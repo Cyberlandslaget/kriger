@@ -6,7 +6,7 @@ use crate::runner::{Job, Runner, RunnerCallback};
 use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine};
 use color_eyre::eyre::{bail, Context, ContextCompat, Result};
 use futures::StreamExt;
-use kriger_common::messaging::model::{CompetitionConfig, ExecutionRequest, Flag};
+use kriger_common::messaging::model::{CompetitionConfig, ExecutionRequest, FlagSubmission};
 use kriger_common::messaging::nats::NatsMessaging;
 use kriger_common::messaging::{
     AckPolicy, Bucket, DeliverPolicy, Messaging, MessagingError, Stream,
@@ -21,17 +21,19 @@ use tracing::{debug, info, warn};
 #[derive(Clone)]
 struct RunnerCallbackImpl<T: Bucket> {
     flags: Box<T>,
+    exploit: String,
+    service: Option<String>,
 }
 
 impl<T: Bucket> RunnerCallback for RunnerCallbackImpl<T> {
     async fn on_flag(&self, request: &ExecutionRequest, flag: &str) -> Result<()> {
-        let encoded_flag = STANDARD_NO_PAD.encode(flag.as_bytes());
-        let payload = Flag {
+        let key = format!("{}.submit", STANDARD_NO_PAD.encode(flag.as_bytes()));
+        let payload = FlagSubmission {
             team_id: request.team_id.clone(),
-            service: None,
-            exploit: None,
+            service: self.service.clone(),
+            exploit: Some(self.exploit.clone()),
         };
-        let res = self.flags.create(&encoded_flag, &payload).await;
+        let res = self.flags.create(&key, &payload).await;
         if let Err(MessagingError::KeyValueConflictError) = res {
             // This means that the flag has already been submitted. We don't need to treat it as
             // an error.
@@ -90,14 +92,6 @@ pub async fn main(args: Config) -> Result<()> {
 
     let (tx, rx) = async_channel::bounded::<Job>(worker_count);
 
-    let runner = Runner {
-        job_rx: rx,
-        exploit_name: args.exploit,
-        exploit_command: args.command,
-        exploit_args: args.args,
-        flag_format,
-    };
-
     let callback = RunnerCallbackImpl {
         flags: Box::new(
             messaging
@@ -105,6 +99,16 @@ pub async fn main(args: Config) -> Result<()> {
                 .await
                 .context("unable to retrieve the flags bucket")?,
         ),
+        exploit: args.exploit.clone(),
+        service: args.service,
+    };
+
+    let runner = Runner {
+        job_rx: rx,
+        exploit_name: args.exploit,
+        exploit_command: args.command,
+        exploit_args: args.args,
+        flag_format,
     };
 
     for i in 0..worker_count {

@@ -80,11 +80,11 @@ The *metrics* component is not explicitly listed as a consumer, but it'll consum
 
 **Key/Value:**
 
-| Bucket   | Key                                   | Description                 | Data owner / data handling pattern            | Consumer (s) |
-|----------|---------------------------------------|-----------------------------|-----------------------------------------------|--------------|
-| exploits | {name}                                | Exploit manifests           | rest. Optimistic concurrency control.         | controller   |   
-| flags    | {exploit}.{team net id}.{flag}.submit | Flags submitted by exploits | runner, rest. Optimistic concurrency control. | submitter    | 
-| flags    | {flag}.result                         | Flag submission results     | Submitter                                     |              | 
+| Bucket   | Key           | Description                                       | Data owner / data handling pattern                  | Consumer (s) |
+|----------|---------------|---------------------------------------------------|-----------------------------------------------------|--------------|
+| exploits | {name}        | Exploit manifests                                 | rest. Optimistic concurrency control.               | controller   |   
+| flags    | {flag}.submit | Flags submitted by exploits or manually submitted | rest, runner, rest. Optimistic concurrency control. | submitter    | 
+| flags    | {flag}.result | Flag submission results                           | Submitter                                           |              | 
 
 *\*Base64 encoding is used for segments with unpredictable names.*
 
