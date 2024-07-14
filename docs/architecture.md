@@ -6,8 +6,8 @@
 - **kriger-scheduler**: Responsible for scheduling exploit runs and timing the "ticks".
 - **kriger-fetcher**: Responsible for fetching various data from the competition system, for example teams.json. The
   fetcher will also persist the received data.
-- **kriger-metrics**: [OpenMetrics](https://openmetrics.io/)/[Prometheus](https://prometheus.io/)-compatible metrics
-  exporter.
+- **kriger-metrics**: [OpenTelemetry](https://opentelemetry.io/) metrics exporter
+  via [OTLP](https://opentelemetry.io/docs/specs/otlp/).
 - **kriger-rest**: REST API for the CLI and the web frontend.
 - **kriger-runner**: Responsible for executing the exploits.
 - **kriger-submitter**: Responsible for submitting flags to the competition system.

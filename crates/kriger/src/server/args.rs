@@ -14,6 +14,10 @@ pub(crate) struct Args {
     #[command(flatten, next_help_heading = "Controller configuration options")]
     pub controller: kriger_controller::config::Config,
 
+    #[cfg(feature = "metrics")]
+    #[command(flatten, next_help_heading = "Metrics exporter configuration options")]
+    pub metrics: kriger_metrics::args::Args,
+
     #[cfg(feature = "rest")]
     #[command(flatten, next_help_heading = "REST API server configuration options")]
     pub rest: kriger_rest::config::Config,

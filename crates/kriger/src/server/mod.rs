@@ -32,7 +32,7 @@ pub(crate) async fn main(args: args::Args) -> Result<()> {
     }
     #[cfg(feature = "metrics")]
     if args.components.enable_metrics || args.components.single {
-        set.spawn(kriger_metrics::main());
+        set.spawn(kriger_metrics::main(runtime.clone(), args.metrics));
     }
     #[cfg(feature = "rest")]
     if args.components.enable_rest || args.components.single {

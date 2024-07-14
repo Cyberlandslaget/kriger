@@ -124,10 +124,10 @@ pub trait Stream: Clone {
         deliver_policy: DeliverPolicy,
     ) -> impl Future<
         Output = Result<
-            impl futures::Stream<Item = Result<NatsMessage<T>, MessagingError>>,
+            impl futures::Stream<Item = Result<NatsMessage<T>, MessagingError>> + Send,
             MessagingError,
         >,
-    >
+    > + Send
     where
         T: DeserializeOwned + Send + Sync + 'static;
 }
