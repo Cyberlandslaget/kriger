@@ -12,6 +12,7 @@ chrono = { workspace = true, features = ["serde"] }
 clap.workspace = true
 clap_derive.workspace = true
 color-eyre.workspace = true
+dashmap = "6.0.1"
 futures.workspace = true
 thiserror.workspace = true
 tokio.workspace = true

@@ -1,7 +1,9 @@
 use std::fmt::Debug;
 use std::future::Future;
+use std::sync::Arc;
 
 use async_trait::async_trait;
+use dashmap::DashMap;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
@@ -113,6 +115,14 @@ pub trait Bucket: Clone + 'static {
     ) -> impl Future<Output = Result<(), MessagingError>> + Send
     where
         T: Serialize + Send + Sync;
+
+    /// Subscribes to all entries in bucket. The subscription will be spawned using [spawn]
+    /// and will be cancelled once the [Arc] is dropped.
+    fn subscribe_all<T>(
+        &self,
+    ) -> impl Future<Output = Result<Arc<DashMap<String, T>>, MessagingError>> + Send
+    where
+        T: Sized + DeserializeOwned + Send + Sync + 'static;
 }
 
 pub trait Stream: Clone {

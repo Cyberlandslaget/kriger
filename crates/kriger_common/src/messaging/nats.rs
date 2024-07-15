@@ -1,15 +1,25 @@
 use crate::messaging;
 use crate::messaging::{Bucket, Message, Messaging, MessagingError};
 use async_nats::jetstream;
+use async_nats::jetstream::consumer::pull::MessagesError;
 use async_nats::jetstream::consumer::{AckPolicy, DeliverPolicy, ReplayPolicy};
-use async_nats::jetstream::kv::{CreateErrorKind, Store};
+use async_nats::jetstream::kv::{CreateErrorKind, EntryError, EntryErrorKind, Operation, Store};
 use async_nats::jetstream::{stream, AckKind, Context};
 use async_trait::async_trait;
+use dashmap::DashMap;
 use futures::{Stream, StreamExt};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use std::borrow::Cow;
+use std::collections::HashMap;
+use std::io::stdin;
+use std::str::FromStr;
+use std::sync::Arc;
 use std::time::Duration;
-use tracing::{debug, info};
+use tokio::spawn;
+use tracing::{debug, info, warn};
+
+const KV_OPERATION: &str = "KV-Operation";
 
 impl Into<AckPolicy> for messaging::AckPolicy {
     fn into(self) -> AckPolicy {
@@ -180,6 +190,113 @@ impl Bucket for NatsBucket {
         }
         Ok(())
     }
+
+    async fn subscribe_all<T>(&self) -> Result<Arc<DashMap<String, T>>, MessagingError>
+    where
+        T: Sized + DeserializeOwned + Send + Sync + 'static,
+    {
+        let mut consumer = self
+            .store
+            .stream
+            .create_consumer(jetstream::consumer::pull::Config {
+                filter_subject: format!("{}>", &self.store.prefix),
+                replay_policy: ReplayPolicy::Instant,
+                ack_policy: AckPolicy::None,
+                deliver_policy: DeliverPolicy::LastPerSubject,
+                ..Default::default()
+            })
+            .await?;
+
+        let mut stream = consumer.messages().await?;
+
+        let mut map = DashMap::<String, T>::new();
+        while let Some(Ok(msg)) = stream.next().await {
+            let info = msg.info()?;
+            let operation = kv_operation_from_message(&msg).unwrap_or(Operation::Put);
+
+            let key = msg
+                .subject
+                .strip_prefix(&self.store.prefix)
+                .map(|s| s.to_string())
+                .unwrap();
+
+            match operation {
+                // The put operation will not have any headers in the message
+                Operation::Put => match serde_json::from_slice::<T>(msg.payload.as_ref()) {
+                    Ok(payload) => {
+                        map.insert(key, payload);
+                    }
+                    Err(err) => {
+                        warn!("malformed message: {err:?}");
+                    }
+                },
+                Operation::Delete | Operation::Purge => {
+                    map.remove(&key);
+                }
+            }
+
+            // We've caught up with the history
+            if info.pending == 0 {
+                break;
+            }
+        }
+
+        let arc = Arc::new(map);
+        let weak_ref = Arc::downgrade(&arc);
+
+        // TODO: Better error handling? What happens if the subscription drops randomly? Is there a way to recover?
+        let prefix = self.store.prefix.clone();
+        spawn(async move {
+            while weak_ref.strong_count() > 0 {
+                // FIXME: This will STILL wait for an element when the weak reference is dropped
+                match stream.next().await {
+                    Some(Ok(msg)) => {
+                        let key = msg
+                            .subject
+                            .strip_prefix(&prefix)
+                            .map(|s| s.to_string())
+                            .unwrap();
+
+                        match weak_ref.upgrade() {
+                            Some(map) => {
+                                let operation =
+                                    kv_operation_from_message(&msg).unwrap_or(Operation::Put);
+                                match operation {
+                                    // The put operation will not have any headers in the message
+                                    Operation::Put => {
+                                        match serde_json::from_slice::<T>(msg.payload.as_ref()) {
+                                            Ok(payload) => {
+                                                map.insert(key, payload);
+                                            }
+                                            Err(err) => {
+                                                warn!("malformed message: {err:?}");
+                                            }
+                                        }
+                                    }
+                                    Operation::Delete | Operation::Purge => {
+                                        map.remove(&key);
+                                    }
+                                }
+                            }
+                            // There are no strong references anymore, we can stop the subscription
+                            None => {
+                                debug!("strong references lost");
+                                return;
+                            }
+                        }
+                    }
+                    Some(Err(err)) => {
+                        warn!("subscription error: {err:?}");
+                    }
+                    // End of stream
+                    None => return,
+                }
+            }
+            debug!("strong references lost");
+        });
+
+        Ok(arc)
+    }
 }
 
 #[derive(Clone)]
@@ -299,4 +416,11 @@ where
     // a consumer (by exceeding its pending messages limit) which will cause it to hang until the
     // AckWait period has been exceeded.
     Ok(messages.map(|res| NatsMessage::<T>::from(res?)))
+}
+
+fn kv_operation_from_message(message: &async_nats::Message) -> Option<Operation> {
+    let headers = message.headers.as_ref()?;
+    let val = headers.get(KV_OPERATION)?;
+
+    Operation::from_str(val.as_str()).ok()
 }
