@@ -19,6 +19,7 @@ fn init_metrics() -> opentelemetry::metrics::Result<SdkMeterProvider> {
         .metrics(runtime::Tokio)
         .with_exporter(opentelemetry_otlp::new_exporter().tonic())
         .with_period(Duration::from_secs(10))
+        .with_delta_temporality()
         .build()
 }
 
@@ -48,11 +49,11 @@ pub async fn main(runtime: AppRuntime, args: Args) -> Result<()> {
     // OTEL_EXPORTER_OTLP_METRICS_ENDPOINT
     let metrics = init_metrics().context("unable to initialize otlp metrics pipeline")?;
 
-    let execution_requests_meter = metrics.meter("kriger.executions.requests");
-    let execution_requests_counter = execution_requests_meter
-        .u64_counter("count")
-        .with_description("execution requests")
-        .with_unit(Unit::new("{execution}"))
+    let meter = metrics.meter("kriger");
+    let execution_requests_counter = meter
+        .u64_counter("kriger.execution.requests")
+        .with_description("The number of execution requests")
+        .with_unit(Unit::new("{request}"))
         .init();
 
     while let Ok(req) = execution_requests.next().await.context("end of stream")? {
