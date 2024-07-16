@@ -50,6 +50,8 @@ pub enum MessagingError {
     NatsGetStreamError(#[from] async_nats::jetstream::context::GetStreamError),
     /// Some key/value operations will return this error. E.g. upon calling create on an element
     /// that already exists due to optimistic concurrency control.
+    #[error("nats jetstream publish error")]
+    NatsJetStreamPublishError(#[from] async_nats::jetstream::context::PublishError),
     #[error("key value conflict error")]
     KeyValueConflictError,
     #[error("serde_json serialization error")]
@@ -65,7 +67,20 @@ pub trait Messaging: Clone {
 
     fn flags(&self) -> impl Future<Output = Result<impl Bucket, MessagingError>>;
 
+    fn services(&self) -> impl Future<Output = Result<impl Bucket, MessagingError>>;
+
+    fn teams(&self) -> impl Future<Output = Result<impl Bucket, MessagingError>>;
+
     fn executions_wq(&self) -> impl Future<Output = Result<impl Stream, MessagingError>>;
+
+    fn publish<T>(
+        &self,
+        subject: String,
+        payload: &T,
+        double_ack: bool,
+    ) -> impl Future<Output = Result<(), MessagingError>> + Send
+    where
+        T: Serialize + Sync;
 }
 
 pub trait Bucket: Clone + 'static {

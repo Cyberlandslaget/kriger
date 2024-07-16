@@ -1,4 +1,3 @@
-use color_eyre::{eyre::eyre, Report};
 use thiserror::Error;
 
 // implementations

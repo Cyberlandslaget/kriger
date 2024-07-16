@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CompetitionConfig {
@@ -36,6 +37,21 @@ pub struct ExploitResources {
     pub mem_request: Option<String>,
     pub cpu_limit: String,
     pub mem_limit: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Service {
+    pub name: String,
+    pub has_hint: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Team {
+    pub name: Option<String>,
+    pub ip_address: Option<String>,
+    /// A map of service IP addresses. This is only used in situations where services have different
+    /// IP addresses. If an entry does not exist, the [ip_address] field is used.
+    pub services: HashMap<String, String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

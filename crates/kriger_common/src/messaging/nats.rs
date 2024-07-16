@@ -12,6 +12,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::future::Future;
 use std::io::stdin;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -88,6 +89,18 @@ impl NatsMessaging {
         self.context
             .create_key_value(jetstream::kv::Config {
                 bucket: "flags".to_string(),
+                ..Default::default()
+            })
+            .await?;
+        self.context
+            .create_key_value(jetstream::kv::Config {
+                bucket: "services".to_string(),
+                ..Default::default()
+            })
+            .await?;
+        self.context
+            .create_key_value(jetstream::kv::Config {
+                bucket: "teams".to_string(),
                 ..Default::default()
             })
             .await?;
@@ -346,9 +359,41 @@ impl Messaging for NatsMessaging {
         Ok(NatsBucket { store })
     }
 
+    async fn services(&self) -> Result<impl Bucket, MessagingError> {
+        let store = self.context.get_key_value("services").await?;
+        Ok(NatsBucket { store })
+    }
+
+    async fn teams(&self) -> Result<impl Bucket, MessagingError> {
+        let store = self.context.get_key_value("teams").await?;
+        Ok(NatsBucket { store })
+    }
+
     async fn executions_wq(&self) -> Result<impl messaging::Stream, MessagingError> {
         let stream = self.context.get_stream("executions_wq").await?;
         Ok(NatsStream { stream })
+    }
+
+    async fn publish<T>(
+        &self,
+        subject: String,
+        payload: &T,
+        double_ack: bool,
+    ) -> Result<(), MessagingError>
+    where
+        T: Serialize,
+    {
+        let serialized_payload = serde_json::to_string(payload)?;
+        let fut = self
+            .context
+            .publish(subject, serialized_payload.into_bytes().into())
+            .await?;
+
+        if double_ack {
+            fut.await?;
+        }
+
+        Ok(())
     }
 }
 
