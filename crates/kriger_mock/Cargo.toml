@@ -1,0 +1,12 @@
+[package]
+name = "kriger_mock"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.86"
+axum = { version = "0.7.5" }
+clap.workspace = true
+hyper = { version = "1.4.0", features = ["server", "http1"] }
+serde.workspace = true
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "net", "macros"] }

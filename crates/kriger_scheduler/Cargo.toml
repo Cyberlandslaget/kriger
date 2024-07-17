@@ -6,6 +6,7 @@ edition = "2021"
 [features]
 
 [dependencies]
+base64.workspace = true
 chrono.workspace = true
 color-eyre.workspace = true
 kriger_common.path = "../kriger_common"

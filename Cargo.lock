@@ -1565,6 +1565,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "kriger_mock"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum 0.7.5",
+ "clap",
+ "hyper 1.4.1",
+ "serde",
+ "tokio",
+]
+
+[[package]]
 name = "kriger_rest"
 version = "0.0.1"
 dependencies = [
@@ -1600,6 +1612,7 @@ dependencies = [
 name = "kriger_scheduler"
 version = "0.0.1"
 dependencies = [
+ "base64 0.22.1",
  "chrono",
  "color-eyre",
  "kriger_common",

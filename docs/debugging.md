@@ -28,13 +28,35 @@ docker run --network kriger_default -e NATS_URL=nats://nats:4222 --rm -it natsio
 ```
 
 ```bash
-nats kv put config competition '{
-  "start": "2024-01-01T08:00:00Z",
-  "tick": 5,
-  "tick_start": 0,
-  "flag_validity": 5,
-  "flag_format": "FLAG_[^ ]+"
-}'
+nats kv put config competition '{"start": "2024-01-01T08:00:00Z", "tick": 5, "tick_start": 0, "flag_validity": 5, "flag_format": "FLAG_[^ ]+"}'
+```
+
+#### Scheduler Testing
+
+Team:
+
+```json
+{
+  "ip_address": "127.0.0.1",
+  "services": {}
+}
+```
+
+```bash
+nats kv put teams 1 '{"ip_address": "127.0.0.1", "service":{}}'
+```
+
+Service:
+
+```json
+{
+  "name": "service 1 Checker 1",
+  "has_hint": false
+}
+```
+
+```bash
+nats kv put services U2VydmljZSAxIENoZWNrZXIgMQ '{"name": "service 1 Checker 1", "has_hint": false}'
 ```
 
 #### Controller Testing
