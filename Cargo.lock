@@ -1624,7 +1624,9 @@ dependencies = [
 name = "kriger_submitter"
 version = "0.0.1"
 dependencies = [
+ "base64 0.22.1",
  "color-eyre",
+ "futures",
  "kriger_common",
  "rand",
  "reqwest",

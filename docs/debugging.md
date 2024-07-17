@@ -23,12 +23,18 @@ docker run --network kriger_default -e NATS_URL=nats://nats:4222 --rm -it natsio
   "tick": 5,
   "tick_start": 0,
   "flag_validity": 5,
-  "flag_format": "FLAG_[^ ]+"
+  "flag_format": "FLAG_[^ ]+",
+  "submitter": {
+    "type": "dummy"
+  },
+  "fetcher": {
+    "type": "dummy"
+  }
 }
 ```
 
 ```bash
-nats kv put config competition '{"start": "2024-01-01T08:00:00Z", "tick": 5, "tick_start": 0, "flag_validity": 5, "flag_format": "FLAG_[^ ]+"}'
+nats kv put config competition '{"start": "2024-01-01T08:00:00Z", "tick": 5, "tick_start": 0, "flag_validity": 5, "flag_format": "FLAG_[^ ]+", "submitter": {"type": "dummy"}, "fetcher": {"type": "dummy"}}'
 ```
 
 #### Scheduler Testing

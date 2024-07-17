@@ -13,6 +13,11 @@ pub struct CompetitionConfig {
     pub flag_validity: u32,
     /// The regular expression for the flag format
     pub flag_format: String,
+    /// The submitter configuration. This will be dynamically checked by the submitter at runtime
+    /// to avoid having to model it in this crate.
+    pub submitter: serde_json::Value,
+    /// The fetcher configuration.
+    pub fetcher: serde_json::Value,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
