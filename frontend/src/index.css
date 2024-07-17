@@ -4,6 +4,7 @@
 
 html {
   @apply h-full;
+  scroll-behavior: smooth;
 }
 
 body {

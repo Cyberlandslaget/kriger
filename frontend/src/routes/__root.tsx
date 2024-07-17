@@ -1,10 +1,10 @@
 import { createRootRoute, Outlet } from "@tanstack/react-router";
-import NavBar from "../components/NavBar";
+import NavigationBar from "../components/NavigationBar";
 
 export const Route = createRootRoute({
   component: () => (
     <>
-      <NavBar />
+      <NavigationBar />
       <div className="px-6">
         <Outlet />
       </div>
