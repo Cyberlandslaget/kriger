@@ -1,15 +1,21 @@
+use std::process::Stdio;
 use std::time::Duration;
 
 use bollard::image::{BuildImageOptions, BuilderVersion};
 use bollard::models::BuildInfo;
 use bollard::secret::BuildInfoAux;
 use bollard::Docker;
+use color_eyre::eyre::{Context, ContextCompat};
 use color_eyre::Result;
 use console::style;
+use futures::stream::select_all;
 use futures::StreamExt;
 use indicatif::ProgressBar;
 use tokio::fs;
+use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::process::Command;
 use tokio::time::Instant;
+use tokio_stream::wrappers::LinesStream;
 
 use crate::cli::model::ExploitManifest;
 use crate::cli::{args, emoji, format_duration_secs, log};
@@ -21,7 +27,7 @@ async fn read_exploit_manifest() -> Result<ExploitManifest> {
     Ok(toml::from_str(toml)?)
 }
 
-async fn build_image(docker: &Docker) -> Result<()> {
+async fn build_image_bollard(docker: &Docker) -> Result<()> {
     let start = Instant::now();
 
     let opt = BuildImageOptions {
@@ -93,12 +99,70 @@ async fn build_image(docker: &Docker) -> Result<()> {
     Ok(())
 }
 
+// TODO: Eventually move to bollard if things work?
+async fn build_image(
+    progress: &ProgressBar,
+    manifest: &ExploitManifest,
+    tag: &str,
+) -> Result<bool> {
+    let start = Instant::now();
+
+    // TODO: Verify if this works on all relevant OSes?
+    let mut child = Command::new("docker")
+        .args(&["buildx", "build", "--tag", tag, "."])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .context("unable to spawn child")?;
+
+    let stdout = child
+        .stdout
+        .take()
+        .context("unable to retrieve a handle to the stdout pipe")?;
+    let stderr = child
+        .stderr
+        .take()
+        .context("unable to retrieve a handle to the stderr pipe")?;
+
+    let stdout_stream = LinesStream::new(BufReader::new(stdout).lines());
+    let stderr_stream = LinesStream::new(BufReader::new(stderr).lines());
+
+    let mut fused_stream = select_all(vec![stdout_stream.boxed(), stderr_stream.boxed()]);
+    while let Some(Ok(line)) = fused_stream.next().await {
+        log(&progress, style(line).blue().to_string());
+    }
+
+    let exit_status = child.wait().await.context("unable to wait for child")?;
+    if !exit_status.success() {
+        return Ok(false);
+    }
+
+    progress.finish_and_clear();
+
+    let elapsed = start.elapsed();
+    println!(
+        "  {} Built in {}",
+        emoji::SPARKLES,
+        style(format_duration_secs(&elapsed)).bold().green()
+    );
+
+    Ok(true)
+}
+
 pub(crate) async fn main(args: args::Deploy) -> Result<()> {
     let manifest = match read_exploit_manifest().await {
         Ok(manifest) => manifest,
         Err(err) => {
-            println!("unable to read the exploit manifest (exploit.toml)");
-            return Err(err);
+            eprintln!(
+                "  {} {}",
+                emoji::CROSS_MARK,
+                style("Unable to read the exploit manifest (exploit.toml)")
+                    .red()
+                    .bold()
+            );
+            eprintln!("{err}");
+            return Ok(());
         }
     };
     println!(
@@ -107,8 +171,39 @@ pub(crate) async fn main(args: args::Deploy) -> Result<()> {
         style(&manifest.exploit.name).green().bold()
     );
 
-    let docker = Docker::connect_with_local_defaults()?;
-    build_image(&docker).await?;
+    let date = chrono::Utc::now();
+    let tag_version = format!("{}", date.timestamp());
+    let tag = format!(
+        "r.o99.no/kriger-exploits/{}:{}",
+        &manifest.exploit.name, tag_version
+    );
+
+    let progress = ProgressBar::new_spinner();
+    progress.enable_steady_tick(Duration::from_millis(130));
+    progress.set_message(format!("{} Building...", emoji::HAMMER));
+
+    match build_image(&progress, &manifest, &tag).await {
+        Err(err) => {
+            progress.finish_and_clear();
+            println!(
+                "  {} {}",
+                emoji::CROSS_MARK,
+                style("Build failed").red().bold()
+            );
+            return Err(err);
+        }
+        Ok(success) => {
+            if !success {
+                progress.finish_and_clear();
+                println!(
+                    "  {} {}",
+                    emoji::CROSS_MARK,
+                    style("Build failed").red().bold()
+                );
+                return Ok(());
+            }
+        }
+    }
 
     Ok(())
 }
