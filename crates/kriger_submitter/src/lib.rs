@@ -3,9 +3,10 @@ mod submitter;
 use crate::submitter::{Submitter, SubmitterCallback, SubmitterConfig};
 use base64::engine::general_purpose::STANDARD_NO_PAD;
 use base64::Engine;
-use color_eyre::eyre::{Context, ContextCompat, Result};
+use color_eyre::eyre;
+use color_eyre::eyre::{Context, ContextCompat};
 use futures::StreamExt;
-use kriger_common::messaging::model::{CompetitionConfig, FlagSubmissionResult};
+use kriger_common::messaging::model::{CompetitionConfig, FlagSubmission, FlagSubmissionResult};
 use kriger_common::messaging::{AckPolicy, Bucket, DeliverPolicy, Messaging, MessagingError};
 use kriger_common::runtime::AppRuntime;
 use std::sync::Arc;
@@ -24,7 +25,7 @@ impl<B: Bucket + Send + Sync> SubmitterCallback for SubmitterCallbackImpl<B> {
     }
 }
 
-pub async fn main(runtime: AppRuntime) -> Result<()> {
+pub async fn main(runtime: AppRuntime) -> eyre::Result<()> {
     info!("starting submitter");
 
     let config_bucket = runtime
@@ -42,13 +43,13 @@ pub async fn main(runtime: AppRuntime) -> Result<()> {
 
     let flags_bucket = runtime
         .messaging
-        .config()
+        .flags()
         .await
         .context("unable to retrieve the flags bucket")?;
     let flags_bucket = Arc::new(flags_bucket);
 
     let flag_submissions = flags_bucket
-        .watch_key(
+        .watch_key::<FlagSubmission>(
             "*.submit",
             Some("submitter".to_string()),
             AckPolicy::Explicit,
@@ -74,6 +75,6 @@ pub async fn main(runtime: AppRuntime) -> Result<()> {
         .context("unable to parse the flag submitter config")?;
 
     let submitter = config.into_submitter();
-    submitter.run(flag_submissions, callback).await?;
+    submitter.run(flag_submissions.boxed(), callback).await?;
     Ok(())
 }

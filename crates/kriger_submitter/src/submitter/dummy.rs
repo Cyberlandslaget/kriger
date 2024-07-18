@@ -1,11 +1,10 @@
 use color_eyre::eyre;
 use color_eyre::eyre::Context;
-use futures::{Stream, StreamExt};
+use futures::Stream;
 use kriger_common::messaging::model::{FlagSubmission, FlagSubmissionResult, FlagSubmissionStatus};
 use kriger_common::messaging::Message;
 use rand::Rng;
-use tokio::pin;
-use tracing::warn;
+use std::pin::Pin;
 
 use super::{Submitter, SubmitterCallback};
 
@@ -15,16 +14,18 @@ pub struct DummySubmitter {}
 impl Submitter for DummySubmitter {
     async fn run(
         &self,
-        flags: impl Stream<Item = impl Message<Payload = FlagSubmission>> + Send + Sync,
-        callback: impl SubmitterCallback + Send + Sync,
+        flags: Pin<
+            Box<dyn Stream<Item = (impl Message<Payload = FlagSubmission> + 'static)> + Send>,
+        >,
+        callback: impl SubmitterCallback + Send + Sync + 'static,
     ) -> eyre::Result<()> {
-        pin!(flags);
-        while let Some(msg) = flags.next().await {
-            if let Err(err) = self.handle_flag(&msg, &callback).await {
-                let _ = msg.nak();
-                warn!("unable to handle flag: {err:?}");
-            }
-        }
+        // pin!(flags);
+        // while let Some(msg) = flags.next().await {
+        //     if let Err(err) = self.handle_flag(&msg, &callback).await {
+        //         let _ = msg.nak();
+        //         warn!("unable to handle flag: {err:?}");
+        //     }
+        // }
         Ok(())
     }
 }

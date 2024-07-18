@@ -1,16 +1,16 @@
 use color_eyre::eyre;
 use futures::Stream;
+use kriger_common::messaging::model::{FlagSubmission, FlagSubmissionResult};
+use kriger_common::messaging::{Message, MessagingError};
 use serde::Deserialize;
 use std::future::Future;
+use std::pin::Pin;
 use thiserror::Error;
 
 // TODO: Port
 //mod dctf;
 //mod faust;
 mod dummy;
-
-use kriger_common::messaging::model::{FlagSubmission, FlagSubmissionResult};
-use kriger_common::messaging::{Message, MessagingError};
 
 // TODO: Devise a more ergonomic way to deal with this.
 pub(crate) trait SubmitterCallback {
@@ -26,8 +26,10 @@ pub(crate) trait SubmitterCallback {
 pub(crate) trait Submitter {
     fn run(
         &self,
-        flags: impl Stream<Item = impl Message<Payload = FlagSubmission>> + Send + Sync,
-        callback: impl SubmitterCallback + Send + Sync,
+        flags: Pin<
+            Box<dyn Stream<Item = (impl Message<Payload = FlagSubmission> + 'static)> + Send>,
+        >,
+        callback: impl SubmitterCallback + Send + Sync + 'static,
     ) -> impl Future<Output = eyre::Result<()>> + Send;
 }
 
@@ -38,7 +40,7 @@ pub enum SubmitterConfig {
 }
 
 impl SubmitterConfig {
-    pub(crate) fn into_submitter(self) -> impl Submitter {
+    pub(crate) fn into_submitter(self) -> impl Submitter + Send {
         match self {
             SubmitterConfig::Dummy => dummy::DummySubmitter {},
         }
