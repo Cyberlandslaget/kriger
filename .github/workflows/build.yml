@@ -10,6 +10,7 @@ jobs:
     name: Build ${{ matrix.tag }}
     runs-on: self-hosted
     strategy:
+      fail-fast: false
       matrix:
         include:
           - tag: kriger/kriger
@@ -49,6 +50,7 @@ jobs:
 #          platforms: linux/amd64,linux/arm64
   build_exploit_base:
     strategy:
+      fail-fast: false
       matrix:
         include:
           - tag: kriger/exploit-base:python
