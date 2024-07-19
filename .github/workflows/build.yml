@@ -80,4 +80,4 @@ jobs:
 #          platforms: linux/amd64,linux/arm64
 
       - name: Push image to registry
-        run: docker image push --all-tags r.o99.no/${{ matrix.tag }}
+        run: docker image push r.o99.no/${{ matrix.tag }}
