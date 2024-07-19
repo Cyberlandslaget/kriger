@@ -79,6 +79,10 @@ pub struct ExecutionResult {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FlagSubmission {
+    /// The flag itself
+    #[serde(rename = "f")]
+    pub flag: String,
+
     /// The network id of the team that the flag was retrieved from
     #[serde(rename = "t")]
     pub team_id: Option<String>,
@@ -94,6 +98,8 @@ pub struct FlagSubmission {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FlagSubmissionResult {
+    #[serde(rename = "f")]
+    pub flag: String,
     #[serde(rename = "s")]
     pub status: FlagSubmissionStatus,
     #[serde(rename = "p")]

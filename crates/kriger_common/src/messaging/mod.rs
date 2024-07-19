@@ -161,7 +161,7 @@ pub trait Stream: Clone {
 
 // Assuming that this trait can be 'static. If not, remove bound here and fix lifetime issues in kriger_runner::main.
 #[async_trait]
-pub trait Message: Send + 'static {
+pub trait Message: Send + Sync + 'static {
     type Payload: Send;
 
     fn payload(&self) -> &Self::Payload;

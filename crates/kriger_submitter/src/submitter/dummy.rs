@@ -1,10 +1,11 @@
 use color_eyre::eyre;
 use color_eyre::eyre::Context;
-use futures::Stream;
+use futures::{Stream, StreamExt};
 use kriger_common::messaging::model::{FlagSubmission, FlagSubmissionResult, FlagSubmissionStatus};
 use kriger_common::messaging::Message;
 use rand::Rng;
 use std::pin::Pin;
+use tracing::warn;
 
 use super::{Submitter, SubmitterCallback};
 
@@ -14,18 +15,19 @@ pub struct DummySubmitter {}
 impl Submitter for DummySubmitter {
     async fn run(
         &self,
-        flags: Pin<
-            Box<dyn Stream<Item = (impl Message<Payload = FlagSubmission> + 'static)> + Send>,
+        mut flags: Pin<
+            Box<
+                dyn Stream<Item = (impl Message<Payload = FlagSubmission> + Sync + 'static)> + Send,
+            >,
         >,
         callback: impl SubmitterCallback + Send + Sync + 'static,
     ) -> eyre::Result<()> {
-        // pin!(flags);
-        // while let Some(msg) = flags.next().await {
-        //     if let Err(err) = self.handle_flag(&msg, &callback).await {
-        //         let _ = msg.nak();
-        //         warn!("unable to handle flag: {err:?}");
-        //     }
-        // }
+        while let Some(msg) = flags.next().await {
+            if let Err(err) = self.handle_flag(&msg, &callback).await {
+                let _ = msg.nak().await;
+                warn!("unable to handle flag: {err:?}");
+            }
+        }
         Ok(())
     }
 }
@@ -39,13 +41,15 @@ impl DummySubmitter {
         msg.progress().await.context("unable to ack")?;
         let status = self.gen_submission_status();
 
+        let payload = msg.payload();
         let result = FlagSubmissionResult {
+            flag: payload.flag.to_string(),
             status,
             points: None,
         };
         // TODO: Extract flag from the key
         callback
-            .submit("", result)
+            .submit(&payload.flag, result)
             .await
             .context("unable to save submission result")?;
 

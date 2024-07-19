@@ -49,8 +49,16 @@ docker compose down
 Run the server components:
 
 ```bash
-cargo run server ---single
+cargo r --bin kriger server ---single
 ```
+
+Run the competition mock:
+
+```bash
+cargo r --bin kriger_mock
+```
+
+The mock will be available at port `:8080` by default.
 
 Run the runner component:
 
@@ -78,10 +86,10 @@ docker build --build-arg "REGISTRY=localhost:5000" \
   data/base/python
 ```
 
-Build templates as exploits:
+Build the example exploit:
 
 ```bash
-tar -ch -C data/templates/python . | docker build --build-arg "REGISTRY=localhost:5000" \
+tar -ch -C data/examples/python-test . | docker build --build-arg "REGISTRY=localhost:5000" \
   -t r.o99.no/kriger-exploits/test \
   -t localhost:5000/kriger-exploits/test \
   -
@@ -90,6 +98,7 @@ tar -ch -C data/templates/python . | docker build --build-arg "REGISTRY=localhos
 > **Note:** `tar -ch` is required to archive the build context since symlinks are used in the templates.
 
 Push the exploit to the registry:
+
 ```bash
 docker push localhost:5000/kriger-exploits/test
 ```

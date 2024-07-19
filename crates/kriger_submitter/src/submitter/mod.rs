@@ -27,7 +27,9 @@ pub(crate) trait Submitter {
     fn run(
         &self,
         flags: Pin<
-            Box<dyn Stream<Item = (impl Message<Payload = FlagSubmission> + 'static)> + Send>,
+            Box<
+                dyn Stream<Item = (impl Message<Payload = FlagSubmission> + Sync + 'static)> + Send,
+            >,
         >,
         callback: impl SubmitterCallback + Send + Sync + 'static,
     ) -> impl Future<Output = eyre::Result<()>> + Send;

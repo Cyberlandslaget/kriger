@@ -29,6 +29,7 @@ impl<T: Bucket> RunnerCallback for RunnerCallbackImpl<T> {
     async fn on_flag(&self, request: &ExecutionRequest, flag: &str) -> Result<()> {
         let key = format!("{}.submit", STANDARD_NO_PAD.encode(flag.as_bytes()));
         let payload = FlagSubmission {
+            flag: flag.to_string(),
             team_id: request.team_id.clone(),
             service: self.service.clone(),
             exploit: Some(self.exploit.clone()),
