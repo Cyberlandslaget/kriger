@@ -155,8 +155,25 @@ impl FlagStore {
     }
 }
 
-async fn flag(state: State<Arc<AppState>>, Path(team): Path<u32>) -> Json<String> {
+async fn getflag(state: State<Arc<AppState>>, Path(team): Path<u32>) -> Json<String> {
     Json(state.fs.get_flag(team))
+}
+
+async fn getflags(state: State<Arc<AppState>>, Path(team): Path<u32>) -> Json<Vec<String>> {
+    let current_tick = state.fs.tick.load(std::sync::atomic::Ordering::Acquire);
+
+    // this is a little racy but it's fiine
+    let first_tick = if current_tick < 6 {
+        1
+    } else {
+        current_tick - 4
+    };
+
+    Json(
+        (first_tick..=current_tick)
+            .map(|tick| state.fs.get_flag_at_time(tick, team))
+            .collect(),
+    )
 }
 
 #[derive(Serialize)]
@@ -252,7 +269,8 @@ async fn main() -> Result<()> {
     let state = Arc::new(AppState { fs, ticker });
 
     let app = Router::new()
-        .route("/getflag/:team", get(flag))
+        .route("/getflag/:team", get(getflag))
+        .route("/getflags/:team", get(getflags))
         .route("/flags", put(flags))
         .route("/force-tick", put(force_tick))
         .with_state(state);
