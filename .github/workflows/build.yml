@@ -73,8 +73,11 @@ jobs:
         with:
           context: ${{ matrix.path }}
           file: ${{ matrix.path }}/Dockerfile
-          push: true
+#          push: true
           tags: r.o99.no/${{ matrix.tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 #          platforms: linux/amd64,linux/arm64
+
+      - name: Push image to registry
+        run: docker image push --all-tags r.o99.no/${{ matrix.tag }}
