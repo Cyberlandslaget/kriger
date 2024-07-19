@@ -7,13 +7,15 @@ use color_eyre::eyre;
 use color_eyre::eyre::{Context, ContextCompat};
 use futures::StreamExt;
 use kriger_common::messaging::model::{CompetitionConfig, FlagSubmission, FlagSubmissionResult};
+use kriger_common::messaging::nats::NatsMessaging;
 use kriger_common::messaging::{AckPolicy, Bucket, DeliverPolicy, Messaging, MessagingError};
 use kriger_common::runtime::AppRuntime;
 use std::sync::Arc;
 use tracing::{info, warn};
 
 struct SubmitterCallbackImpl<B: Bucket + Send + Sync> {
-    bucket: Arc<B>,
+    // NOTE this ought to be an Arc or something once the Box::leak is removed
+    bucket: &'static B,
 }
 
 impl<B: Bucket + Send + Sync> SubmitterCallback for SubmitterCallbackImpl<B> {
@@ -46,7 +48,8 @@ pub async fn main(runtime: AppRuntime) -> eyre::Result<()> {
         .flags()
         .await
         .context("unable to retrieve the flags bucket")?;
-    let flags_bucket = Arc::new(flags_bucket);
+    let flags_bucket = Box::leak(Box::new(flags_bucket));
+    // TODO FIXME Using Box::leak is ugly, avoid doing that
 
     let flag_submissions = flags_bucket
         .watch_key::<FlagSubmission>(
@@ -68,7 +71,7 @@ pub async fn main(runtime: AppRuntime) -> eyre::Result<()> {
         });
 
     let callback = SubmitterCallbackImpl {
-        bucket: flags_bucket.clone(),
+        bucket: flags_bucket,
     };
 
     let config: SubmitterConfig = serde_json::from_value(competition_config.submitter)
