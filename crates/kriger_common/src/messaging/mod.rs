@@ -91,6 +91,7 @@ pub trait Bucket: Clone + 'static {
     fn watch_key<T>(
         &self,
         key: &str,
+        durable_name: Option<String>,
         ack_policy: AckPolicy,
         deliver_policy: DeliverPolicy,
     ) -> impl Future<
@@ -104,6 +105,7 @@ pub trait Bucket: Clone + 'static {
 
     fn watch_all<T>(
         &self,
+        durable_name: Option<String>,
         ack_policy: AckPolicy,
         deliver_policy: DeliverPolicy,
     ) -> impl Future<

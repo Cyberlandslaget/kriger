@@ -119,6 +119,7 @@ impl NatsBucket {
     async fn watch<T>(
         &self,
         key: Option<&str>,
+        durable_name: Option<String>,
         ack_policy: AckPolicy,
         deliver_policy: DeliverPolicy,
     ) -> Result<impl Stream<Item = Result<NatsMessage<T>, MessagingError>>, MessagingError>
@@ -132,6 +133,7 @@ impl NatsBucket {
                 filter_subject: key.map_or(Default::default(), |key| {
                     format!("{}{}", &self.store.prefix, key)
                 }),
+                durable_name,
                 ack_policy,
                 deliver_policy,
                 ..Default::default()
@@ -155,25 +157,32 @@ impl Bucket for NatsBucket {
     async fn watch_key<T>(
         &self,
         key: &str,
+        durable_name: Option<String>,
         ack_policy: messaging::AckPolicy,
         deliver_policy: messaging::DeliverPolicy,
     ) -> Result<impl Stream<Item = Result<impl Message<Payload = T>, MessagingError>>, MessagingError>
     where
         T: DeserializeOwned + Send + Sync + 'static,
     {
-        self.watch(Some(key), ack_policy.into(), deliver_policy.into())
-            .await
+        self.watch(
+            Some(key),
+            durable_name,
+            ack_policy.into(),
+            deliver_policy.into(),
+        )
+        .await
     }
 
     async fn watch_all<T>(
         &self,
+        durable_name: Option<String>,
         ack_policy: messaging::AckPolicy,
         deliver_policy: messaging::DeliverPolicy,
     ) -> Result<impl Stream<Item = Result<impl Message<Payload = T>, MessagingError>>, MessagingError>
     where
         T: DeserializeOwned + Send + Sync + 'static,
     {
-        self.watch(None, ack_policy.into(), deliver_policy.into())
+        self.watch(None, durable_name, ack_policy.into(), deliver_policy.into())
             .await
     }
 

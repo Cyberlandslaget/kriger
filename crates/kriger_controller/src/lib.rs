@@ -4,7 +4,11 @@ use crate::config::Config;
 use color_eyre::eyre::{Context, Result};
 use futures::StreamExt;
 use k8s_openapi::api::apps::v1::{Deployment, DeploymentSpec};
-use k8s_openapi::api::core::v1::{Capabilities, Container, EnvVar, PodSpec, PodTemplateSpec, ResourceRequirements, SecurityContext};
+use k8s_openapi::api::core::v1::{
+    Capabilities, Container, EnvVar, PodSpec, PodTemplateSpec, ResourceRequirements,
+    SecurityContext,
+};
+use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta};
 use kriger_common::messaging::model::Exploit;
 use kriger_common::messaging::{AckPolicy, Bucket, DeliverPolicy, Message, Messaging};
@@ -12,7 +16,6 @@ use kriger_common::runtime::AppRuntime;
 use kube::api::{Patch, PatchParams};
 use kube::{Api, Client};
 use std::collections::BTreeMap;
-use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
 use tokio::pin;
 use tracing::{info, warn};
 
@@ -40,7 +43,7 @@ pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
     // Technically, we can use a durable consumer here, but this approach allows us to quickly fix
     // provisioning issue with the underlying orchestration platform.
     let exploits_stream = exploits
-        .watch_all::<Exploit>(AckPolicy::Explicit, DeliverPolicy::Last)
+        .watch_all::<Exploit>(None, AckPolicy::Explicit, DeliverPolicy::Last)
         .await
         .context("unable to watch exploits")?;
     pin!(exploits_stream);
@@ -48,13 +51,7 @@ pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
     while let Some(res) = exploits_stream.next().await {
         match res {
             Ok(message) => {
-                if let Err(err) = handle_message(
-                    &deployments,
-                    message,
-                    &config,
-                )
-                    .await
-                {
+                if let Err(err) = handle_message(&deployments, message, &config).await {
                     warn!("unable to handle message: {err:?}");
                 }
             }
@@ -67,7 +64,7 @@ pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
 
 async fn handle_message(
     deployments: &Api<Deployment>,
-    message: impl Message<Payload=Exploit>,
+    message: impl Message<Payload = Exploit>,
     config: &Config,
 ) -> Result<()> {
     let exploit = message.payload();
@@ -131,8 +128,14 @@ async fn reconcile(
         if let Some(mem_request) = exploit.manifest.resources.mem_request.clone() {
             requests.insert("memory".to_string(), Quantity(mem_request));
         }
-        limits.insert("cpu".to_string(), Quantity(exploit.manifest.resources.cpu_limit.clone()));
-        limits.insert("memory".to_string(), Quantity(exploit.manifest.resources.cpu_limit.clone()));
+        limits.insert(
+            "cpu".to_string(),
+            Quantity(exploit.manifest.resources.cpu_limit.clone()),
+        );
+        limits.insert(
+            "memory".to_string(),
+            Quantity(exploit.manifest.resources.cpu_limit.clone()),
+        );
     }
 
     let spec = DeploymentSpec {

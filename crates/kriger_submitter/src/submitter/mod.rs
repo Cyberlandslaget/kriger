@@ -1,19 +1,50 @@
+use color_eyre::eyre;
+use futures::Stream;
+use kriger_common::messaging::model::{FlagSubmission, FlagSubmissionResult};
+use kriger_common::messaging::{Message, MessagingError};
+use serde::Deserialize;
+use std::future::Future;
+use std::pin::Pin;
 use thiserror::Error;
 
-// implementations
-mod dctf;
-pub use dctf::DctfSubmitter;
-mod faust;
-pub use faust::FaustSubmitter;
+// TODO: Port
+//mod dctf;
+//mod faust;
 mod dummy;
-pub use dummy::DummySubmitter;
-use kriger_common::messaging::model::FlagSubmissionStatus;
 
-#[derive(Debug)]
-pub enum Submitters {
-    Dummy(DummySubmitter),
-    Faust(FaustSubmitter),
-    Dctf(DctfSubmitter),
+// TODO: Devise a more ergonomic way to deal with this.
+pub(crate) trait SubmitterCallback {
+    fn submit(
+        &self,
+        flag: &str,
+        result: FlagSubmissionResult,
+    ) -> impl Future<Output = Result<(), MessagingError>> + Send;
+}
+
+/// The submitter will be responsible for handling the flag submission lifecycle with the given
+/// [flags] stream and the [callback].
+pub(crate) trait Submitter {
+    fn run(
+        &self,
+        flags: Pin<
+            Box<dyn Stream<Item = (impl Message<Payload = FlagSubmission> + 'static)> + Send>,
+        >,
+        callback: impl SubmitterCallback + Send + Sync + 'static,
+    ) -> impl Future<Output = eyre::Result<()>> + Send;
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum SubmitterConfig {
+    Dummy,
+}
+
+impl SubmitterConfig {
+    pub(crate) fn into_submitter(self) -> impl Submitter + Send {
+        match self {
+            SubmitterConfig::Dummy => dummy::DummySubmitter {},
+        }
+    }
 }
 
 /// Did not manage to submit
@@ -28,57 +59,4 @@ pub enum SubmitError {
     SerdeJson(#[from] serde_json::Error),
     #[error("reqwest")]
     Reqwest(#[from] reqwest::Error),
-}
-
-/// Implements the low-level operation of submitting a bunch of flags
-pub trait Submitter {
-    async fn submit(
-        &self,
-        flags: Vec<String>,
-    ) -> Result<Vec<(String, FlagSubmissionStatus)>, SubmitError>;
-}
-
-// Deserialize
-impl Submitters {
-    /*
-    pub fn from_conf(manager: &config::Manager) -> Result<Self, Report> {
-        match manager.submitter_name.as_str() {
-            "dummy" => Ok(Self::Dummy(DummySubmitter {})),
-            "faust" => {
-                let host = manager
-                    .submitter
-                    .get("host")
-                    .ok_or(eyre!("Faust submitter requires host"))?
-                    .as_str()
-                    .ok_or(eyre!("Faust submitter host must be a string"))?
-                    .to_owned();
-
-                let faust = FaustSubmitter::new(host);
-
-                Ok(Self::Faust(faust))
-            }
-            "dctf" => {
-                let url = manager
-                    .submitter
-                    .get("url")
-                    .ok_or(eyre!("DCTF submitter requires url"))?
-                    .as_str()
-                    .ok_or(eyre!("DCTF submitter url must be a string"))?
-                    .to_owned();
-
-                let cookie = manager
-                    .submitter
-                    .get("cookie")
-                    .ok_or(eyre!("DCTF submitter requires cookie"))?
-                    .as_str()
-                    .ok_or(eyre!("DCTF submitter cookie must be a string"))?
-                    .to_owned();
-
-                let dctf = DctfSubmitter::new(url, cookie);
-
-                Ok(Self::Dctf(dctf))
-            }
-            _ => Err(eyre!("Unknown submitter {}", manager.submitter_name)),
-        }
-    }*/
 }
