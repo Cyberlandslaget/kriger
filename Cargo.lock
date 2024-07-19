@@ -1576,6 +1576,8 @@ dependencies = [
  "hyper 1.4.1",
  "serde",
  "tokio",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

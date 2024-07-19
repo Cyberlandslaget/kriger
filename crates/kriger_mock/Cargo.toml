@@ -10,3 +10,5 @@ clap.workspace = true
 hyper = { version = "1.4.0", features = ["server", "http1"] }
 serde.workspace = true
 tokio = { workspace = true, features = ["rt", "rt-multi-thread", "net", "macros"] }
+tracing.workspace = true
+tracing-subscriber.workspace = true

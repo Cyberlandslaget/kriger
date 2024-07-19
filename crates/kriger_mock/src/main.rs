@@ -11,8 +11,9 @@ use axum::{
     Json, Router,
 };
 use clap::Parser;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use tokio::sync::Mutex;
+use tracing::debug;
 
 mod util;
 
@@ -37,9 +38,19 @@ struct FlagStore {
     hasher: RandomState,
 }
 
-#[derive(Default)]
+struct TickerControl {
+    tx: tokio::sync::mpsc::Sender<()>,
+}
+
 struct AppState {
-    fs: FlagStore,
+    fs: Arc<FlagStore>,
+    ticker: TickerControl,
+}
+
+impl TickerControl {
+    async fn tick(&self) {
+        self.tx.send(()).await.unwrap();
+    }
 }
 
 #[derive(PartialEq, PartialOrd, Debug)]
@@ -64,6 +75,8 @@ impl FlagStore {
             .lock()
             .await
             .clear();
+
+        debug!("Tick!");
     }
 
     fn complete(&self, buf: &mut [u8; 31]) {
@@ -181,24 +194,68 @@ async fn flags(
 }
 
 async fn force_tick(state: State<Arc<AppState>>) {
-    state.fs.tick().await;
+    state.ticker.tick().await;
+}
+
+async fn autotick(fs: Arc<FlagStore>, duration: Option<u64>) -> TickerControl {
+    let (tx, mut rx) = tokio::sync::mpsc::channel(1);
+
+    if let Some(duration) = duration {
+        tokio::task::spawn(async move {
+            loop {
+                let ticker = async {
+                    let mut it = tokio::time::interval(std::time::Duration::from_secs(duration));
+
+                    // Intentionally not skipping first tick
+                    loop {
+                        it.tick().await;
+                        fs.tick().await;
+                    }
+                };
+
+                tokio::select! {
+                    _ = ticker => unreachable!(),
+                    _ = rx.recv() => {},
+                };
+            }
+        });
+    } else {
+        tokio::task::spawn(async move {
+            loop {
+                rx.recv().await.unwrap();
+                fs.tick().await;
+            }
+        });
+    }
+
+    TickerControl { tx }
 }
 
 #[derive(Parser)]
 struct Args {
     #[clap(default_value = "0.0.0.0:8080")]
     listen_on: String,
+
+    #[clap(long)]
+    /// Number of seconds between each tick
+    autotick: Option<u64>,
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
 
+    tracing_subscriber::fmt::init();
+
+    let fs = Arc::new(FlagStore::default());
+    let ticker = autotick(fs.clone(), args.autotick).await;
+    let state = Arc::new(AppState { fs, ticker });
+
     let app = Router::new()
         .route("/getflag/:team", get(flag))
         .route("/flags", put(flags))
         .route("/force-tick", put(force_tick))
-        .with_state(Arc::new(AppState::default()));
+        .with_state(state);
 
     let listener = tokio::net::TcpListener::bind(&args.listen_on).await?;
 
