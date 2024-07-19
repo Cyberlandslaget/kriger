@@ -38,7 +38,7 @@ jobs:
       matrix:
         include:
           - tag: kriger/exploit-base:python
-            path: data/templates/python
+            path: data/base/python
     name: Build exploit base ${{ matrix.tag }}
     runs-on: self-hosted
     needs: [ build ]
