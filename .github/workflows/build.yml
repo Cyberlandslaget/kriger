@@ -13,8 +13,8 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v4
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+#      - name: Set up QEMU
+#        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -38,7 +38,7 @@ jobs:
           tags: r.o99.no/kriger/kriger:${{ github.run_number }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          platforms: linux/amd64,linux/arm64
+#          platforms: linux/amd64,linux/arm64
   build_exploit_base:
     strategy:
       matrix:
@@ -52,8 +52,8 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v4
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+#      - name: Set up QEMU
+#        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -77,4 +77,4 @@ jobs:
           tags: r.o99.no/${{ matrix.tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          platforms: linux/amd64,linux/arm64
+#          platforms: linux/amd64,linux/arm64
