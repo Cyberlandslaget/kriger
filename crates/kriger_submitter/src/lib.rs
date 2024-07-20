@@ -10,6 +10,7 @@ use futures::StreamExt;
 use kriger_common::messaging::model::{CompetitionConfig, FlagSubmission, FlagSubmissionResult};
 use kriger_common::messaging::{AckPolicy, Bucket, DeliverPolicy, Messaging, MessagingError};
 use kriger_common::runtime::AppRuntime;
+use std::time::Duration;
 use tracing::{debug, info, warn};
 
 struct SubmitterCallbackImpl<B: Bucket + Send + Sync> {
@@ -58,6 +59,17 @@ pub async fn main(runtime: AppRuntime) -> eyre::Result<()> {
             Some("submitter".to_string()),
             AckPolicy::Explicit,
             DeliverPolicy::New,
+            // TODO: Un-hardcode
+            vec![
+                Duration::from_secs(1),
+                Duration::from_secs(3),
+                Duration::from_secs(5),
+                Duration::from_secs(10),
+                Duration::from_secs(30),
+                Duration::from_secs(60),
+                Duration::from_secs(90),
+                Duration::from_secs(120),
+            ],
         )
         .await
         .context("unable to watch flag submissions")?

@@ -1,6 +1,7 @@
 use std::fmt::Debug;
 use std::future::Future;
 use std::sync::Arc;
+use std::time::Duration;
 
 use async_trait::async_trait;
 use dashmap::DashMap;
@@ -94,6 +95,7 @@ pub trait Bucket: Clone + 'static {
         durable_name: Option<String>,
         ack_policy: AckPolicy,
         deliver_policy: DeliverPolicy,
+        backoff: Vec<Duration>,
     ) -> impl Future<
         Output = Result<
             impl futures::Stream<Item = Result<impl Message<Payload = T>, MessagingError>> + Send,

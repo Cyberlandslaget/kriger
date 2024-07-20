@@ -122,6 +122,7 @@ impl NatsBucket {
         durable_name: Option<String>,
         ack_policy: AckPolicy,
         deliver_policy: DeliverPolicy,
+        backoff: Vec<Duration>,
     ) -> Result<impl Stream<Item = Result<NatsMessage<T>, MessagingError>>, MessagingError>
     where
         T: Sized + DeserializeOwned,
@@ -136,6 +137,7 @@ impl NatsBucket {
                 durable_name,
                 ack_policy,
                 deliver_policy,
+                backoff,
                 ..Default::default()
             },
         )
@@ -160,6 +162,7 @@ impl Bucket for NatsBucket {
         durable_name: Option<String>,
         ack_policy: messaging::AckPolicy,
         deliver_policy: messaging::DeliverPolicy,
+        backoff: Vec<Duration>,
     ) -> Result<impl Stream<Item = Result<impl Message<Payload = T>, MessagingError>>, MessagingError>
     where
         T: DeserializeOwned + Send + Sync + 'static,
@@ -169,6 +172,7 @@ impl Bucket for NatsBucket {
             durable_name,
             ack_policy.into(),
             deliver_policy.into(),
+            backoff
         )
         .await
     }
