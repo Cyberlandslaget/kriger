@@ -114,7 +114,7 @@ pub struct FlagSubmissionResult {
     #[serde(rename = "e", skip_serializing_if = "Option::is_none")]
     pub exploit: Option<String>,
 
-    #[serde(rename = "s")]
+    #[serde(rename = "r")]
     pub status: FlagSubmissionStatus,
 
     #[serde(rename = "p", skip_serializing_if = "Option::is_none")]
