@@ -4,7 +4,7 @@ import {
   DUMMY_FLAGSUBMISSION_LOG,
   DUMMY_SCOREBOARD_DATA,
 } from "../utils/constants";
-import type { FlagType } from "../utils/types";
+import type { FlagSubmissionResult } from "../utils/types";
 
 const BOX = [
   { title: "Executions in queue", value: "26" },
@@ -31,7 +31,7 @@ export const Route = createLazyFileRoute("/")({
       <SimpleDisplay
         data={{
           scoreboard: DUMMY_SCOREBOARD_DATA,
-          flag: DUMMY_FLAGSUBMISSION_LOG as FlagType[],
+          flag: DUMMY_FLAGSUBMISSION_LOG as FlagSubmissionResult[],
         }}
       />
     </main>

@@ -3,7 +3,7 @@ import type { FLAG_CODE } from "./enums";
 export type ScoreboardType = {
   teams: {
     [key: string]: {
-      ip: string;
+      ip_address: string;
       name?: string;
       services: {
         [key: string]: number;
@@ -26,20 +26,6 @@ export type ExecutionType = {
   team: string;
 };
 
-export type FlagType = {
-  id: number;
-  text: string;
-  status: FLAG_CODE;
-  submitted: boolean;
-  timestamp: string;
-  execution_id: number;
-  exploit_id: number;
-
-  service: string;
-  target_tick: number;
-  team: string;
-};
-
 export type ExploitType = {
   id: number;
   name: string;
@@ -49,4 +35,14 @@ export type ExploitType = {
   docker_image: string;
   docker_containers: string[];
   blacklist: string[];
+};
+
+export type FlagSubmissionResult = {
+  flag: string; // f
+  team_id?: string; // t
+  service?: string; // s
+  exploit?: string; // e
+  status: FLAG_CODE; // r
+  points?: number; // p
+  tick: number; // c
 };

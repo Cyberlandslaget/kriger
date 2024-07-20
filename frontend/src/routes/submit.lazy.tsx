@@ -45,12 +45,12 @@ export const Route = createLazyFileRoute("/submit")({
         </thead>
         <tbody className="text-sm">
           <tr className="text-left pt-2">
-            <td>{FLAG_CODE.OK}</td>
+            <td>{FLAG_CODE.Ok}</td>
             <td>ECSC_KcpNAJ2gTzNviLzZE6hsIKIEJqbV4Dcr</td>
             <td>Accepted: X flag points</td>
           </tr>
           <tr className="text-left">
-            <td>{FLAG_CODE.OK}</td>
+            <td>{FLAG_CODE.Ok}</td>
             <td>ECSC_KcpNAJ2gTzNviLzZE6hsIKIEJqbV4Dcr</td>
             <td>Accepted: X flag points</td>
           </tr>

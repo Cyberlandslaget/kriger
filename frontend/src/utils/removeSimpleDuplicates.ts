@@ -1,8 +1,8 @@
 import { FLAG_CODE } from "./enums";
-import type { FlagType } from "./types";
+import type { FlagSubmissionResult } from "./types";
 
 type Ticks = {
-  [key: number]: FlagType | null;
+  [key: number]: FlagSubmissionResult | null;
 };
 type ServiceTicks = {
   [key: string]: Ticks;
@@ -14,9 +14,8 @@ type Challenges = {
 export const removeSimpleDuplicates = (
   teams: string[],
   services: string[],
-  flags: FlagType[],
+  flags: FlagSubmissionResult[],
   currentTick: number,
-  exploitId?: number,
 ) => {
   const newFlags: Challenges = {};
 
@@ -35,12 +34,12 @@ export const removeSimpleDuplicates = (
 
   // Get total amount of services from current tick
   for (const oldFlag of flags) {
+    if (!oldFlag?.team_id || !oldFlag.service) continue;
     try {
       const newFlag =
-        newFlags[oldFlag?.team]?.[oldFlag?.service]?.[oldFlag?.target_tick];
-      if (exploitId && oldFlag?.exploit_id !== exploitId) continue;
-      if (!newFlag || FLAG_CODE[oldFlag.status] > FLAG_CODE[newFlag.status])
-        newFlags[oldFlag.team][oldFlag.service][oldFlag.target_tick] = oldFlag;
+        newFlags[oldFlag?.team_id]?.[oldFlag?.service]?.[oldFlag?.tick];
+      if (!newFlag || oldFlag.status > newFlag.status)
+        newFlags[oldFlag.team_id][oldFlag.service][oldFlag.tick] = oldFlag;
     } catch (_e) {}
   }
   return newFlags;

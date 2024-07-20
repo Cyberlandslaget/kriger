@@ -1,12 +1,12 @@
-import { useAtom, useAtomValue } from "jotai";
-import { currentTickAtom, extendedSelectionAtom } from "../utils/atoms";
-import { ExtendedType, FLAG_CODE, SERVICE_STATUS } from "../utils/enums";
-import type { FlagType, ScoreboardType } from "../utils/types";
+import { useAtomValue } from "jotai";
+import { currentTickAtom } from "../utils/atoms";
+import { FLAG_CODE, SERVICE_STATUS } from "../utils/enums";
+import type { FlagSubmissionResult, ScoreboardType } from "../utils/types";
 import { useMemo } from "react";
 import { removeSimpleDuplicates } from "../utils/removeSimpleDuplicates";
 
 type Data = {
-  [key: number]: FlagType;
+  [key: number]: FlagSubmissionResult;
 };
 type SimpleOverviewProps = {
   data: Data;
@@ -39,13 +39,10 @@ const StatusRow = ({
 type SimpleDisplayProps = {
   data: {
     scoreboard: ScoreboardType;
-    flag: FlagType[];
+    flag: FlagSubmissionResult[];
   };
 };
 function SimpleDisplay({ data }: SimpleDisplayProps) {
-  const [extendedSelection, setExtendedSelection] = useAtom(
-    extendedSelectionAtom,
-  );
   const currentTick = 5 ?? useAtomValue(currentTickAtom);
   const total = 5;
 
@@ -75,27 +72,12 @@ function SimpleDisplay({ data }: SimpleDisplayProps) {
             <p className="flex mb-1 items-center font-bold text-sm p-2 h-[2.1rem] shadow-inner bg-slate-950/30 border-slate-950 border-opacity-20 border-2 rounded-sm text-ellipsis whitespace-nowrap overflow-hidden">
               Team
             </p>
-            {teams.map((team, teamIndex) => (
-              // biome-ignore lint/a11y/useKeyWithClickEvents: <explanation>
+            {teams.map((team, _teamIndex) => (
               <div
                 key={`team_${team[0]}_overview`}
                 id={team[0]}
-                className={`flex items-center text-sm p-2 h-[2.1rem] shadow-inner bg-slate-950 bg-opacity-30 border-slate-950 border-opacity-20 border-2 rounded-sm transition-all duration-150 hover:brightness-125 hover:bg-opacity-80 cursor-pointer
-                  ${
-                    extendedSelection.selection === String(teamIndex)
-                      ? "!bg-opacity-90"
-                      : ""
-                  }`}
+                className="flex items-center text-sm p-2 h-[2.1rem] shadow-inner bg-slate-950 bg-opacity-30 border-slate-950 border-opacity-20 border-2 rounded-sm transition-all duration-150"
                 title={`[${team[0]}] ${team[1].name ?? ""}`}
-                onClick={() => {
-                  setExtendedSelection((es) => ({
-                    type: ExtendedType.Team,
-                    selection:
-                      es.selection === String(teamIndex)
-                        ? null
-                        : String(teamIndex),
-                  }));
-                }}
               >
                 <p className="truncate">
                   [{team[0]}] {team[1].name}
@@ -110,21 +92,7 @@ function SimpleDisplay({ data }: SimpleDisplayProps) {
                 key={`service_${service}_overview`}
                 className="flex flex-col gap-1"
               >
-                {/* biome-ignore lint/a11y/useKeyWithClickEvents: <explanation> */}
-                <p
-                  className={`flex w-44 mb-1 items-center justify-center font-bold text-sm p-2 h-[2.1rem] shadow-inner bg-slate-950 bg-opacity-30 border-slate-950 border-opacity-20 border-2 rounded-sm text-ellipsis whitespace-nowrap overflow-hidden transition-all duration-150 hover:brightness-125 hover:bg-opacity-80 cursor-pointer
-                  ${
-                    extendedSelection.selection === service
-                      ? "!bg-opacity-90"
-                      : ""
-                  }`}
-                  onClick={() => {
-                    setExtendedSelection((es) => ({
-                      type: ExtendedType.Service,
-                      selection: es.selection === service ? null : service,
-                    }));
-                  }}
-                >
+                <p className="flex w-44 mb-1 items-center justify-center font-bold text-sm p-2 h-[2.1rem] shadow-inner bg-slate-950 bg-opacity-30 border-slate-950 border-opacity-20 border-2 rounded-sm text-ellipsis whitespace-nowrap overflow-hidden transition-all duration-150">
                   {service}
                 </p>
                 {teams.map((team) => {
@@ -158,9 +126,9 @@ function SimpleDisplay({ data }: SimpleDisplayProps) {
 }
 export default SimpleDisplay;
 
-function getStatusIcon(chall: FlagType, tick: number) {
-  switch (FLAG_CODE[chall?.status]) {
-    case FLAG_CODE.OK:
+function getStatusIcon(chall: FlagSubmissionResult, tick: number) {
+  switch (chall?.status) {
+    case FLAG_CODE.Ok:
       return (
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -174,7 +142,7 @@ function getStatusIcon(chall: FlagType, tick: number) {
           />
         </svg>
       );
-    case FLAG_CODE.DUP:
+    case FLAG_CODE.Duplicate:
       return (
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -188,7 +156,7 @@ function getStatusIcon(chall: FlagType, tick: number) {
           />
         </svg>
       );
-    case FLAG_CODE.OLD:
+    case FLAG_CODE.Old:
       return (
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -202,7 +170,7 @@ function getStatusIcon(chall: FlagType, tick: number) {
           />
         </svg>
       );
-    case FLAG_CODE.INV:
+    case FLAG_CODE.Invalid:
       return (
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -216,7 +184,7 @@ function getStatusIcon(chall: FlagType, tick: number) {
           />
         </svg>
       );
-    case FLAG_CODE.ERR:
+    case FLAG_CODE.Error:
       return (
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -230,7 +198,7 @@ function getStatusIcon(chall: FlagType, tick: number) {
           />
         </svg>
       );
-    case FLAG_CODE.OWN:
+    case FLAG_CODE.Own:
       return (
         <svg
           xmlns="http://www.w3.org/2000/svg"

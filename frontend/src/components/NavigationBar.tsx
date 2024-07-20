@@ -5,6 +5,7 @@ import { currentTickAtom, statusAtom } from "../utils/atoms";
 const ROUTES = [
   { href: "/", text: "Dashboard" },
   { href: "/executions", text: "Executions" },
+  { href: "/exploits", text: "Exploits" },
   { href: "/submit", text: "Manual submit" },
   { href: "/config", text: "Configuration" },
 ];
