@@ -27,17 +27,19 @@ impl<St: ?Sized + Stream + Unpin> Future for PollPending<'_, St> {
     type Output = Vec<St::Item>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        // This may panic if it's polled after Ready has been returned, but /shrug
-        match self.stream.poll_next_unpin(cx) {
-            Poll::Ready(Some(item)) => {
-                let buf = self.buf.as_mut().unwrap();
-                buf.push(item);
-                if buf.len() >= self.limit {
-                    return Poll::Ready(self.buf.take().unwrap());
+        loop {
+            // This may panic if it's polled after Ready has been returned, but /shrug
+            // TERMINATION: each iteration either decreases self.limit - buf.len() or returns
+            match self.stream.poll_next_unpin(cx) {
+                Poll::Ready(Some(item)) => {
+                    let buf = self.buf.as_mut().unwrap();
+                    buf.push(item);
+                    if buf.len() >= self.limit {
+                        return Poll::Ready(self.buf.take().unwrap());
+                    }
                 }
-                Poll::Pending
+                Poll::Ready(None) | Poll::Pending => return Poll::Ready(self.buf.take().unwrap()),
             }
-            Poll::Ready(None) | Poll::Pending => return Poll::Ready(self.buf.take().unwrap()),
         }
     }
 }
