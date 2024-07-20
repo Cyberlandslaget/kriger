@@ -172,7 +172,7 @@ impl Bucket for NatsBucket {
             durable_name,
             ack_policy.into(),
             deliver_policy.into(),
-            backoff
+            backoff,
         )
         .await
     }
@@ -186,8 +186,14 @@ impl Bucket for NatsBucket {
     where
         T: DeserializeOwned + Send + Sync + 'static,
     {
-        self.watch(None, durable_name, ack_policy.into(), deliver_policy.into())
-            .await
+        self.watch(
+            None,
+            durable_name,
+            ack_policy.into(),
+            deliver_policy.into(),
+            vec![],
+        )
+        .await
     }
 
     async fn put<T>(&self, key: &str, body: &T) -> Result<(), MessagingError>
