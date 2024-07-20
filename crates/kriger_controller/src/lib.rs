@@ -5,8 +5,8 @@ use color_eyre::eyre::{Context, Result};
 use futures::StreamExt;
 use k8s_openapi::api::apps::v1::{Deployment, DeploymentSpec};
 use k8s_openapi::api::core::v1::{
-    Capabilities, Container, EnvVar, PodSpec, PodTemplateSpec, ResourceRequirements,
-    SecurityContext,
+    Capabilities, Container, EnvVar, LocalObjectReference, PodSpec, PodTemplateSpec,
+    ResourceRequirements, SecurityContext,
 };
 use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta};
@@ -169,6 +169,9 @@ async fn reconcile(
                     }),
                     ..Default::default()
                 }],
+                image_pull_secrets: Some(vec![LocalObjectReference {
+                    name: Some("registry".to_string()),
+                }]),
                 automount_service_account_token: Some(false),
                 enable_service_links: Some(false),
                 ..Default::default()
