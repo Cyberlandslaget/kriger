@@ -109,7 +109,7 @@ async fn build_image(
 
     // TODO: Verify if this works on all relevant OSes?
     let mut child = Command::new("docker")
-        .args(&["buildx", "build", "--tag", tag, "."])
+        .args(&["buildx", "build", "--push", "--pull", "--tag", tag, "."])
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -143,6 +143,52 @@ async fn build_image(
     let elapsed = start.elapsed();
     println!(
         "  {} Built in {}",
+        emoji::SPARKLES,
+        style(format_duration_secs(&elapsed)).bold().green()
+    );
+
+    Ok(true)
+}
+
+async fn push_image(progress: &ProgressBar, manifest: &ExploitManifest, tag: &str) -> Result<bool> {
+    let start = Instant::now();
+
+    // TODO: Verify if this works on all relevant OSes?
+    let mut child = Command::new("docker")
+        .args(&["image", "push", tag])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .context("unable to spawn child")?;
+
+    let stdout = child
+        .stdout
+        .take()
+        .context("unable to retrieve a handle to the stdout pipe")?;
+    let stderr = child
+        .stderr
+        .take()
+        .context("unable to retrieve a handle to the stderr pipe")?;
+
+    let stdout_stream = LinesStream::new(BufReader::new(stdout).lines());
+    let stderr_stream = LinesStream::new(BufReader::new(stderr).lines());
+
+    let mut fused_stream = select_all(vec![stdout_stream.boxed(), stderr_stream.boxed()]);
+    while let Some(Ok(line)) = fused_stream.next().await {
+        log(&progress, style(line).blue().to_string());
+    }
+
+    let exit_status = child.wait().await.context("unable to wait for child")?;
+    if !exit_status.success() {
+        return Ok(false);
+    }
+
+    progress.finish_and_clear();
+
+    let elapsed = start.elapsed();
+    println!(
+        "  {} Pushed in {}",
         emoji::SPARKLES,
         style(format_duration_secs(&elapsed)).bold().green()
     );
@@ -204,6 +250,33 @@ pub(crate) async fn main(args: args::Deploy) -> Result<()> {
             }
         }
     }
+
+    // let progress = ProgressBar::new_spinner();
+    // progress.enable_steady_tick(Duration::from_millis(130));
+    // progress.set_message(format!("{} Pushing...", emoji::ROCKET));
+    // 
+    // match push_image(&progress, &manifest, &tag).await {
+    //     Err(err) => {
+    //         progress.finish_and_clear();
+    //         println!(
+    //             "  {} {}",
+    //             emoji::CROSS_MARK,
+    //             style("Push failed").red().bold()
+    //         );
+    //         return Err(err);
+    //     }
+    //     Ok(success) => {
+    //         if !success {
+    //             progress.finish_and_clear();
+    //             println!(
+    //                 "  {} {}",
+    //                 emoji::CROSS_MARK,
+    //                 style("Push failed").red().bold()
+    //             );
+    //             return Ok(());
+    //         }
+    //     }
+    // }
 
     Ok(())
 }
