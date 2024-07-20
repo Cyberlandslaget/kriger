@@ -101,8 +101,22 @@ pub struct FlagSubmission {
 pub struct FlagSubmissionResult {
     #[serde(rename = "f")]
     pub flag: String,
+
+    /// The network id of the team that the flag was retrieved from
+    #[serde(rename = "t", skip_serializing_if = "Option::is_none")]
+    pub team_id: Option<String>,
+
+    /// The service that stored this flag
+    #[serde(rename = "s", skip_serializing_if = "Option::is_none")]
+    pub service: Option<String>,
+
+    /// The exploit that retrieved this flag
+    #[serde(rename = "e", skip_serializing_if = "Option::is_none")]
+    pub exploit: Option<String>,
+
     #[serde(rename = "s")]
     pub status: FlagSubmissionStatus,
+
     #[serde(rename = "p", skip_serializing_if = "Option::is_none")]
     pub points: Option<f32>,
 }

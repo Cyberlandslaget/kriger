@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use color_eyre::eyre;
 use futures::Stream;
 use kriger_common::messaging::model::{FlagSubmission, FlagSubmissionResult};
@@ -22,10 +23,18 @@ pub(crate) trait SubmitterCallback {
     ) -> impl Future<Output = Result<(), MessagingError>> + Send;
 }
 
+// Workaround for non-object traits
+// FIXME: Are there workarounds..?
+pub(crate) enum Submitters {
+    Dummy(dummy::DummySubmitter),
+    Cini(cini::CiniSubmitter),
+}
+
 /// The submitter will be responsible for handling the flag submission lifecycle with the given
 /// [flags] stream and the [callback].
+#[async_trait]
 pub(crate) trait Submitter {
-    fn run(
+    async fn run(
         &self,
         flags: Pin<
             Box<
@@ -33,7 +42,7 @@ pub(crate) trait Submitter {
             >,
         >,
         callback: impl SubmitterCallback + Send + Sync + 'static,
-    ) -> impl Future<Output = eyre::Result<()>> + Send;
+    ) -> eyre::Result<()>;
 }
 
 #[derive(Deserialize, Debug)]
@@ -48,10 +57,14 @@ pub enum SubmitterConfig {
 }
 
 impl SubmitterConfig {
-    pub(crate) fn into_submitter(self) -> impl Submitter + Send {
+    pub(crate) fn into_submitter(self) -> Submitters {
         match self {
-            SubmitterConfig::Dummy => dummy::DummySubmitter {},
-            _ => dummy::DummySubmitter {}, // TODO: SubmitterConfig::Cini { url, interval, token } => cini::CiniSubmitter { url, interval, token },
+            SubmitterConfig::Dummy => Submitters::Dummy(dummy::DummySubmitter {}),
+            SubmitterConfig::Cini {
+                url,
+                interval,
+                token,
+            } => Submitters::Cini(cini::CiniSubmitter::new(url, interval, token)),
         }
     }
 }
