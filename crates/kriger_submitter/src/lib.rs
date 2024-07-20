@@ -1,17 +1,16 @@
 mod submitter;
+mod utils;
 
-use crate::submitter::{Submitter, SubmitterCallback, SubmitterConfig};
+use crate::submitter::{Submitter, SubmitterCallback, SubmitterConfig, Submitters};
 use base64::engine::general_purpose::STANDARD_NO_PAD;
 use base64::Engine;
 use color_eyre::eyre;
 use color_eyre::eyre::{Context, ContextCompat};
 use futures::StreamExt;
 use kriger_common::messaging::model::{CompetitionConfig, FlagSubmission, FlagSubmissionResult};
-use kriger_common::messaging::nats::NatsMessaging;
 use kriger_common::messaging::{AckPolicy, Bucket, DeliverPolicy, Messaging, MessagingError};
 use kriger_common::runtime::AppRuntime;
-use std::sync::Arc;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 struct SubmitterCallbackImpl<B: Bucket + Send + Sync> {
     // NOTE this ought to be an Arc or something once the Box::leak is removed
@@ -20,6 +19,8 @@ struct SubmitterCallbackImpl<B: Bucket + Send + Sync> {
 
 impl<B: Bucket + Send + Sync> SubmitterCallback for SubmitterCallbackImpl<B> {
     async fn submit(&self, flag: &str, result: FlagSubmissionResult) -> Result<(), MessagingError> {
+        debug!("flag submission result: {result:?}");
+
         let flag_b64 = STANDARD_NO_PAD.encode(flag);
         let key = format!("{}.result", &flag_b64);
         self.bucket.put(&key, &result).await?;
@@ -77,7 +78,13 @@ pub async fn main(runtime: AppRuntime) -> eyre::Result<()> {
     let config: SubmitterConfig = serde_json::from_value(competition_config.submitter)
         .context("unable to parse the flag submitter config")?;
 
-    let submitter = config.into_submitter();
-    submitter.run(flag_submissions.boxed(), callback).await?;
+    match config.into_submitter() {
+        Submitters::Dummy(submitter) => {
+            submitter.run(flag_submissions.boxed(), callback).await?;
+        }
+        Submitters::Cini(submitter) => {
+            submitter.run(flag_submissions.boxed(), callback).await?;
+        }
+    }
     Ok(())
 }

@@ -5,6 +5,7 @@ use kriger_common::messaging::model::{FlagSubmission, FlagSubmissionResult, Flag
 use kriger_common::messaging::Message;
 use rand::Rng;
 use std::pin::Pin;
+use async_trait::async_trait;
 use tracing::warn;
 
 use super::{Submitter, SubmitterCallback};
@@ -12,6 +13,7 @@ use super::{Submitter, SubmitterCallback};
 #[derive(Clone, Debug)]
 pub struct DummySubmitter {}
 
+#[async_trait]
 impl Submitter for DummySubmitter {
     async fn run(
         &self,
@@ -44,6 +46,9 @@ impl DummySubmitter {
         let payload = msg.payload();
         let result = FlagSubmissionResult {
             flag: payload.flag.to_string(),
+            team_id: None,
+            service: None,
+            exploit: None,
             status,
             points: None,
         };
