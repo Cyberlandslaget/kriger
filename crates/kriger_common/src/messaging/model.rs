@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::collections::HashMap;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -63,11 +64,11 @@ pub struct Team {
 pub struct ExecutionRequest {
     #[serde(rename = "a")]
     pub ip_address: String,
-    #[serde(rename = "h")]
+    #[serde(rename = "h", skip_serializing_if = "Option::is_none")]
     pub flag_hint: Option<serde_json::Value>,
     /// The Team ID that this execution is targeted towards. This should only be optional for
     /// manual/emergency runs.
-    #[serde(rename = "t")]
+    #[serde(rename = "t", skip_serializing_if = "Option::is_none")]
     pub team_id: Option<String>,
 }
 
@@ -84,15 +85,15 @@ pub struct FlagSubmission {
     pub flag: String,
 
     /// The network id of the team that the flag was retrieved from
-    #[serde(rename = "t")]
+    #[serde(rename = "t", skip_serializing_if = "Option::is_none")]
     pub team_id: Option<String>,
 
     /// The service that stored this flag
-    #[serde(rename = "s")]
+    #[serde(rename = "s", skip_serializing_if = "Option::is_none")]
     pub service: Option<String>,
 
     /// The exploit that retrieved this flag
-    #[serde(rename = "e")]
+    #[serde(rename = "e", skip_serializing_if = "Option::is_none")]
     pub exploit: Option<String>,
 }
 
@@ -102,11 +103,11 @@ pub struct FlagSubmissionResult {
     pub flag: String,
     #[serde(rename = "s")]
     pub status: FlagSubmissionStatus,
-    #[serde(rename = "p")]
+    #[serde(rename = "p", skip_serializing_if = "Option::is_none")]
     pub points: Option<f32>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize_repr, Deserialize_repr, PartialEq)]
 #[repr(u8)]
 pub enum FlagSubmissionStatus {
     Ok = 1,
@@ -114,10 +115,15 @@ pub enum FlagSubmissionStatus {
     Own = 3,
     Old = 4,
     Invalid = 5,
+    /// The server explicitly requests the flag to be resubmitted.
+    /// This can be due to the fact that the flag is not yet valid.
+    /// Submitters should retry this status.
+    Resubmit = 6,
     /// Server refused flag. Pre- or post-competition.
     /// Submitters should retry this status.
-    Error = 6,
-    Unknown(String) = 7,
+    Error = 7,
+    /// Unknown response. Submitters should definitely retry this status.
+    Unknown = 8,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
