@@ -113,17 +113,29 @@ pub enum FlagSubmissionStatus {
     Ok = 1,
     Duplicate = 2,
     Own = 3,
-    Old = 4,
-    Invalid = 5,
+    Nop = 4,
+    Old = 5,
+    Invalid = 6,
     /// The server explicitly requests the flag to be resubmitted.
     /// This can be due to the fact that the flag is not yet valid.
     /// Submitters should retry this status.
-    Resubmit = 6,
+    Resubmit = 7,
     /// Server refused flag. Pre- or post-competition.
     /// Submitters should retry this status.
-    Error = 7,
+    Error = 8,
     /// Unknown response. Submitters should definitely retry this status.
-    Unknown = 8,
+    Unknown = 200,
+}
+
+impl FlagSubmissionStatus {
+    fn should_retry(&self) -> bool {
+        match self {
+            FlagSubmissionStatus::Resubmit
+            | FlagSubmissionStatus::Error
+            | FlagSubmissionStatus::Unknown => true,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]

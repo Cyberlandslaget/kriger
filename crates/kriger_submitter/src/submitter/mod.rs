@@ -10,6 +10,7 @@ use thiserror::Error;
 // TODO: Port
 //mod dctf;
 //mod faust;
+mod cini;
 mod dummy;
 
 // TODO: Devise a more ergonomic way to deal with this.
@@ -39,12 +40,18 @@ pub(crate) trait Submitter {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SubmitterConfig {
     Dummy,
+    Cini {
+        url: String,
+        interval: u64,
+        token: String,
+    },
 }
 
 impl SubmitterConfig {
     pub(crate) fn into_submitter(self) -> impl Submitter + Send {
         match self {
             SubmitterConfig::Dummy => dummy::DummySubmitter {},
+            _ => dummy::DummySubmitter {}, // TODO: SubmitterConfig::Cini { url, interval, token } => cini::CiniSubmitter { url, interval, token },
         }
     }
 }
