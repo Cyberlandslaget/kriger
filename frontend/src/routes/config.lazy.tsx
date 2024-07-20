@@ -1,57 +1,73 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
-import { useAtom } from "jotai";
-import { configurationAtom } from "../utils/atoms";
-import { type ChangeEvent, useEffect } from "react";
+import MonacoEditor, { type Monaco } from "@monaco-editor/react";
+import { useCallback, useEffect, useRef } from "react";
+import { createHighlighter } from "shiki";
+import { shikiToMonaco } from "@shikijs/monaco";
+import theme from "shiki/themes/catppuccin-mocha.mjs";
 
 export const Route = createLazyFileRoute("/config")({
   component: () => Configuration(),
 });
 
 function Configuration() {
-  const [configuration, setConfiguration] = useAtom(configurationAtom);
+  const stringConfiguration = useRef(`hello = [
+  "world",
+  "computer"
+]`);
 
-  const onChangeHandler = (
-    event: ChangeEvent<HTMLInputElement>,
-    key: string,
-  ) => {
-    const value = event.target.value;
-    setConfiguration((prev) => {
-      return { ...prev, [key]: value };
-    });
-  };
+  const updateConfiguration = useCallback(() => {
+    // TODO: post new configuration
+  }, []);
 
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      localStorage.setItem(
-        "kriger-configuration",
-        JSON.stringify(configuration),
-      );
-    }, 500);
-    return () => clearTimeout(timeoutId);
-  }, [configuration]);
+    // TODO: fetch server configuration
+  }, []);
+
+  const monacoMount = useCallback(async (monaco: Monaco) => {
+    const highlighter = await createHighlighter({
+      themes: [
+        {
+          ...theme,
+          name: "kriger",
+          colors: {
+            ...theme.colors,
+            "editor.background": "#050a1b",
+          },
+        },
+      ],
+      langs: ["toml"],
+    });
+    monaco.languages.register({ id: "toml" });
+    shikiToMonaco(highlighter, monaco);
+  }, []);
 
   return (
-    <main className="flex flex-col gap-3">
-      <div>
-        <div className="grid grid-cols-2 gap-2 items-center p-2 rounded-md">
-          <h2 className="text-slate-300">Flag regex:</h2>
-          <input
-            className="w-full bg-slate-950/80 px-2 py-1 text-slate-300 rounded-sm"
-            type="text"
-            onChange={(e) => onChangeHandler(e, "flagRegex")}
-            value={configuration.flagRegex}
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-2 items-center p-2 rounded-md">
-          <h2 className="text-slate-300">Minutes to fetch:</h2>
-          <input
-            className="w-full bg-slate-950/80 px-2 py-1 text-slate-300 rounded-sm"
-            type="number"
-            onChange={(e) => onChangeHandler(e, "minutesToFetch")}
-            value={configuration.minutesToFetch}
-          />
-        </div>
+    <main className="flex flex-col gap-3 h-full">
+      <div className="h-96">
+        <MonacoEditor
+          value={stringConfiguration.current}
+          beforeMount={monacoMount}
+          language="toml"
+          theme="kriger"
+          onChange={(value?: string) => {
+            if (!value) return;
+            stringConfiguration.current = value;
+          }}
+          options={{
+            minimap: {
+              enabled: false,
+            },
+          }}
+        />
       </div>
+
+      <button
+        type="button"
+        className="flex items-center justify-center gap-2 bg-red-500/80 text-center truncate p-1 px-3 rounded-sm transition-all hover:!bg-red-600/60"
+        onClick={updateConfiguration}
+      >
+        Update configuration
+      </button>
     </main>
   );
 }

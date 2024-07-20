@@ -11,13 +11,16 @@
   },
   "dependencies": {
     "@fontsource/b612-mono": "^5.0.19",
+    "@monaco-editor/react": "^4.6.0",
     "@tanstack/react-router": "^1.45.0",
     "jotai": "^2.9.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "shiki": "^1.10.3"
   },
   "devDependencies": {
     "@biomejs/biome": "1.8.3",
+    "@shikijs/monaco": "^1.10.3",
     "@tanstack/router-devtools": "^1.45.1",
     "@tanstack/router-plugin": "^1.45.0",
     "@types/react": "^18.3.3",

@@ -11,3 +11,8 @@ body {
   @apply bg-primary-bg text-white h-full;
   font-family: "B612 Mono", monospace;
 }
+
+#root {
+  width: 100%;
+  height: 100%;
+}
