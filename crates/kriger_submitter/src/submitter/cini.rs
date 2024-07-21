@@ -48,6 +48,10 @@ impl Submitter for CiniSubmitter {
                 .map(|msg| msg.payload().flag.as_ref())
                 .collect();
             debug!("submitting flags: {flags:?}");
+            for request in &requests {
+                // TODO: parallelize
+                let _ = request.progress().await;
+            }
             match self.submit(&flags).await {
                 Ok(mut results) => {
                     for message in requests {
@@ -137,7 +141,11 @@ impl CiniSubmitter {
 
         let response = self.client.execute(request).await?;
         if !response.status().is_success() {
-            debug!("response: {:?}", response.text().await);
+            warn!(
+                "received a non-successful response ({}): {:?}",
+                response.status(),
+                response.text().await
+            );
             return Err(SubmitError::FormatError);
         }
 
