@@ -1490,6 +1490,7 @@ dependencies = [
  "kriger_scheduler",
  "kriger_submitter",
  "kriger_ws",
+ "reqwest",
  "serde",
  "tar",
  "tokio",

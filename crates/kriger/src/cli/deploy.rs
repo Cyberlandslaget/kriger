@@ -5,17 +5,20 @@ use bollard::image::{BuildImageOptions, BuilderVersion};
 use bollard::models::BuildInfo;
 use bollard::secret::BuildInfoAux;
 use bollard::Docker;
-use color_eyre::eyre::{Context, ContextCompat};
+use color_eyre::eyre::{bail, Context, ContextCompat};
 use color_eyre::Result;
 use console::style;
 use futures::stream::select_all;
 use futures::StreamExt;
 use indicatif::ProgressBar;
+use kriger_common::messaging::model::Exploit;
+use reqwest::{Method, StatusCode};
 use tokio::fs;
 use tokio::io::{AsyncBufReadExt, BufReader};
-use tokio::process::Command;
+use tokio::process::{Child, Command};
 use tokio::time::Instant;
 use tokio_stream::wrappers::LinesStream;
+use tracing::debug;
 
 use crate::cli::model::ExploitManifest;
 use crate::cli::{args, emoji, format_duration_secs, log};
@@ -96,6 +99,8 @@ async fn build_image_bollard(docker: &Docker) -> Result<()> {
         style(format_duration_secs(&elapsed)).bold().green()
     );
 
+    // TODO: launch
+
     Ok(())
 }
 
@@ -108,8 +113,18 @@ async fn build_image(
     let start = Instant::now();
 
     // TODO: Verify if this works on all relevant OSes?
+    debug!("Running: docker buildx build --push --pull --tag {tag} .");
     let mut child = Command::new("docker")
-        .args(&["buildx", "build", "--push", "--pull", "--tag", tag, "."])
+        .args(&[
+            "buildx",
+            "build",
+            "--network=host",
+            "--push",
+            "--pull",
+            "--tag",
+            tag,
+            ".",
+        ])
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -150,9 +165,28 @@ async fn build_image(
     Ok(true)
 }
 
+async fn launch(exploit: &Exploit, rest_url: &str) -> Result<()> {
+    let client = reqwest::Client::new();
+    let response = client
+        .request(Method::PUT, format!("{rest_url}/launch"))
+        .json(&exploit)
+        .send()
+        .await
+        .context("Sending /launch request to REST API")?;
+
+    match response.status() {
+        StatusCode::OK => Ok(()),
+        StatusCode::INTERNAL_SERVER_ERROR => {
+            bail!("Error during launch: {}", response.text().await?)
+        }
+        _ => bail!("unexpected response: {response:?}"),
+    }
+}
+
 async fn push_image(progress: &ProgressBar, manifest: &ExploitManifest, tag: &str) -> Result<bool> {
     let start = Instant::now();
 
+    debug!("Running: docker image push {tag}");
     // TODO: Verify if this works on all relevant OSes?
     let mut child = Command::new("docker")
         .args(&["image", "push", tag])
@@ -246,15 +280,34 @@ pub(crate) async fn main(args: args::Deploy) -> Result<()> {
                     emoji::CROSS_MARK,
                     style("Build failed").red().bold()
                 );
-                return Ok(());
             }
+        }
+    }
+
+    if !args.no_launch {
+        let image = format!("{}:{}", &manifest.exploit.name, tag_version);
+        if let Err(err) = launch(
+            &Exploit {
+                manifest: manifest.exploit,
+                image,
+            },
+            &args.rest_url,
+        )
+        .await
+        {
+            progress.finish_and_clear();
+            println!(
+                "  {} {}",
+                emoji::CROSS_MARK,
+                style("Launch failed").red().bold()
+            );
         }
     }
 
     // let progress = ProgressBar::new_spinner();
     // progress.enable_steady_tick(Duration::from_millis(130));
     // progress.set_message(format!("{} Pushing...", emoji::ROCKET));
-    // 
+    //
     // match push_image(&progress, &manifest, &tag).await {
     //     Err(err) => {
     //         progress.finish_and_clear();
