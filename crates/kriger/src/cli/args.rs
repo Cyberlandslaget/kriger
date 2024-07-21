@@ -9,6 +9,6 @@ pub(crate) struct Deploy {
     pub(crate) no_launch: bool,
 
     /// URL for REST API
-    #[arg(env, long, default_value = "https://kriger.o99.no:8000")]
+    #[arg(env, long, default_value = "https://kriger.o99.no/api")]
     pub(crate) rest_url: String,
 }
