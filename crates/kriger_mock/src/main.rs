@@ -1,17 +1,18 @@
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     hash::{BuildHasher, RandomState},
     sync::{atomic::AtomicU32, Arc},
 };
 
 use anyhow::Result;
 use axum::{
-    extract::{self, Path, State},
+    extract::{self, Path, Query, State},
     routing::{get, put},
     Json, Router,
 };
 use clap::Parser;
-use serde::Serialize;
+use rand::{distributions::DistString, Rng, SeedableRng};
+use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use tracing::debug;
 
@@ -218,6 +219,8 @@ async fn autotick(fs: Arc<FlagStore>, duration: Option<u64>) -> TickerControl {
     let (tx, mut rx) = tokio::sync::mpsc::channel(1);
 
     if let Some(duration) = duration {
+        fs.tick.store(u32::MAX, std::sync::atomic::Ordering::SeqCst);
+
         tokio::task::spawn(async move {
             loop {
                 let ticker = async {
@@ -248,6 +251,90 @@ async fn autotick(fs: Arc<FlagStore>, duration: Option<u64>) -> TickerControl {
     TickerControl { tx }
 }
 
+#[derive(Deserialize, Debug)]
+struct FlagIdQuery {
+    service: Option<String>,
+    team: Option<u32>,
+}
+
+#[derive(Serialize)]
+struct FlagIdResponse(
+    HashMap<
+        String, /* chall */
+        HashMap<
+            u32, /* team */
+            HashMap<u32 /* tick */, HashMap<&'static str /* hint name */, String>>,
+        >,
+    >,
+);
+
+async fn flag_id(
+    state: State<Arc<AppState>>,
+    query: Query<FlagIdQuery>,
+) -> Result<Json<FlagIdResponse>, String> {
+    println!("{query:?}");
+
+    if query.service.is_none() && query.team.is_none() {
+        return Err("You must specify a service or a team".into());
+    }
+
+    let service_names;
+    let teams;
+    if let Some(ref service) = query.service {
+        service_names = vec![service.as_str()];
+    } else {
+        service_names = vec![
+            "Idk-1",
+            "Idk-2",
+            "AnotherChall-1",
+            "RSA-1",
+            "RSA-2",
+            "RSA-3",
+        ];
+    }
+    if let Some(team) = query.team {
+        teams = vec![team];
+    } else {
+        teams = (0..10).collect();
+    }
+
+    let ticks = 0..=state.fs.tick.load(std::sync::atomic::Ordering::Acquire);
+
+    // TODO: sort data
+    let data = service_names
+        .iter()
+        .map(|&s| {
+            (
+                s.to_owned(),
+                teams
+                    .iter()
+                    .map(|&i| {
+                        (
+                            i,
+                            ticks
+                                .clone()
+                                .map(|t| {
+                                    (t, [("hint", get_hint_thing(&state.fs.hasher, s, i, t))].into_iter().collect())
+                                })
+                                .collect(),
+                        )
+                    })
+                    .collect(),
+            )
+        })
+        .collect();
+
+    Ok(Json(FlagIdResponse(data)))
+}
+
+fn get_hint_thing(hasher: &RandomState, s: &str, i: u32, t: u32) -> String {
+    let a = hasher.hash_one((s, i, t));
+    let mut seed = [0; 32];
+    seed[0..8].copy_from_slice(&a.to_le_bytes());
+    let mut rng = rand::rngs::StdRng::from_seed(seed);
+    rand::distributions::Alphanumeric.sample_string(&mut rng, 10)
+}
+
 #[derive(Parser)]
 struct Args {
     #[clap(default_value = "0.0.0.0:8080")]
@@ -272,7 +359,8 @@ async fn main() -> Result<()> {
         .route("/getflag/:team", get(getflag))
         .route("/getflags/:team", get(getflags))
         .route("/flags", put(flags))
-        .route("/force-tick", put(force_tick))
+        .route("/forceTick", put(force_tick))
+        .route("/flagId", get(flag_id))
         .with_state(state);
 
     let listener = tokio::net::TcpListener::bind(&args.listen_on).await?;

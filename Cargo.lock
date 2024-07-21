@@ -1575,6 +1575,7 @@ dependencies = [
  "axum 0.7.5",
  "clap",
  "hyper 1.4.1",
+ "rand",
  "serde",
  "tokio",
  "tracing",
