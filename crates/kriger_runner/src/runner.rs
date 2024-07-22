@@ -133,6 +133,7 @@ impl Runner {
         match tokio::time::timeout(self.timeout, handle_output).await {
             Ok(res) => res?,
             Err(_elapsed) => {
+                warn!("Timeout expired for {}", self.exploit_name);
                 child.start_kill().context("SIGKILLing exploit")?;
             }
         }
