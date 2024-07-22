@@ -14,6 +14,7 @@ use kriger_common::messaging::{
 use regex::Regex;
 use std::str;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::Semaphore;
 use tokio::{pin, spawn};
 use tracing::{debug, info, warn};
@@ -110,6 +111,7 @@ pub async fn main(args: Config) -> Result<()> {
         exploit_command: args.command,
         exploit_args: args.args,
         flag_format,
+        timeout: Duration::from_secs(args.timeout),
     };
 
     for i in 0..worker_count {
