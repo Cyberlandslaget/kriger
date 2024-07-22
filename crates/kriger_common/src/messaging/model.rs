@@ -43,6 +43,7 @@ pub struct ExploitResources {
     pub mem_request: Option<String>,
     pub cpu_limit: String,
     pub mem_limit: String,
+    pub timeout: u32,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

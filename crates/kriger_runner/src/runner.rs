@@ -7,6 +7,7 @@ use kriger_common::messaging::Message;
 use regex::Regex;
 use std::future::Future;
 use std::process::Stdio;
+use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::sync::OwnedSemaphorePermit;
 use tokio_stream::wrappers::LinesStream;
@@ -19,6 +20,7 @@ pub struct Runner {
     pub exploit_command: String,
     pub exploit_args: Vec<String>,
     pub flag_format: Regex,
+    pub timeout: Duration,
 }
 
 pub struct Job {
@@ -57,12 +59,12 @@ impl Runner {
         job.request.progress().await.context("unable to ack")?;
         match self.execute(job.request.payload(), callback).await {
             Err(err) => {
+                warn!("execution failed: {err:?} (worker {idx})");
                 job.request.nak().await.context("unable to nak")?;
-                warn!("execution failed: {err:?} (worker {idx})")
             }
             Ok(..) => {
+                debug!("execution succeeded (worker {idx})");
                 job.request.ack().await.context("unable to ack")?;
-                debug!("execution succeeded (worker {idx})")
             }
         }
         Ok(())
@@ -99,32 +101,49 @@ impl Runner {
             .take()
             .context("unable to retrieve a handle to the stderr pipe")?;
 
-        let stdout_stream = LinesStream::new(BufReader::new(stdout).lines())
-            .map(|line| line.map(OutputLine::Stdout));
-        let stderr_stream = LinesStream::new(BufReader::new(stderr).lines())
-            .map(|line| line.map(OutputLine::Stderr));
+        let handle_output = async move {
+            let stdout_stream = LinesStream::new(BufReader::new(stdout).lines())
+                .map(|line| line.map(OutputLine::Stdout));
+            let stderr_stream = LinesStream::new(BufReader::new(stderr).lines())
+                .map(|line| line.map(OutputLine::Stderr));
 
-        let mut fused_stream = select_all(vec![stdout_stream.boxed(), stderr_stream.boxed()]);
-        while let Some(Ok(line)) = fused_stream.next().await {
-            match line {
-                OutputLine::Stdout(line) => {
-                    debug!("exploit stdout: {line}");
-                    for m in self.flag_format.find_iter(&line) {
-                        debug!("flag matched: {}", m.as_str());
-                        callback
-                            .on_flag(request, m.as_str())
-                            .await
-                            .context("flag callback failed")?;
+            let mut fused_stream = select_all(vec![stdout_stream.boxed(), stderr_stream.boxed()]);
+            while let Some(Ok(line)) = fused_stream.next().await {
+                match line {
+                    OutputLine::Stdout(line) => {
+                        debug!("exploit stdout: {line}");
+                        for m in self.flag_format.find_iter(&line) {
+                            debug!("flag matched: {}", m.as_str());
+                            callback
+                                .on_flag(request, m.as_str())
+                                .await
+                                .context("flag callback failed")?;
+                        }
+                    }
+                    OutputLine::Stderr(line) => {
+                        debug!("exploit stderr: {line}");
+                        // TODO: Do something with this
                     }
                 }
-                OutputLine::Stderr(line) => {
-                    debug!("exploit stderr: {line}");
-                    // TODO: Do something with this
-                }
+            }
+
+            Ok::<(), color_eyre::eyre::ErrReport>(())
+        };
+
+        match tokio::time::timeout(self.timeout, handle_output).await {
+            Ok(res) => res?,
+            Err(_elapsed) => {
+                child.start_kill().context("SIGKILLing exploit")?;
             }
         }
 
         let exit_status = child.wait().await.context("unable to wait for child")?;
+
+        if exit_status.success() {
+            debug!("Exploit finished with exit status {exit_status}");
+        } else {
+            warn!("Exploit finished with exit status {exit_status}");
+        }
 
         Ok(())
     }

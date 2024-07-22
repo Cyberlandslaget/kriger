@@ -109,6 +109,11 @@ async fn reconcile(
             value: Some(config.controller_nats_svc_url.clone()),
             ..Default::default()
         },
+        EnvVar {
+            name: "TIMEOUT".to_string(),
+            value: Some(exploit.manifest.resources.timeout.to_string()),
+            ..Default::default()
+        },
     ];
 
     if let Some(workers) = &exploit.manifest.workers {

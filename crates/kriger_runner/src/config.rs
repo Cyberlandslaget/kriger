@@ -20,6 +20,10 @@ pub struct Config {
     #[arg(env, long)]
     pub workers: Option<usize>,
 
+    /// The timeout, in seconds
+    #[arg(env, long, default_value = "30")]
+    pub timeout: u64,
+
     /// The command to execute
     pub command: String,
 
