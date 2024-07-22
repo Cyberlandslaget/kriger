@@ -21,7 +21,7 @@ pub struct Config {
     pub workers: Option<usize>,
 
     /// The timeout, in seconds
-    #[arg(env, long, default_value = "30")]
+    #[arg(env, long, default_value_t = 15)]
     pub timeout: u64,
 
     /// The command to execute
