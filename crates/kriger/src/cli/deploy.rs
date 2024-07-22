@@ -285,11 +285,10 @@ pub(crate) async fn main(args: args::Deploy) -> Result<()> {
     }
 
     if !args.no_launch {
-        let image = format!("{}:{}", &manifest.exploit.name, tag_version);
         if let Err(err) = launch(
             &Exploit {
                 manifest: manifest.exploit,
-                image,
+                image: tag,
             },
             &args.rest_url,
         )
@@ -297,9 +296,10 @@ pub(crate) async fn main(args: args::Deploy) -> Result<()> {
         {
             progress.finish_and_clear();
             println!(
-                "  {} {}",
+                "  {} {}: {:?}",
                 emoji::CROSS_MARK,
-                style("Launch failed").red().bold()
+                style("Launch failed").red().bold(),
+                err
             );
         }
     }
