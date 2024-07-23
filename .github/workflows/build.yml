@@ -26,6 +26,7 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        id: builder
         with:
           # See: https://github.com/docker/buildx/issues/298
           driver-opts: |
@@ -47,6 +48,7 @@ jobs:
           tags: r.o99.no/${{ matrix.tag }}:latest,r.o99.no/${{ matrix.tag }}:${{ github.run_number }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          builder: ${{ steps.builder.outputs.name }}
 #          platforms: linux/amd64,linux/arm64
   build_exploit_base:
     strategy:
@@ -67,6 +69,7 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        id: builder
         with:
           driver-opts: |
             network=host
@@ -87,6 +90,7 @@ jobs:
           tags: r.o99.no/${{ matrix.tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          builder: ${{ steps.builder.outputs.name }}
 #          platforms: linux/amd64,linux/arm64
 
 #      - name: Push image to registry
