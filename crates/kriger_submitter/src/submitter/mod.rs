@@ -50,8 +50,13 @@ pub(crate) trait Submitter {
 pub enum SubmitterConfig {
     Dummy,
     Cini {
+        /// The URL of the flag submission endpoint.
         url: String,
+        /// The interval that the submitter should submit flags at.
         interval: u64,
+        /// The batch size of each submission request.
+        batch: usize,
+        /// The team token used to authenticate with the flag submission API.
         token: String,
     },
 }
@@ -63,8 +68,9 @@ impl SubmitterConfig {
             SubmitterConfig::Cini {
                 url,
                 interval,
+                batch,
                 token,
-            } => Submitters::Cini(cini::CiniSubmitter::new(url, interval, token)),
+            } => Submitters::Cini(cini::CiniSubmitter::new(url, interval, batch, token)),
         }
     }
 }

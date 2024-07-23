@@ -1,22 +1,21 @@
+use crate::submitter::{SubmitError, Submitter, SubmitterCallback};
+use crate::utils::futures::PollPending;
 use async_trait::async_trait;
+use futures::future::join_all;
+use futures::Stream;
+use kriger_common::messaging::model::{FlagSubmission, FlagSubmissionResult, FlagSubmissionStatus};
+use kriger_common::messaging::Message;
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::pin::Pin;
 use std::time::Duration;
-
-use futures::Stream;
-use serde::Deserialize;
 use tokio::time::{interval_at, Instant, MissedTickBehavior};
-use tracing::{debug, error, warn};
-
-use kriger_common::messaging::model::{FlagSubmission, FlagSubmissionResult, FlagSubmissionStatus};
-use kriger_common::messaging::Message;
-
-use crate::submitter::{SubmitError, Submitter, SubmitterCallback};
-use crate::utils::futures::PollPending;
+use tracing::{debug, error, instrument, warn};
 
 pub(crate) struct CiniSubmitter {
     pub url: String,
     pub interval: u64,
+    pub batch: usize,
     pub token: String,
     client: reqwest::Client,
 }
@@ -42,76 +41,14 @@ impl Submitter for CiniSubmitter {
             debug!("submitter tick");
             interval.tick().await;
 
-            let requests = PollPending::new(&mut flags, 100).await;
-            let flags: Vec<&str> = requests
-                .iter()
-                .map(|msg| msg.payload().flag.as_ref())
-                .collect();
-            debug!("submitting flags: {flags:?}");
-            for request in &requests {
-                // TODO: parallelize
-                let _ = request.progress().await;
-            }
-            match self.submit(&flags).await {
-                Ok(mut results) => {
-                    for message in requests {
-                        let payload = message.payload();
-                        match results.remove(&payload.flag) {
-                            Some(status) => {
-                                debug!(
-                                    "flag submission response for flag `{}`: {:?}",
-                                    &payload.flag, status
-                                );
-                                // TODO: Can't we move??
-                                let res = callback
-                                    .submit(
-                                        &payload.flag,
-                                        FlagSubmissionResult {
-                                            flag: payload.flag.clone(),
-                                            team_id: payload.team_id.clone(),
-                                            service: payload.service.clone(),
-                                            exploit: payload.exploit.clone(),
-                                            status,
-                                            points: None,
-                                        },
-                                    )
-                                    .await;
-                                match res {
-                                    Ok(_) => {
-                                        let _ = message.ack().await;
-                                    }
-                                    Err(err) => {
-                                        warn!("unable to submit result: {err:?}");
-                                        let _ = message.nak().await;
-                                    }
-                                }
-                            }
-                            None => {
-                                // ??? was??
-                                warn!(
-                                    "submitted flag did not receive a response, flag: `{}`",
-                                    &payload.flag
-                                );
-                                let _ = message.nak().await;
-                            }
-                        }
-                    }
-                }
-                Err(err) => {
-                    error!("unable to submit: {err:?}");
-                    // TODO: Parallelize
-                    for message in requests {
-                        // TODO: Send message that an attempt was done
-                        let _ = message.nak().await;
-                    }
-                }
-            }
+            let requests = PollPending::new(&mut flags, self.batch).await;
+            self.handle_submit(requests, &callback).await;
         }
     }
 }
 
 impl CiniSubmitter {
-    pub(crate) fn new(url: String, interval: u64, token: String) -> Self {
+    pub(crate) fn new(url: String, interval: u64, batch: usize, token: String) -> Self {
         let client = reqwest::Client::builder()
             .pool_max_idle_per_host(0) // should disable pooling which fixes errors against some hosts
             .build()
@@ -120,14 +57,90 @@ impl CiniSubmitter {
         Self {
             url,
             interval,
+            batch,
             token,
             client,
+        }
+    }
+
+    #[instrument(level="info", skip_all, fields(flag_count = %requests.len()))]
+    async fn handle_submit(
+        &self,
+        requests: Vec<impl Message<Payload = FlagSubmission>>,
+        callback: &(impl SubmitterCallback + Send + Sync + Sized),
+    ) {
+        // TODO: Investigate why duplicate flags were received?
+        let flags: Vec<&str> = requests
+            .iter()
+            .map(|msg| msg.payload().flag.as_ref())
+            .collect();
+
+        // Indicate the work is in progress. We do this concurrently.
+        // FIXME: Indicating in-progress will only increase the ongoing period by another AckWait
+        let progress_futures = requests.iter().map(|req| req.progress());
+        join_all(progress_futures).await;
+
+        match self.submit(&flags).await {
+            Ok(mut results) => {
+                for message in requests {
+                    let payload = message.payload();
+                    match results.remove(&payload.flag) {
+                        Some(status) => {
+                            debug! {
+                                flag = %payload.flag,
+                                flag.status = ?status,
+                                "received flag submission response"
+                            };
+                            // TODO: Can't we move??
+                            let res = callback
+                                .submit(
+                                    &payload.flag,
+                                    FlagSubmissionResult {
+                                        flag: payload.flag.clone(),
+                                        team_id: payload.team_id.clone(),
+                                        service: payload.service.clone(),
+                                        exploit: payload.exploit.clone(),
+                                        status,
+                                        points: None,
+                                    },
+                                )
+                                .await;
+                            match res {
+                                Ok(_) => {
+                                    let _ = message.ack().await;
+                                }
+                                Err(err) => {
+                                    warn!("unable to submit result: {err:?}");
+                                    let _ = message.nak().await;
+                                }
+                            }
+                        }
+                        None => {
+                            // ??? was??
+                            warn! {
+                                flag = %payload.flag,
+                                "submitted flag did not receive a response",
+                            };
+                            let _ = message.nak().await;
+                        }
+                    }
+                }
+            }
+            Err(err) => {
+                error!("unable to submit: {err:?}");
+                // TODO: Parallelize
+                for message in requests {
+                    // TODO: Send message that an attempt was done
+                    let _ = message.nak().await;
+                }
+            }
         }
     }
 
     /// You can submit stolen flags by performing an HTTP PUT request to the game system at
     /// http://10.10.0.1:8080/flags. The flags must be submitted as an array of strings and the
     /// requests must contain the header X-Team-Token set to the team token given to the participants.
+    #[instrument(level = "debug", skip(self))]
     async fn submit(
         &self,
         flags: &[&str],
@@ -141,11 +154,13 @@ impl CiniSubmitter {
 
         let response = self.client.execute(request).await?;
         if !response.status().is_success() {
-            warn!(
-                "received a non-successful response ({}): {:?}",
-                response.status(),
-                response.text().await
-            );
+            let response_status = response.status().as_u16();
+            let response_body = response.text().await;
+            warn! {
+                response.status = %response_status,
+                response.body = ?response_body,
+                "received a non-successful response from the flag submission api",
+            };
             return Err(SubmitError::FormatError);
         }
 
