@@ -9,7 +9,9 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::pin::Pin;
 use std::time::Duration;
+use tokio::select;
 use tokio::time::{interval_at, Instant, MissedTickBehavior};
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, instrument, warn};
 
 pub(crate) struct CiniSubmitter {
@@ -30,6 +32,7 @@ impl Submitter for CiniSubmitter {
             >,
         >,
         callback: impl SubmitterCallback + Send + Sync + 'static,
+        cancellation_token: CancellationToken,
     ) -> color_eyre::Result<()> {
         let mut interval = interval_at(Instant::now(), Duration::from_secs(self.interval));
         interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
@@ -39,7 +42,12 @@ impl Submitter for CiniSubmitter {
 
         loop {
             debug!("submitter tick");
-            interval.tick().await;
+            select! {
+                _ = cancellation_token.cancelled() => {
+                    return Ok(());
+                }
+                _ = interval.tick() => {}
+            }
 
             let requests = PollPending::new(&mut flags, self.batch).await;
             if requests.len() == 0 {

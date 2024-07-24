@@ -8,6 +8,7 @@ use kriger_common::messaging::model::{
 use kriger_common::messaging::{Bucket, Messaging};
 use kriger_common::runtime::AppRuntime;
 use std::time::Duration;
+use tokio::select;
 use tokio::time::{interval_at, MissedTickBehavior};
 use tracing::{debug, info, warn};
 
@@ -94,7 +95,12 @@ pub async fn main(runtime: AppRuntime) -> Result<()> {
 
     // TODO: Add scheduling for services with hints
     loop {
-        interval.tick().await;
+        select! {
+            _ = interval.tick() => {}
+            _ = runtime.cancellation_token.cancelled() => {
+                return Ok(());
+            }
+        }
         debug!("ticking");
         // TODO: Send tick message
 

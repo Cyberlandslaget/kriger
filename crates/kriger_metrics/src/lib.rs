@@ -1,7 +1,7 @@
 pub mod args;
 
 use crate::args::Args;
-use color_eyre::eyre::{Context, ContextCompat, Result};
+use color_eyre::eyre::{Context, Result};
 use futures::StreamExt;
 use kriger_common::messaging::model::ExecutionRequest;
 use kriger_common::messaging::{AckPolicy, DeliverPolicy, Message, Messaging, Stream};
@@ -9,10 +9,10 @@ use kriger_common::runtime::AppRuntime;
 use opentelemetry::metrics::{MeterProvider, Unit};
 use opentelemetry::KeyValue;
 use opentelemetry_sdk::metrics::SdkMeterProvider;
-use opentelemetry_sdk::{runtime, Resource};
+use opentelemetry_sdk::runtime;
 use std::time::Duration;
-use tokio::pin;
-use tracing::info;
+use tokio::{pin, select};
+use tracing::{info, warn};
 
 fn init_metrics() -> opentelemetry::metrics::Result<SdkMeterProvider> {
     opentelemetry_otlp::new_pipeline()
@@ -56,14 +56,32 @@ pub async fn main(runtime: AppRuntime, args: Args) -> Result<()> {
         .with_unit(Unit::new("{request}"))
         .init();
 
-    while let Ok(req) = execution_requests.next().await.context("end of stream")? {
-        let payload = req.payload();
-        let mut labels = Vec::new();
-        if let Some(team_id) = &payload.team_id {
-            labels.push(KeyValue::new("team_id", team_id.clone()));
+    loop {
+        select! {
+            _ = runtime.cancellation_token.cancelled() => {
+                return Ok(());
+            }
+            res = execution_requests.next() => {
+                match res {
+                    Some(Ok(message)) => {
+                        let payload = message.payload();
+                        let mut labels = Vec::new();
+                        if let Some(team_id) = &payload.team_id {
+                            labels.push(KeyValue::new("team_id", team_id.clone()));
+                        }
+                        execution_requests_counter.add(1, &labels);
+                    }
+                    Some(Err(error)) => {
+                        warn! {
+                            ?error,
+                            "unable to poll message"
+                        }
+                    }
+                    None => {
+                        // End of stream
+                    }
+                }
+            }
         }
-        execution_requests_counter.add(1, &labels);
     }
-
-    Ok(())
 }

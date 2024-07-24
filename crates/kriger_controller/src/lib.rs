@@ -16,7 +16,7 @@ use kriger_common::runtime::AppRuntime;
 use kube::api::{Patch, PatchParams};
 use kube::{Api, Client};
 use std::collections::BTreeMap;
-use tokio::pin;
+use tokio::{pin, select};
 use tracing::{info, warn};
 
 pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
@@ -48,18 +48,34 @@ pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
         .context("unable to watch exploits")?;
     pin!(exploits_stream);
 
-    while let Some(res) = exploits_stream.next().await {
-        match res {
-            Ok(message) => {
-                if let Err(err) = handle_message(&deployments, message, &config).await {
-                    warn!("unable to handle message: {err:?}");
+    loop {
+        select! {
+            _ = runtime.cancellation_token.cancelled() => {
+                return Ok(());
+            }
+            res = exploits_stream.next() => {
+                match res {
+                    Some(Ok(message)) => {
+                        if let Err(error) = handle_message(&deployments, message, &config).await {
+                            warn! {
+                                ?error,
+                                "unable to handle message"
+                            }
+                        }
+                    }
+                    Some(Err(error)) => {
+                        warn! {
+                            ?error,
+                            "unable to poll message"
+                        }
+                    }
+                    None => {
+                        // End of stream
+                    }
                 }
             }
-            Err(err) => warn!("unable to parse exploit: {err:?}"),
         }
     }
-
-    Ok(())
 }
 
 async fn handle_message(

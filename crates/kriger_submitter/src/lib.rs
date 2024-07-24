@@ -92,10 +92,22 @@ pub async fn main(runtime: AppRuntime) -> eyre::Result<()> {
 
     match config.into_submitter() {
         Submitters::Dummy(submitter) => {
-            submitter.run(flag_submissions.boxed(), callback).await?;
+            submitter
+                .run(
+                    flag_submissions.boxed(),
+                    callback,
+                    runtime.cancellation_token,
+                )
+                .await?;
         }
         Submitters::Cini(submitter) => {
-            submitter.run(flag_submissions.boxed(), callback).await?;
+            submitter
+                .run(
+                    flag_submissions.boxed(),
+                    callback,
+                    runtime.cancellation_token,
+                )
+                .await?;
         }
     }
     Ok(())

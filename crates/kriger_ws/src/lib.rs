@@ -12,7 +12,7 @@ use hyper_util::server::conn::auto::Builder;
 use kriger_common::runtime::AppRuntime;
 use std::net::SocketAddr;
 use tokio::net::{TcpListener, TcpStream};
-use tokio::spawn;
+use tokio::{select, spawn};
 use tracing::{info, warn};
 
 pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
@@ -29,15 +29,29 @@ pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
     info!("listening on {addr:?}");
 
     loop {
-        let (stream, client_socket) = listener.accept().await?;
-        info!("accepted client: {client_socket:?}");
-        spawn(async move {
-            if let Err(err) = handle_conn(stream).await {
-                warn!("connection error: {err:?}");
+        select! {
+            _ = runtime.cancellation_token.cancelled() => {
+                return Ok(());
+            },
+            res = listener.accept() => {
+               let (stream, client_socket) = res?;
+                info! {
+                    ?client_socket,
+                    "accepted a client"
+                }
+                spawn(async move {
+                    if let Err(error) = handle_conn(stream).await {
+                        warn! {
+                            ?error,
+                            "connection handling error"
+                        }
+                    }
+                });
             }
-        });
+        }
     }
 }
+
 async fn handle_conn(stream: TcpStream) -> Result<()> {
     let io = TokioIo::new(stream);
     let res = Builder::new(TokioExecutor::new())
@@ -55,8 +69,11 @@ async fn server_upgrade(
     let (response, fut) = upgrade::upgrade(&mut req)?;
 
     spawn(async move {
-        if let Err(err) = tokio::task::unconstrained(handle_client(fut)).await {
-            warn!("websocket error: {err:?}");
+        if let Err(error) = tokio::task::unconstrained(handle_client(fut)).await {
+            warn! {
+                ?error,
+                "websocket error"
+            }
         }
     });
 

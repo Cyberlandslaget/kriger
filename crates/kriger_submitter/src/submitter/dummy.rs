@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use color_eyre::eyre;
 use color_eyre::eyre::Context;
 use futures::{Stream, StreamExt};
@@ -5,7 +6,8 @@ use kriger_common::messaging::model::{FlagSubmission, FlagSubmissionResult, Flag
 use kriger_common::messaging::Message;
 use rand::Rng;
 use std::pin::Pin;
-use async_trait::async_trait;
+use tokio::select;
+use tokio_util::sync::CancellationToken;
 use tracing::warn;
 
 use super::{Submitter, SubmitterCallback};
@@ -23,14 +25,32 @@ impl Submitter for DummySubmitter {
             >,
         >,
         callback: impl SubmitterCallback + Send + Sync + 'static,
+        cancellation_token: CancellationToken,
     ) -> eyre::Result<()> {
-        while let Some(msg) = flags.next().await {
-            if let Err(err) = self.handle_flag(&msg, &callback).await {
-                let _ = msg.nak().await;
-                warn!("unable to handle flag: {err:?}");
+        loop {
+            select! {
+                _ = cancellation_token.cancelled() => {
+                    return Ok(());
+                }
+                res = flags.next() => {
+                    match res {
+                        Some(message) => {
+                            if let Err(error) = self.handle_flag(&message, &callback).await {
+                                let _ = message.nak().await;
+                                warn! {
+                                    ?error,
+                                    flag = message.payload().flag,
+                                    "unable to handle flag"
+                                }
+                            }
+                        }
+                        None => {
+                            // End of stream
+                        }
+                    }
+                }
             }
         }
-        Ok(())
     }
 }
 

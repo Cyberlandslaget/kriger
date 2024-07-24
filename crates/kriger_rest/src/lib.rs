@@ -25,12 +25,16 @@ pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
         .context("unable to start the rest server, is the port taken?")?;
     info!("listening on {addr:?}");
 
+    let cancellation_token = runtime.cancellation_token.clone();
     let state = AppState { runtime };
 
     let app = Router::new()
         .route("/launch", put(deploy::launch))
         .with_state(Arc::new(state));
     axum::serve(listener, app)
+        .with_graceful_shutdown(async move {
+            cancellation_token.cancelled().await;
+        })
         .await
         .context("http server error")?;
 

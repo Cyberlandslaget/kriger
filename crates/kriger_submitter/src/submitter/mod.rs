@@ -7,6 +7,7 @@ use serde::Deserialize;
 use std::future::Future;
 use std::pin::Pin;
 use thiserror::Error;
+use tokio_util::sync::CancellationToken;
 
 // TODO: Port
 //mod dctf;
@@ -42,6 +43,7 @@ pub(crate) trait Submitter {
             >,
         >,
         callback: impl SubmitterCallback + Send + Sync + 'static,
+        cancellation_token: CancellationToken,
     ) -> eyre::Result<()>;
 }
 

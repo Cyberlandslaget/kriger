@@ -3,7 +3,9 @@ use kriger_common::messaging::nats::NatsMessaging;
 use kriger_common::runtime::AppRuntime;
 use std::sync::Arc;
 use tokio::task::JoinSet;
-use tracing::{info, warn};
+use tokio::{signal, spawn};
+use tokio_util::sync::CancellationToken;
+use tracing::{error, info, warn};
 
 pub(crate) mod args;
 
@@ -14,9 +16,27 @@ pub(crate) async fn main(args: args::Args) -> Result<()> {
     // TODO: Move this somewhere else
     messaging.do_migration().await?;
 
+    let cancellation_token = CancellationToken::new();
+    let signal_cancellation_token = cancellation_token.clone();
+    spawn(async move {
+        match signal::ctrl_c().await {
+            Ok(()) => {
+                signal_cancellation_token.cancel();
+                info!("shutdown signal received");
+            }
+            Err(error) => {
+                error! {
+                    ?error,
+                    "unable to listen for shutdown signal"
+                }
+            }
+        }
+    });
+
     let runtime = AppRuntime {
         config: Arc::new(args.common),
         messaging: Arc::new(messaging),
+        cancellation_token,
     };
 
     info!("starting components");
