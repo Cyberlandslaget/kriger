@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::pin::Pin;
 use std::time::Duration;
 use tokio::time::{interval_at, Instant, MissedTickBehavior};
-use tracing::{debug, error, instrument, warn};
+use tracing::{debug, error, info, instrument, warn};
 
 pub(crate) struct CiniSubmitter {
     pub url: String,
@@ -42,6 +42,11 @@ impl Submitter for CiniSubmitter {
             interval.tick().await;
 
             let requests = PollPending::new(&mut flags, self.batch).await;
+            if requests.len() == 0 {
+                debug!("there are no flags to submit, skipping");
+                continue;
+            }
+
             self.handle_submit(requests, &callback).await;
         }
     }
@@ -51,6 +56,7 @@ impl CiniSubmitter {
     pub(crate) fn new(url: String, interval: u64, batch: usize, token: String) -> Self {
         let client = reqwest::Client::builder()
             .pool_max_idle_per_host(0) // should disable pooling which fixes errors against some hosts
+            .timeout(Duration::from_secs(60)) // This was the recommended timeout. TODO: Make this configurable
             .build()
             .expect("unable to construct reqwest client"); // TODO: Should probably return a result
 
@@ -69,6 +75,11 @@ impl CiniSubmitter {
         requests: Vec<impl Message<Payload = FlagSubmission>>,
         callback: &(impl SubmitterCallback + Send + Sync + Sized),
     ) {
+        info! {
+            flags.count = requests.len(),
+            "preparing to submit flags"
+        }
+
         // TODO: Investigate why duplicate flags were received?
         let flags: Vec<&str> = requests
             .iter()
@@ -76,63 +87,24 @@ impl CiniSubmitter {
             .collect();
 
         // Indicate the work is in progress. We do this concurrently.
-        // FIXME: Indicating in-progress will only increase the ongoing period by another AckWait
+        // FIXME: Indicating in-progress will only increase the ongoing period by another AckWait, maybe increase this periodically?
         let progress_futures = requests.iter().map(|req| req.progress());
         join_all(progress_futures).await;
 
         match self.submit(&flags).await {
             Ok(mut results) => {
-                for message in requests {
-                    let payload = message.payload();
-                    match results.remove(&payload.flag) {
-                        Some(status) => {
-                            debug! {
-                                flag = %payload.flag,
-                                flag.status = ?status,
-                                "received flag submission response"
-                            };
-                            // TODO: Can't we move??
-                            let res = callback
-                                .submit(
-                                    &payload.flag,
-                                    FlagSubmissionResult {
-                                        flag: payload.flag.clone(),
-                                        team_id: payload.team_id.clone(),
-                                        service: payload.service.clone(),
-                                        exploit: payload.exploit.clone(),
-                                        status,
-                                        points: None,
-                                    },
-                                )
-                                .await;
-                            match res {
-                                Ok(_) => {
-                                    let _ = message.ack().await;
-                                }
-                                Err(err) => {
-                                    warn!("unable to submit result: {err:?}");
-                                    let _ = message.nak().await;
-                                }
-                            }
-                        }
-                        None => {
-                            // ??? was??
-                            warn! {
-                                flag = %payload.flag,
-                                "submitted flag did not receive a response",
-                            };
-                            let _ = message.nak().await;
-                        }
-                    }
-                }
+                let futures = requests.into_iter().map(|message| {
+                    Self::handle_result(results.remove(&message.payload().flag), message, callback)
+                });
+                join_all(futures).await;
             }
-            Err(err) => {
-                error!("unable to submit: {err:?}");
-                // TODO: Parallelize
-                for message in requests {
-                    // TODO: Send message that an attempt was done
-                    let _ = message.nak().await;
-                }
+            Err(error) => {
+                error! {
+                    ?error,
+                    "unable to submit flags"
+                };
+                let futures = requests.iter().map(|message| message.nak());
+                join_all(futures).await;
             }
         }
     }
@@ -140,11 +112,16 @@ impl CiniSubmitter {
     /// You can submit stolen flags by performing an HTTP PUT request to the game system at
     /// http://10.10.0.1:8080/flags. The flags must be submitted as an array of strings and the
     /// requests must contain the header X-Team-Token set to the team token given to the participants.
-    #[instrument(level = "debug", skip(self))]
+    #[instrument(level = "info", skip_all)]
     async fn submit(
         &self,
         flags: &[&str],
     ) -> Result<HashMap<String, FlagSubmissionStatus>, SubmitError> {
+        debug! {
+            flags = ?flags,
+            "submitting flags"
+        }
+
         let request = self
             .client
             .put(&self.url)
@@ -160,7 +137,7 @@ impl CiniSubmitter {
                 response.status = %response_status,
                 response.body = ?response_body,
                 "received a non-successful response from the flag submission api",
-            };
+            }
             return Err(SubmitError::FormatError);
         }
 
@@ -208,6 +185,57 @@ impl CiniSubmitter {
 
         warn!("unknown response message: {msg}");
         return FlagSubmissionStatus::Unknown;
+    }
+
+    async fn handle_result(
+        maybe_status: Option<FlagSubmissionStatus>,
+        message: impl Message<Payload = FlagSubmission>,
+        callback: &(impl SubmitterCallback + Send + Sync + Sized),
+    ) {
+        let payload = message.payload();
+        match maybe_status {
+            Some(status) => {
+                debug! {
+                    flag = %payload.flag,
+                    flag.status = ?status,
+                    "received flag submission response"
+                };
+                // TODO: Can't we move??
+                let res = callback
+                    .submit(
+                        &payload.flag,
+                        FlagSubmissionResult {
+                            flag: payload.flag.clone(),
+                            team_id: payload.team_id.clone(),
+                            service: payload.service.clone(),
+                            exploit: payload.exploit.clone(),
+                            status,
+                            points: None,
+                        },
+                    )
+                    .await;
+                match res {
+                    Ok(_) => {
+                        let _ = message.ack().await;
+                    }
+                    Err(error) => {
+                        warn! {
+                            ?error,
+                            "unable to publish flag submission result"
+                        }
+                        let _ = message.nak().await;
+                    }
+                }
+            }
+            None => {
+                // ??? was??
+                warn! {
+                    flag = %payload.flag,
+                    "submitted flag did not receive a response",
+                };
+                let _ = message.nak().await;
+            }
+        }
     }
 }
 
