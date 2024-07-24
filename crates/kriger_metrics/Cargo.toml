@@ -11,9 +11,9 @@ clap_derive.workspace = true
 color-eyre.workspace = true
 futures.workspace = true
 kriger_common.path = "../kriger_common"
-opentelemetry = "0.23.0"
-opentelemetry-semantic-conventions = "0.15.0"
-opentelemetry_sdk = { version = "0.23.0", features = ["rt-tokio"] }
-opentelemetry-otlp = { version = "0.16.0", features = ["metrics"] }
+opentelemetry.workspace = true
+opentelemetry-semantic-conventions.workspace = true
+opentelemetry_sdk.workspace = true
+opentelemetry-otlp = { workspace = true, features = ["metrics"] }
 tokio.workspace = true
 tracing.workspace = true

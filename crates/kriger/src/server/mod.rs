@@ -5,10 +5,11 @@ use std::sync::Arc;
 use tokio::task::JoinSet;
 use tokio::{signal, spawn};
 use tokio_util::sync::CancellationToken;
-use tracing::{error, info, warn};
+use tracing::{error, info, instrument, warn};
 
 pub(crate) mod args;
 
+#[instrument(skip_all)]
 pub(crate) async fn main(args: args::Args) -> Result<()> {
     info!("initializing messaging");
     let messaging = NatsMessaging::new(&args.common.nats_url).await?;
@@ -51,7 +52,8 @@ pub(crate) async fn main(args: args::Args) -> Result<()> {
         set.spawn(kriger_fetcher::main(runtime.clone()));
     }
     #[cfg(feature = "metrics")]
-    if args.components.enable_metrics || args.components.single {
+    if args.components.enable_metrics {
+        // TODO: Consider enabling this by default with --single?
         set.spawn(kriger_metrics::main(runtime.clone(), args.metrics));
     }
     #[cfg(feature = "rest")]

@@ -4,7 +4,7 @@ version = "0.0.1"
 edition = "2021"
 
 [features]
-default = ["server-all", "cli"]
+default = ["server-all", "otel", "cli"]
 server = []
 server-all = ["server", "controller", "fetcher", "metrics", "rest", "runner", "scheduler", "submitter", "ws"]
 controller = ["dep:kriger_controller", "server"]
@@ -15,6 +15,7 @@ runner = ["dep:kriger_runner", "server"]
 scheduler = ["dep:kriger_scheduler", "server"]
 submitter = ["dep:kriger_submitter", "server"]
 ws = ["dep:kriger_ws", "server"]
+otel = ["dep:tracing-opentelemetry"]
 cli = ["dep:indicatif", "dep:bollard", "dep:tar", "dep:console", "dep:humantime", "dep:tokio-stream", "dep:chrono"]
 
 [dependencies]
@@ -27,11 +28,16 @@ console = { version = "0.15.8", optional = true }
 futures.workspace = true
 humantime = { version = "2.1.0", optional = true }
 indicatif = { version = "0.17.8", optional = true }
+opentelemetry.workspace = true
+opentelemetry-semantic-conventions.workspace = true
+opentelemetry_sdk.workspace = true
+opentelemetry-otlp = { workspace = true, features = ["trace"] }
 tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "process"] }
 tokio-stream = { workspace = true, optional = true }
 tokio-util.workspace = true
 tracing.workspace = true
-tracing-subscriber.workspace = true
+tracing-opentelemetry = { version = "0.25.0", optional = true }
+tracing-subscriber = { workspace = true, features = ["env-filter", "registry"] }
 kriger_common = { path = "../kriger_common" }
 kriger_controller = { path = "../kriger_controller", optional = true }
 kriger_fetcher = { path = "../kriger_fetcher", optional = true }

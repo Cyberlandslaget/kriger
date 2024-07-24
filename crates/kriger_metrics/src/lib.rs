@@ -6,13 +6,13 @@ use futures::StreamExt;
 use kriger_common::messaging::model::ExecutionRequest;
 use kriger_common::messaging::{AckPolicy, DeliverPolicy, Message, Messaging, Stream};
 use kriger_common::runtime::AppRuntime;
-use opentelemetry::metrics::{MeterProvider, Unit};
+use opentelemetry::metrics::MeterProvider;
 use opentelemetry::KeyValue;
 use opentelemetry_sdk::metrics::SdkMeterProvider;
 use opentelemetry_sdk::runtime;
 use std::time::Duration;
 use tokio::{pin, select};
-use tracing::{info, warn};
+use tracing::{info, instrument, warn};
 
 fn init_metrics() -> opentelemetry::metrics::Result<SdkMeterProvider> {
     opentelemetry_otlp::new_pipeline()
@@ -23,6 +23,7 @@ fn init_metrics() -> opentelemetry::metrics::Result<SdkMeterProvider> {
         .build()
 }
 
+#[instrument(skip_all)]
 pub async fn main(runtime: AppRuntime, args: Args) -> Result<()> {
     info!("starting metrics exporter");
 
@@ -53,12 +54,15 @@ pub async fn main(runtime: AppRuntime, args: Args) -> Result<()> {
     let execution_requests_counter = meter
         .u64_counter("kriger.execution.requests")
         .with_description("The number of execution requests")
-        .with_unit(Unit::new("{request}"))
+        .with_unit("{request}")
         .init();
 
     loop {
         select! {
+            // TODO: Investigate why the cancellation token is not working properly here.
             _ = runtime.cancellation_token.cancelled() => {
+                info!("shutting down metrics ");
+                metrics.shutdown()?;
                 return Ok(());
             }
             res = execution_requests.next() => {

@@ -17,7 +17,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Semaphore;
 use tokio::{pin, spawn};
-use tracing::{debug, info, warn};
+use tracing::{debug, info, instrument, warn};
 
 #[derive(Clone)]
 struct RunnerCallbackImpl<T: Bucket> {
@@ -50,6 +50,7 @@ impl<T: Bucket> RunnerCallback for RunnerCallbackImpl<T> {
     }
 }
 
+#[instrument(skip_all)]
 pub async fn main(args: Config) -> Result<()> {
     info!("initializing messaging");
     let messaging = NatsMessaging::new(&args.nats_url).await?;

@@ -7,12 +7,13 @@ use color_eyre::eyre::{Context, Result};
 use kriger_common::runtime::AppRuntime;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::net::TcpListener;
-use tracing::info;
+use tracing::{info, instrument};
 
 struct AppState {
     runtime: AppRuntime,
 }
 
+#[instrument(skip_all)]
 pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
     info!("starting rest server");
 

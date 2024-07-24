@@ -30,6 +30,8 @@ A Linux or macOS environment is **highly** recommended. Windows users should con
 | nats     | 4222 (NATS & JetStream)   |
 | k3s      | 6443 (Kubernetes API)     |
 | registry | 5000 (Container registry) |
+| jeager   | 4317 (OTLP)               |
+| jeager   | 16686 (Jeager UI)         |
 
 **Start services:**
 

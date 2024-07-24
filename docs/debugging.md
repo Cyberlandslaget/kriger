@@ -87,6 +87,11 @@ nats kv put services U2VydmljZSAxIENoZWNrZXIgMQ '{"name": "service 1 Checker 1",
 nats kv put exploits test '{"manifest":{"name":"test","service":"Service 1 Checker 1","replicas":4,"enabled":true,"resources":{"cpu_limit":"1","mem_limit":"512M"}},"image":"r.o99.no/kriger-exploits/test"}'
 ```
 
+### Submitter Testing
+```bash
+flag=$(head -c 23 /dev/random | base64) && nats kv put flags "$(echo $flag | base64)".submit "{\"f\":\"$flag\"}"
+````
+
 #### Runner Testing
 
 ```json5

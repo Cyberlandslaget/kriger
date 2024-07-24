@@ -4,8 +4,9 @@ use color_eyre::eyre::Result;
 use kriger_common::runtime::AppRuntime;
 use tokio::time;
 use tokio::time::MissedTickBehavior;
-use tracing::info;
+use tracing::{info, instrument};
 
+#[instrument(skip_all)]
 pub async fn main(runtime: AppRuntime) -> Result<()> {
     info!("starting data fetcher");
 

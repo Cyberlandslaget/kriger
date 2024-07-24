@@ -14,6 +14,10 @@ color-eyre = "0.6.3"
 futures = "0.3.30"
 hyper = "1.4.1"
 hyper-util = "0.1.6"
+opentelemetry = "0.24.0"
+opentelemetry-semantic-conventions = "0.16.0"
+opentelemetry_sdk = { version = "0.24.1", features = ["rt-tokio"] }
+opentelemetry-otlp = "0.17.0"
 rand = "0.8.5"
 reqwest = { version = "0.12.5", features = ["rustls-tls", "charset", "http2", "json"], default-features = false }
 serde = { version = "1.0.203", features = ["derive"] }

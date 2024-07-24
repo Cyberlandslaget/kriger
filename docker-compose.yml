@@ -41,6 +41,12 @@ services:
       - "127.0.0.1:5000:5000"
     volumes:
       - registry:/var/lib/registry
+  jeager:
+    image: jaegertracing/all-in-one:latest
+    restart: always
+    ports:
+      - 127.0.0.1:4317:4317
+      - 127.0.0.1:16686:16686
 
 volumes:
   registry:

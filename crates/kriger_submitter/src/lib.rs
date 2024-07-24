@@ -11,7 +11,7 @@ use kriger_common::messaging::model::{CompetitionConfig, FlagSubmission, FlagSub
 use kriger_common::messaging::{AckPolicy, Bucket, DeliverPolicy, Messaging, MessagingError};
 use kriger_common::runtime::AppRuntime;
 use std::time::Duration;
-use tracing::{debug, info, warn};
+use tracing::{debug, info, instrument, warn};
 
 struct SubmitterCallbackImpl<B: Bucket + Send + Sync> {
     // NOTE this ought to be an Arc or something once the Box::leak is removed
@@ -29,6 +29,7 @@ impl<B: Bucket + Send + Sync> SubmitterCallback for SubmitterCallbackImpl<B> {
     }
 }
 
+#[instrument(skip_all)]
 pub async fn main(runtime: AppRuntime) -> eyre::Result<()> {
     info!("starting submitter");
 
