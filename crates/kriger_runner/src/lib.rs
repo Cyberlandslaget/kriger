@@ -11,12 +11,13 @@ use kriger_common::messaging::nats::NatsMessaging;
 use kriger_common::messaging::{
     AckPolicy, Bucket, DeliverPolicy, Messaging, MessagingError, Stream,
 };
+use kriger_common::runtime::create_shutdown_cancellation_token;
 use regex::Regex;
 use std::str;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Semaphore;
-use tokio::{pin, spawn};
+use tokio::{pin, select, spawn};
 use tracing::{debug, info, instrument, warn};
 
 #[derive(Clone)]
@@ -54,6 +55,7 @@ impl<T: Bucket> RunnerCallback for RunnerCallbackImpl<T> {
 pub async fn main(args: Config) -> Result<()> {
     info!("initializing messaging");
     let messaging = NatsMessaging::new(&args.nats_url).await?;
+    let cancellation_token = create_shutdown_cancellation_token();
 
     let config_bucket = messaging
         .config()
@@ -116,28 +118,34 @@ pub async fn main(args: Config) -> Result<()> {
     };
 
     for i in 0..worker_count {
-        // TODO: Support cancellation tokens
-        spawn(runner.clone().worker(i, callback.clone()));
+        spawn(
+            runner
+                .clone()
+                .worker(i, callback.clone(), cancellation_token.clone()),
+        );
     }
 
     loop {
-        let permit = semaphore
-            .clone()
-            .acquire_owned()
-            .await
-            .context("permit acquisition failed")?;
-        debug!("permit acquired: {permit:?}");
-        match stream.next().await.context("end of stream")? {
-            Ok(message) => {
-                let job = Job {
-                    request: Box::new(message),
-                    _permit: permit,
-                };
-                if let Err(err) = tx.send(job).await {
-                    bail!("channel closed: {err:?}");
-                }
+        select! {
+            _ = cancellation_token.cancelled() => {
+                return Ok(());
             }
-            Err(err) => warn!("unable to parse message: {err:?}"),
-        };
+            maybe_permit = semaphore.clone().acquire_owned() => {
+                let permit = maybe_permit.context("permit acquisition failed")?;
+                debug!("permit acquired: {permit:?}");
+                match stream.next().await.context("end of stream")? {
+                    Ok(message) => {
+                        let job = Job {
+                            request: Box::new(message),
+                            _permit: permit,
+                        };
+                        if let Err(err) = tx.send(job).await {
+                            bail!("channel closed: {err:?}");
+                        }
+                    }
+                    Err(err) => warn!("unable to parse message: {err:?}"),
+                };
+            }
+        }
     }
 }

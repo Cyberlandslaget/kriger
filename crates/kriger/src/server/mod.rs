@@ -1,11 +1,9 @@
 use color_eyre::eyre::Result;
 use kriger_common::messaging::nats::NatsMessaging;
-use kriger_common::runtime::AppRuntime;
+use kriger_common::runtime::{create_shutdown_cancellation_token, AppRuntime};
 use std::sync::Arc;
 use tokio::task::JoinSet;
-use tokio::{signal, spawn};
-use tokio_util::sync::CancellationToken;
-use tracing::{error, info, instrument, warn};
+use tracing::{info, instrument, warn};
 
 pub(crate) mod args;
 
@@ -17,22 +15,7 @@ pub(crate) async fn main(args: args::Args) -> Result<()> {
     // TODO: Move this somewhere else
     messaging.do_migration().await?;
 
-    let cancellation_token = CancellationToken::new();
-    let signal_cancellation_token = cancellation_token.clone();
-    spawn(async move {
-        match signal::ctrl_c().await {
-            Ok(()) => {
-                signal_cancellation_token.cancel();
-                info!("shutdown signal received");
-            }
-            Err(error) => {
-                error! {
-                    ?error,
-                    "unable to listen for shutdown signal"
-                }
-            }
-        }
-    });
+    let cancellation_token = create_shutdown_cancellation_token();
 
     let runtime = AppRuntime {
         config: Arc::new(args.common),

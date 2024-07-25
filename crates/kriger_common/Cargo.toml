@@ -15,7 +15,7 @@ color-eyre.workspace = true
 dashmap = "6.0.1"
 futures.workspace = true
 thiserror.workspace = true
-tokio.workspace = true
+tokio = { workspace = true, features = ["signal"] }
 tokio-util.workspace = true
 tracing.workspace = true
 serde.workspace = true

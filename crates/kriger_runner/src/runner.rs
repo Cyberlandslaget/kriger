@@ -9,8 +9,10 @@ use std::future::Future;
 use std::process::Stdio;
 use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::select;
 use tokio::sync::OwnedSemaphorePermit;
 use tokio_stream::wrappers::LinesStream;
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, warn};
 
 #[derive(Clone)]
@@ -44,13 +46,26 @@ pub trait RunnerCallback {
 }
 
 impl Runner {
-    pub(crate) async fn worker(self, idx: usize, callback: impl RunnerCallback) -> Result<()> {
+    pub(crate) async fn worker(
+        self,
+        idx: usize,
+        callback: impl RunnerCallback,
+        token: CancellationToken,
+    ) -> Result<()> {
         loop {
-            // The channel has most likely been closed
-            let job = self.job_rx.recv().await.context("unable to receive job")?;
-            if let Err(err) = self.handle_job(job, idx, &callback).await {
-                error!("unexpected error: {err:?}");
-                // TODO: Consider delaying with jitter? Perhaps NATS is down?
+            select! {
+                // Wait for the jobs to gracefully shut down
+                _ = token.cancelled() => {
+                    return Ok(());
+                }
+                res = self.job_rx.recv() => {
+                    // The channel has most likely been closed
+                    let job = res.context("unable to receive job")?;
+                    if let Err(err) = self.handle_job(job, idx, &callback).await {
+                        error!("unexpected error: {err:?}");
+                        // TODO: Consider delaying with jitter? Perhaps NATS is down?
+                    }
+                }
             }
         }
     }
@@ -59,11 +74,16 @@ impl Runner {
         job.request.progress().await.context("unable to ack")?;
         match self.execute(job.request.payload(), callback).await {
             Err(err) => {
-                warn!("execution failed: {err:?} (worker {idx})");
+                warn! {
+                    "execution failed: {err:?} (worker {idx})"
+                };
                 job.request.nak().await.context("unable to nak")?;
             }
             Ok(..) => {
-                debug!("execution succeeded (worker {idx})");
+                debug! {
+                    worker.id = idx,
+                    "execution succeeded"
+                }
                 job.request.ack().await.context("unable to ack")?;
             }
         }
