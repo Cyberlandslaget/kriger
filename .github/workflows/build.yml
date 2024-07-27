@@ -47,9 +47,8 @@ jobs:
           file: ${{ matrix.path }}/Dockerfile
           push: true
           tags: r.o99.no/${{ matrix.tag }}:latest,r.o99.no/${{ matrix.tag }}:${{ github.run_number }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          scope: ${{ matrix.cache.scope }}
+          cache-from: type=gha,scope=${{ matrix.cache.scope }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.cache.scope }}
           builder: ${{ steps.builder.outputs.name }}
 
   build_exploit_base:
