@@ -16,13 +16,11 @@ jobs:
           - tag: kriger/kriger
             path: .
             cache:
-              key: rust
-              files: "Cargo.lock"
+              scope: cargo
           - tag: kriger/frontend
             path: frontend
             cache:
-              key: pnpm
-              files: "frontend/pnpm-lock.yaml"
+              scope: pnpm
     steps:
       - name: Check out the repo
         uses: actions/checkout@v4
@@ -42,18 +40,6 @@ jobs:
           username: ${{ secrets.REGISTRY_USER }}
           password: ${{ secrets.REGISTRY_PASS }}
 
-      - name: Set up build cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ matrix.cache.key }}-build-cache
-          key: ${{ runner.os }}-${{ matrix.cache.key }}-build-cache-${{ hashFiles(matrix.cache.files) }}
-
-      - name: Inject build cache
-        uses: reproducible-containers/buildkit-cache-dance@5b6db76d1da5c8b307d5d2e0706d266521b710de # v3.1.2
-        with:
-          cache-map: |
-            { "${{ matrix.cache.key }}-build-cache": "/var/cache/${{ matrix.cache.key }}" }
-
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
@@ -63,6 +49,7 @@ jobs:
           tags: r.o99.no/${{ matrix.tag }}:latest,r.o99.no/${{ matrix.tag }}:${{ github.run_number }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          scope: ${{ matrix.cache.scope }}
           builder: ${{ steps.builder.outputs.name }}
 
   build_exploit_base:
