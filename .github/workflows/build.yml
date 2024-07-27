@@ -51,7 +51,8 @@ jobs:
       - name: Inject build cache
         uses: reproducible-containers/buildkit-cache-dance@5b6db76d1da5c8b307d5d2e0706d266521b710de # v3.1.2
         with:
-          cache-source: ${{ matrix.cache.key }}-build-cache
+          cache-map: |
+            { "${{ matrix.cache.key }}-build-cache": "/var/cache/${{ matrix.cache.key }}" }
 
       - name: Build and push
         uses: docker/build-push-action@v6
