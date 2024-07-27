@@ -1,21 +1,28 @@
 pub mod config;
 
 use crate::config::Config;
-use color_eyre::eyre::{bail, Context, Result};
-use fastwebsockets::{upgrade, OpCode, WebSocketError};
+use color_eyre::eyre;
+use color_eyre::eyre::{bail, Context};
+use fastwebsockets::{upgrade, Frame, Payload, WebSocketError};
+use flume::Sender;
+use futures::stream::{select_all, StreamExt};
 use http_body_util::Empty;
 use hyper::body::{Bytes, Incoming};
 use hyper::service::service_fn;
 use hyper::{Request, Response};
 use hyper_util::rt::{TokioExecutor, TokioIo};
 use hyper_util::server::conn::auto::Builder;
+use kriger_common::messaging::model::{FlagSubmission, FlagSubmissionResult};
+use kriger_common::messaging::{AckPolicy, Bucket, DeliverPolicy, Message, Messaging};
 use kriger_common::runtime::AppRuntime;
+use serde::Serialize;
 use std::net::SocketAddr;
 use tokio::net::{TcpListener, TcpStream};
+use tokio::task::JoinSet;
 use tokio::{select, spawn};
 use tracing::{info, warn};
 
-pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
+pub async fn main(runtime: AppRuntime, config: Config) -> eyre::Result<()> {
     info!("starting websocket server");
 
     let addr: SocketAddr = config
@@ -28,9 +35,11 @@ pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
 
     info!("listening on {addr:?}");
 
+    let cancellation_token = runtime.cancellation_token.clone();
+
     loop {
         select! {
-            _ = runtime.cancellation_token.cancelled() => {
+            _ = cancellation_token.cancelled() => {
                 return Ok(());
             },
             res = listener.accept() => {
@@ -39,8 +48,9 @@ pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
                     ?client_socket,
                     "accepted a client"
                 }
+                let runtime_clone = runtime.clone();
                 spawn(async move {
-                    if let Err(error) = handle_conn(stream).await {
+                    if let Err(error) = handle_conn(stream, runtime_clone).await {
                         warn! {
                             ?error,
                             "connection handling error"
@@ -52,10 +62,15 @@ pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
     }
 }
 
-async fn handle_conn(stream: TcpStream) -> Result<()> {
+async fn handle_conn(stream: TcpStream, runtime: AppRuntime) -> eyre::Result<()> {
     let io = TokioIo::new(stream);
     let res = Builder::new(TokioExecutor::new())
-        .serve_connection_with_upgrades(io, service_fn(server_upgrade))
+        .serve_connection_with_upgrades(
+            io,
+            service_fn(move |req| {
+                return handle_request(req, runtime.clone());
+            }),
+        )
         .await;
     if let Err(err) = res {
         bail!("connection error: {err:?}");
@@ -63,13 +78,14 @@ async fn handle_conn(stream: TcpStream) -> Result<()> {
     Ok(())
 }
 
-async fn server_upgrade(
+async fn handle_request(
     mut req: Request<Incoming>,
+    runtime: AppRuntime,
 ) -> Result<Response<Empty<Bytes>>, WebSocketError> {
     let (response, fut) = upgrade::upgrade(&mut req)?;
 
     spawn(async move {
-        if let Err(error) = tokio::task::unconstrained(handle_client(fut)).await {
+        if let Err(error) = tokio::task::unconstrained(handle_client(fut, runtime)).await {
             warn! {
                 ?error,
                 "websocket error"
@@ -80,19 +96,103 @@ async fn server_upgrade(
     Ok(response)
 }
 
-async fn handle_client(fut: upgrade::UpgradeFut) -> Result<(), WebSocketError> {
-    let mut ws = fastwebsockets::FragmentCollector::new(fut.await?);
+async fn handle_client(
+    fut: upgrade::UpgradeFut,
+    runtime: AppRuntime,
+) -> Result<(), WebSocketError> {
+    let ws = fut.await?;
+    let (mut ws_rx, mut ws_tx) = ws.split(tokio::io::split);
 
-    loop {
-        let frame = ws.read_frame().await?;
-        match frame.opcode {
-            OpCode::Close => break,
-            OpCode::Text | OpCode::Binary => {
-                ws.write_frame(frame).await?;
+    // FIXME: Should probably handle backpressure somehow, eg. the websocket connection being slow.
+    let (tx, rx) = flume::unbounded::<WebSocketEvent>();
+
+    let mut set = JoinSet::new();
+    set.spawn(subscribe_all(runtime, tx));
+    set.spawn(async move {
+        let mut rx = rx.into_stream();
+        while let Some(msg) = rx.next().await {
+            match serde_json::to_vec(&msg) {
+                Ok(bytes) => {
+                    ws_tx
+                        .write_frame(Frame::text(Payload::Owned(bytes)))
+                        .await?;
+                }
+                Err(err) => {
+                    bail!("serialization error: {err:?}");
+                }
             }
-            _ => {}
         }
+        Ok(())
+    });
+    // TODO: Handle reads and disconnect messages and a few other things
+
+    while let Some(Ok(res)) = set.join_next().await {
+        if let Err(error) = res {
+            warn! {
+                ?error,
+                "unexpected error"
+            }
+        }
+
+        // We abort when the first future returns
+        set.abort_all();
+        return Ok(());
     }
 
     Ok(())
+}
+
+async fn subscribe_all(runtime: AppRuntime, tx: Sender<WebSocketEvent>) -> eyre::Result<()> {
+    let flags = runtime
+        .messaging
+        .flags()
+        .await
+        .context("unable to retrieve flags bucket")?;
+
+    // TODO: Deliver messages from the last N ticks
+    let flag_submissions_stream = flags
+        .watch_key::<FlagSubmission>(
+            "*.submit",
+            None,
+            AckPolicy::None,
+            DeliverPolicy::New,
+            vec![],
+        )
+        .await
+        .context("unable to watch flags")?
+        .filter_map(|res| async {
+            res.ok()
+                .map(|msg| WebSocketEvent::FlagSubmission(msg.into_payload()))
+        });
+    let flag_results_stream = flags
+        .watch_key::<FlagSubmissionResult>(
+            "*.result",
+            None,
+            AckPolicy::None,
+            DeliverPolicy::New,
+            vec![],
+        )
+        .await
+        .context("unable to watch flags")?
+        .filter_map(|res| async {
+            res.ok()
+                .map(|msg| WebSocketEvent::FlagSubmissionResult(msg.into_payload()))
+        });
+
+    let mut fused_stream = select_all(vec![
+        flag_submissions_stream.boxed(),
+        flag_results_stream.boxed(),
+    ]);
+    while let Some(event) = fused_stream.next().await {
+        tx.send_async(event).await.context("send error")?;
+    }
+
+    Ok(())
+}
+
+#[derive(Serialize, Debug)]
+#[serde(tag = "t", content = "d", rename_all = "snake_case")]
+enum WebSocketEvent {
+    FlagSubmission(FlagSubmission),
+    FlagSubmissionResult(FlagSubmissionResult),
 }

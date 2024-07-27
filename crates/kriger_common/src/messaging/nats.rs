@@ -1,19 +1,14 @@
 use crate::messaging;
 use crate::messaging::{Bucket, Message, Messaging, MessagingError};
 use async_nats::jetstream;
-use async_nats::jetstream::consumer::pull::MessagesError;
 use async_nats::jetstream::consumer::{AckPolicy, DeliverPolicy, ReplayPolicy};
-use async_nats::jetstream::kv::{CreateErrorKind, EntryError, EntryErrorKind, Operation, Store};
+use async_nats::jetstream::kv::{CreateErrorKind, Operation, Store};
 use async_nats::jetstream::{stream, AckKind, Context};
 use async_trait::async_trait;
 use dashmap::DashMap;
 use futures::{Stream, StreamExt};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use std::borrow::Cow;
-use std::collections::HashMap;
-use std::future::Future;
-use std::io::stdin;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -38,6 +33,9 @@ impl Into<DeliverPolicy> for messaging::DeliverPolicy {
             messaging::DeliverPolicy::Last => DeliverPolicy::Last,
             messaging::DeliverPolicy::New => DeliverPolicy::New,
             messaging::DeliverPolicy::LastPerSubject => DeliverPolicy::LastPerSubject,
+            messaging::DeliverPolicy::ByStartTime { start_time } => {
+                DeliverPolicy::ByStartTime { start_time }
+            }
         }
     }
 }
@@ -373,7 +371,7 @@ impl Messaging for NatsMessaging {
         Ok(NatsBucket { store })
     }
 
-    async fn flags(&self) -> Result<impl Bucket, MessagingError> {
+    async fn flags(&self) -> Result<impl Bucket + 'static, MessagingError> {
         let store = self.context.get_key_value("flags").await?;
         Ok(NatsBucket { store })
     }
@@ -434,8 +432,12 @@ impl<T: DeserializeOwned> NatsMessage<T> {
 impl<T: DeserializeOwned + Send + Sync + 'static> Message for NatsMessage<T> {
     type Payload = T;
 
-    fn payload(&self) -> &T {
+    fn payload(&self) -> &Self::Payload {
         &self.payload
+    }
+
+    fn into_payload(self) -> Self::Payload {
+        self.payload
     }
 
     async fn ack(&self) -> Result<(), MessagingError> {

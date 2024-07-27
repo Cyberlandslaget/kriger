@@ -89,7 +89,7 @@ nats kv put exploits test '{"manifest":{"name":"test","service":"Service 1 Check
 
 ### Submitter Testing
 ```bash
-flag=$(head -c 23 /dev/random | base64) && nats kv put flags "$(echo $flag | base64)".submit "{\"f\":\"$flag\"}"
+flag=$(head -c 19 /dev/random | base32) && nats kv put flags "$(echo $flag | base64)".submit "{\"f\":\"$flag\"}"
 ````
 
 #### Runner Testing

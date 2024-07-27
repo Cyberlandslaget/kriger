@@ -7,6 +7,7 @@ use async_trait::async_trait;
 use dashmap::DashMap;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use time::OffsetDateTime;
 
 use crate::messaging::nats::NatsMessage;
 
@@ -23,6 +24,10 @@ pub enum DeliverPolicy {
     Last,
     New,
     LastPerSubject,
+    /// `ByStartTime` will select the first message with a timestamp >= to the provided `start_time`.
+    ByStartTime {
+        start_time: OffsetDateTime,
+    },
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -66,7 +71,7 @@ pub trait Messaging: Clone {
 
     fn exploits(&self) -> impl Future<Output = Result<impl Bucket, MessagingError>>;
 
-    fn flags(&self) -> impl Future<Output = Result<impl Bucket, MessagingError>>;
+    fn flags(&self) -> impl Future<Output = Result<impl Bucket + 'static, MessagingError>>;
 
     fn services(&self) -> impl Future<Output = Result<impl Bucket, MessagingError>>;
 
@@ -167,6 +172,8 @@ pub trait Message: Send + Sync + 'static {
     type Payload: Send;
 
     fn payload(&self) -> &Self::Payload;
+
+    fn into_payload(self) -> Self::Payload;
 
     /// Acknowledges a message was completely handled.
     async fn ack(&self) -> Result<(), MessagingError>;

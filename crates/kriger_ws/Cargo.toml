@@ -9,10 +9,14 @@ edition = "2021"
 clap.workspace = true
 clap_derive.workspace = true
 color-eyre.workspace = true
-fastwebsockets = { version = "0.8.0", features = ["upgrade"] }
+fastwebsockets = { version = "0.8.0", features = ["upgrade", "unstable-split"] }
+flume.workspace = true
+futures.workspace = true
 http-body-util = "0.1.2"
 hyper = { workspace = true, features = ["server", "http1", "http2"] }
 hyper-util = { workspace = true, features = ["tokio", "server", "http1", "http2"] }
 kriger_common = { path = "../kriger_common" }
 tokio = { workspace = true, features = ["rt", "net"] }
+serde.workspace = true
+serde_json.workspace = true
 tracing.workspace = true

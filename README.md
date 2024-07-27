@@ -65,7 +65,7 @@ The mock will be available at port `:8080` by default.
 Run the runner component:
 
 ```bash
-RUST_LOG=debug cargo run runner --exploit test -- bash -c 'echo FLAG_$(openssl rand -base64 18)'
+RUST_LOG=debug cargo run runner --exploit test -- bash -c 'head -c 19 /dev/random | base32'
 ```
 
 ### Building Images Locally

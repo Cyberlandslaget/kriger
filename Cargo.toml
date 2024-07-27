@@ -11,6 +11,7 @@ chrono = "0.4.38"
 clap = { version = "4.5.8", features = ["env", "derive"] }
 clap_derive = "4.5.8"
 color-eyre = "0.6.3"
+flume = { version = "0.11.0", features = ["async", "select"] }
 futures = "0.3.30"
 hyper = "1.4.1"
 hyper-util = "0.1.6"
@@ -24,6 +25,7 @@ serde = { version = "1.0.203", features = ["derive"] }
 serde_repr = "0.1.19"
 serde_json = "1.0.118"
 thiserror = "1.0.61"
+time = "0.3.36"
 tokio = "1.38.0"
 tokio-stream = "0.1.15"
 tokio-util = "0.7.11"
