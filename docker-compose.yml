@@ -11,6 +11,16 @@ services:
       default:
         # Assign a static IP address for the Kubernetes "cluster" to access it
         ipv4_address: 172.30.100.10
+  nats-init:
+    image: natsio/nats-box
+    restart: on-failure
+    depends_on:
+      - nats
+    entrypoint: [ "/docker-entrypoint.sh" ]
+    environment:
+      NATS_URL: "nats://nats:4222"
+    volumes:
+      - "./data/test/nats-seed.sh:/docker-entrypoint.sh:roZ"
   k3s:
     # https://hub.docker.com/r/rancher/k3s/tags
     image: rancher/k3s:v1.30.2-k3s1
