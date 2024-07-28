@@ -2,6 +2,9 @@
 
 ## Messaging / NATS
 
+This document highlights manual testing operations for NATS. Do note that this should only be required during
+development.
+
 ### Local Debugging
 
 This assumes that the [development guide](../README.md#development) was followed.
@@ -49,7 +52,7 @@ Team:
 ```
 
 ```bash
-nats kv put teams 1 '{"ip_address": "127.0.0.1", "service":{}}'
+nats kv put teams 1 '{"ip_address": "127.0.0.1", "services":{}}'
 ```
 
 Service:
@@ -88,6 +91,7 @@ nats kv put exploits test '{"manifest":{"name":"test","service":"Service 1 Check
 ```
 
 ### Submitter Testing
+
 ```bash
 flag=$(head -c 19 /dev/random | base32) && nats kv put flags "$(echo $flag | base64)".submit "{\"f\":\"$flag\"}"
 ````
