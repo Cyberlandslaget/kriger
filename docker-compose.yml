@@ -25,7 +25,7 @@ services:
     # https://hub.docker.com/r/rancher/k3s/tags
     image: rancher/k3s:v1.30.2-k3s1
     restart: always
-    command: [ "server" ]
+    command: [ "server", "--disable=traefik,servicelb,local-storage" ]
     privileged: true
     tmpfs:
       - /run
