@@ -20,8 +20,9 @@ use std::net::SocketAddr;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::task::JoinSet;
 use tokio::{select, spawn};
-use tracing::{info, warn};
+use tracing::{info, instrument, warn};
 
+#[instrument(skip_all)]
 pub async fn main(runtime: AppRuntime, config: Config) -> eyre::Result<()> {
     info!("starting websocket server");
 

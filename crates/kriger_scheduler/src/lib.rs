@@ -10,8 +10,9 @@ use kriger_common::runtime::AppRuntime;
 use std::time::Duration;
 use tokio::select;
 use tokio::time::{interval_at, MissedTickBehavior};
-use tracing::{debug, info, warn};
+use tracing::{debug, info, instrument, warn};
 
+#[instrument(skip_all)]
 pub async fn main(runtime: AppRuntime) -> Result<()> {
     info!("starting scheduler");
 
