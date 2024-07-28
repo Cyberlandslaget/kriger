@@ -2,6 +2,7 @@
 name = "kriger"
 version = "0.0.1"
 edition = "2021"
+default-run = "kriger"
 
 [features]
 default = ["server-all", "otel", "cli"]
