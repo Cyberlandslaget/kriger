@@ -1,7 +1,6 @@
 use clap::Parser;
 use color_eyre::eyre;
 use color_eyre::eyre::Context;
-use tracing::instrument::WithSubscriber;
 use tracing::metadata::LevelFilter;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;

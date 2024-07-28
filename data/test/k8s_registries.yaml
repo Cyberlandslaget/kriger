@@ -2,3 +2,6 @@ mirrors:
   r.o99.no:
     endpoint:
       - "http://registry:5000"
+  localhost:5000:
+    endpoint:
+      - "http://registry:5000"
