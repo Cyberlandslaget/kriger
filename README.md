@@ -51,13 +51,13 @@ docker compose down
 Run the server components:
 
 ```bash
-cargo r --bin kriger server ---single
+cargo r server ---single
 ```
 
 Run the competition mock:
 
 ```bash
-cargo r --bin kriger_mock
+cargo r --bin kriger_mock -- --autotick 5
 ```
 
 The mock will be available at port `:8080` by default.
@@ -65,50 +65,18 @@ The mock will be available at port `:8080` by default.
 Run the runner component:
 
 ```bash
-RUST_LOG=debug cargo run runner --exploit test -- bash -c 'head -c 19 /dev/random | base32'
+RUST_LOG=debug cargo r runner --exploit test -- bash -c 'head -c 19 /dev/random | base32'
 ```
 
-### Building Images Locally
+> **Note:** This is not required if the example exploit is deployed.
 
-Run the following command in the project's root directory:
+### Running the example exploit
 
-```bash
-docker build \
-  -t r.o99.no/kriger/kriger  \
-  -t localhost:5000/kriger/kriger \
-  .
-```
-
-Build base images:
+Deploying the example exploit:
 
 ```bash
-docker build --build-arg "REGISTRY=localhost:5000" \
-  -t r.o99.no/kriger/exploit-base:python  \
-  -t localhost:5000/kriger/exploit-base:python \
-  data/base/python
-```
-
-Build the example exploit:
-
-```bash
-tar -ch -C data/examples/python-test . | docker build --build-arg "REGISTRY=localhost:5000" \
-  -t r.o99.no/kriger-exploits/test \
-  -t localhost:5000/kriger-exploits/test \
-  -
-```
-
-> **Note:** `tar -ch` is required to archive the build context since symlinks are used in the templates.
-
-Push the exploit to the registry:
-
-```bash
-docker push localhost:5000/kriger-exploits/test
-```
-
-Run the exploit directly:
-
-```bash
-docker run --rm -it --network kriger_default -e EXPLOIT=test r.o99.no/kriger-exploits/test
+cd data/examples/python-test
+cargo r deploy # or kriger deploy
 ```
 
 ## Terminologies
