@@ -14,9 +14,9 @@ const DEFAULT_REGISTRY: &str = "r.o99.no";
 #[derive(Parser, Debug)]
 #[command(version, about)]
 pub(crate) struct Deploy {
-    /// Do not immediately launch the exploit
+    /// Do not deploy the exploit. This will only build the exploit and push it to the registry.
     #[arg(long)]
-    pub(crate) no_launch: bool,
+    pub(crate) no_deploy: bool,
 
     /// URL for REST API
     #[arg(env, long, default_value = DEFAULT_REST_URL)]

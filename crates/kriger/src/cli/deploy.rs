@@ -77,24 +77,28 @@ async fn build_image(progress: &ProgressBar, tag: &str) -> Result<bool> {
         emoji::SPARKLES,
         style(format_duration_secs(&elapsed)).bold().green()
     );
-    println!("  {} Tag: {}", emoji::PACKAGE, style(tag).yellow());
+    println!("  {} Tag: {}", emoji::PACKAGE, style(tag).underlined());
 
     Ok(true)
 }
 
-async fn launch(exploit: &Exploit, rest_url: &str) -> Result<()> {
+async fn update_exploit(exploit: &Exploit, rest_url: &str) -> Result<()> {
     let client = reqwest::Client::new();
     let response = client
-        .request(Method::PUT, format!("{rest_url}/launch"))
+        .request(
+            Method::PUT,
+            format!("{}/exploits/{}", rest_url, &exploit.manifest.name),
+        )
         .json(&exploit)
         .send()
         .await
-        .context("Sending /launch request to REST API")?;
+        .context("unable to send a request to update the exploit")?;
 
+    // TODO: Use the common error response model
     match response.status() {
         StatusCode::OK => Ok(()),
         StatusCode::INTERNAL_SERVER_ERROR => {
-            bail!("Error during launch: {}", response.text().await?)
+            bail!("update error: {}", response.text().await?)
         }
         _ => bail!("unexpected response: {response:?}"),
     }
@@ -155,26 +159,51 @@ pub(crate) async fn main(args: args::Deploy) -> Result<()> {
                     emoji::CROSS_MARK,
                     style("Build failed").red().bold()
                 );
+                // FIXME: Properly propagate error
+                return Ok(());
             }
         }
     }
 
-    if !args.no_launch {
-        if let Err(err) = launch(
-            &Exploit {
-                manifest: manifest.exploit,
-                image: tag,
-            },
-            &args.rest_url,
-        )
-        .await
-        {
-            progress.finish_and_clear();
+    if args.no_deploy {
+        println!(
+            "  {} {}",
+            emoji::INFORMATION,
+            style("The deployment step has been skipped.")
+                .yellow()
+                .bold()
+        );
+        return Ok(());
+    }
+
+    let progress = ProgressBar::new_spinner();
+    progress.enable_steady_tick(Duration::from_millis(130));
+    progress.set_message(format!("{} Deploying exploit...", emoji::ROCKET));
+
+    let update_res = update_exploit(
+        &Exploit {
+            manifest: manifest.exploit,
+            image: tag,
+        },
+        &args.rest_url,
+    )
+    .await;
+
+    progress.finish_and_clear();
+    match update_res {
+        Err(err) => {
             println!(
                 "  {} {}: {:?}",
                 emoji::CROSS_MARK,
                 style("Launch failed").red().bold(),
                 err
+            );
+        }
+        Ok(..) => {
+            println!(
+                "  {} {}",
+                emoji::CHECK_MARK,
+                style("Deployment succeeded").green().bold()
             );
         }
     }

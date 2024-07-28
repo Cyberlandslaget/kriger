@@ -1,5 +1,6 @@
 pub mod config;
-mod deploy;
+mod routes;
+mod support;
 
 use crate::config::Config;
 use axum::{routing::put, Router};
@@ -7,6 +8,7 @@ use color_eyre::eyre::{Context, Result};
 use kriger_common::runtime::AppRuntime;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::net::TcpListener;
+use tower_http::trace::TraceLayer;
 use tracing::{info, instrument};
 
 struct AppState {
@@ -30,8 +32,10 @@ pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
     let state = AppState { runtime };
 
     let app = Router::new()
-        .route("/launch", put(deploy::launch))
+        .route("/exploits/:name", put(routes::exploits::update_exploit))
+        .layer(TraceLayer::new_for_http())
         .with_state(Arc::new(state));
+
     axum::serve(listener, app)
         .with_graceful_shutdown(async move {
             cancellation_token.cancelled().await;
