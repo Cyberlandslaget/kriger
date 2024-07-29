@@ -44,7 +44,13 @@ pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
     // Technically, we can use a durable consumer here, but this approach allows us to quickly fix
     // provisioning issue with the underlying orchestration platform.
     let exploits_stream = exploits
-        .watch_all::<Exploit>(None, AckPolicy::Explicit, DeliverPolicy::Last)
+        .watch_key::<Exploit>(
+            "*",
+            None,
+            AckPolicy::Explicit,
+            DeliverPolicy::LastPerSubject,
+            vec![],
+        )
         .await
         .context("unable to watch exploits")?;
     pin!(exploits_stream);
