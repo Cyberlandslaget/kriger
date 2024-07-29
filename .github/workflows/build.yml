@@ -15,12 +15,8 @@ jobs:
         include:
           - tag: kriger/kriger
             path: .
-            cache:
-              scope: cargo
           - tag: kriger/frontend
             path: frontend
-            cache:
-              scope: pnpm
     steps:
       - name: Check out the repo
         uses: actions/checkout@v4
@@ -47,8 +43,8 @@ jobs:
           file: ${{ matrix.path }}/Dockerfile
           push: true
           tags: r.o99.no/${{ matrix.tag }}:latest,r.o99.no/${{ matrix.tag }}:${{ github.run_number }}
-          cache-from: type=gha,scope=${{ matrix.cache.scope }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.cache.scope }}
+          cache-from: type=registry,ref=r.o99.no/${{ matrix.tag }}:buildcache
+          cache-to: type=registry,ref=r.o99.no/${{ matrix.tag }}:buildcache,mode=max
           builder: ${{ steps.builder.outputs.name }}
 
   build_exploit_base:
