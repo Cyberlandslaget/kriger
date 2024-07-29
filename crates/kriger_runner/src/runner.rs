@@ -13,7 +13,7 @@ use tokio::select;
 use tokio::sync::OwnedSemaphorePermit;
 use tokio_stream::wrappers::LinesStream;
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, error, warn};
+use tracing::{debug, error, instrument, warn};
 
 #[derive(Clone)]
 pub struct Runner {
@@ -46,6 +46,7 @@ pub trait RunnerCallback {
 }
 
 impl Runner {
+    #[instrument(skip_all, fields(idx))]
     pub(crate) async fn worker(
         self,
         idx: usize,
@@ -61,8 +62,11 @@ impl Runner {
                 res = self.job_rx.recv() => {
                     // The channel has most likely been closed
                     let job = res.context("unable to receive job")?;
-                    if let Err(err) = self.handle_job(job, idx, &callback).await {
-                        error!("unexpected error: {err:?}");
+                    if let Err(error) = self.handle_job(job, &callback).await {
+                        error! {
+                            ?error,
+                            "unexpected job handling error"
+                        }
                         // TODO: Consider delaying with jitter? Perhaps NATS is down?
                     }
                 }
@@ -70,32 +74,36 @@ impl Runner {
         }
     }
 
-    async fn handle_job(&self, job: Job, idx: usize, callback: &impl RunnerCallback) -> Result<()> {
+    #[instrument(level = "debug", skip_all, fields(
+        job.team_id = job.request.payload().team_id,
+        job.ip_address = job.request.payload().ip_address,
+        job.flag_hint = ?job.request.payload().flag_hint,
+    ))]
+    async fn handle_job(&self, job: Job, callback: &impl RunnerCallback) -> Result<()> {
         job.request.progress().await.context("unable to ack")?;
         match self.execute(job.request.payload(), callback).await {
-            Err(err) => {
+            Err(error) => {
                 warn! {
-                    "execution failed: {err:?} (worker {idx})"
-                };
+                    ?error,
+                    "execution failed"
+                }
                 job.request.nak().await.context("unable to nak")?;
             }
             Ok(..) => {
-                debug! {
-                    worker.id = idx,
-                    "execution succeeded"
-                }
+                debug!("execution succeeded");
                 job.request.ack().await.context("unable to ack")?;
             }
         }
         Ok(())
     }
 
+    #[instrument(level = "debug", skip_all)]
     async fn execute(
         &self,
         request: &ExecutionRequest,
         callback: &impl RunnerCallback,
     ) -> Result<()> {
-        debug!("processing request: {request:?}");
+        debug!("performing execution");
 
         let mut command = tokio::process::Command::new(&self.exploit_command);
         command.env(ENV_EXPLOIT_NAME, &self.exploit_name);
@@ -131,7 +139,7 @@ impl Runner {
             while let Some(Ok(line)) = fused_stream.next().await {
                 match line {
                     OutputLine::Stdout(line) => {
-                        debug!("exploit stdout: {line}");
+                        debug!("stdout: {line}");
                         for m in self.flag_format.find_iter(&line) {
                             debug!("flag matched: {}", m.as_str());
                             callback
@@ -141,7 +149,7 @@ impl Runner {
                         }
                     }
                     OutputLine::Stderr(line) => {
-                        debug!("exploit stderr: {line}");
+                        debug!("stderr: {line}");
                         // TODO: Do something with this
                     }
                 }
@@ -152,18 +160,29 @@ impl Runner {
 
         match tokio::time::timeout(self.timeout, handle_output).await {
             Ok(res) => res?,
-            Err(_elapsed) => {
-                warn!("Timeout expired for {}", self.exploit_name);
-                child.start_kill().context("SIGKILLing exploit")?;
+            Err(_) => {
+                warn! {
+                    timeout = self.timeout.as_secs(),
+                    "timeout exceeded"
+                }
+                child
+                    .start_kill()
+                    .context("unable to kill the exploit process")?;
             }
         }
 
         let exit_status = child.wait().await.context("unable to wait for child")?;
 
         if exit_status.success() {
-            debug!("Exploit finished with exit status {exit_status}");
+            debug! {
+                %exit_status,
+                "exploit process exited with a successful exit code"
+            }
         } else {
-            warn!("Exploit finished with exit status {exit_status}");
+            warn! {
+                %exit_status,
+                "exploit process exited with an unsuccessful exit code"
+            }
         }
 
         Ok(())
