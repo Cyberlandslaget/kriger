@@ -137,6 +137,16 @@ async fn reconcile(
             value: Some(exploit.manifest.resources.timeout.to_string()),
             ..Default::default()
         },
+        EnvVar {
+            name: "OTEL_EXPORTER_OTLP_ENDPOINT".to_string(),
+            value: Some(config.controller_otlp_endpoint.clone()),
+            ..Default::default()
+        },
+        EnvVar {
+            name: "OTEL_SERVICE_NAME".to_string(),
+            value: Some(exploit.manifest.name.clone()),
+            ..Default::default()
+        },
     ];
 
     if let Some(workers) = &exploit.manifest.workers {
