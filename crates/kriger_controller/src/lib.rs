@@ -162,7 +162,7 @@ async fn reconcile(
         );
         limits.insert(
             "memory".to_string(),
-            Quantity(exploit.manifest.resources.cpu_limit.clone()),
+            Quantity(exploit.manifest.resources.mem_limit.clone()),
         );
     }
 
