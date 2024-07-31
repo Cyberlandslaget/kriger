@@ -24,6 +24,21 @@ impl CiniFetcher {
 
         Ok(body)
     }
+
+    async fn get_flag_ids_by_service<S: AsRef<str>>(
+        &self,
+        service: S,
+    ) -> eyre::Result<FlagIdsResponse> {
+        let res = self
+            .client
+            .get(format!("{}/flagIds", &self.endpoint))
+            .query(&[("service", service.as_ref())])
+            .send()
+            .await?;
+        let flag_ids: FlagIdsResponse = res.json().await?;
+
+        Ok(flag_ids)
+    }
 }
 
 #[derive(Deserialize, PartialEq)]
