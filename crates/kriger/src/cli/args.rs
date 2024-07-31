@@ -10,7 +10,7 @@ const DEFAULT_REGISTRY: &str = "localhost:5000";
 #[cfg(not(debug_assertions))]
 const DEFAULT_REGISTRY: &str = "r.o99.no";
 
-/// An exploit farm for attack/defense CTFs
+/// Deploy an exploit to the attack farm.
 #[derive(Parser, Debug)]
 #[command(version, about)]
 pub(crate) struct Deploy {
@@ -25,4 +25,16 @@ pub(crate) struct Deploy {
     /// The registry to push the image to
     #[arg(env, long, default_value = DEFAULT_REGISTRY)]
     pub(crate) registry: String,
+}
+
+/// Create a new exploit based on a template.
+#[derive(Parser, Debug)]
+#[command(version, about)]
+pub(crate) struct Create {
+    /// URL for REST API
+    #[arg(env, long, default_value = DEFAULT_REST_URL)]
+    pub(crate) rest_url: String,
+
+    /// The name to give the exploit
+    pub(crate) name: Option<String>,
 }

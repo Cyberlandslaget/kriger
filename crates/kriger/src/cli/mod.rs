@@ -2,6 +2,7 @@ use indicatif::ProgressBar;
 use std::time::Duration;
 
 pub(crate) mod args;
+pub(crate) mod create;
 pub(crate) mod deploy;
 mod emoji;
 mod model;
