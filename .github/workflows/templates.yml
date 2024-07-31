@@ -1,0 +1,40 @@
+permissions: read-all
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "data/templates/**"
+  workflow_dispatch:
+
+name: Package templates
+
+jobs:
+  package-templates:
+    name: Package exploit template ${{ matrix.name }}
+    runs-on: self-hosted
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: python
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Set up ORAS
+        uses: oras-project/setup-oras@ca28077386065e263c03428f4ae0c09024817c93 # v1.2.0
+
+      - name: Log in to the OCI registry
+        run: |
+          oras login -u "$REGISTRY_USER" -p "$REGISTRY_PASS" r.o99.no
+        env:
+          REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
+          REGISTRY_PASS: ${{ secrets.REGISTRY_PASS }}
+
+      - name: Archive the template
+        run: |
+          tar -czf template.tar.gz -C "data/templates/${{ matrix.name }}" .
+
+      - name: Push the template
+        run: |
+          oras push r.o99.no/kriger/exploit-templates:${{ matrix.name }} template.tar.gz:application/vnd.kriger.exploit.template.v1.tar+gzip
