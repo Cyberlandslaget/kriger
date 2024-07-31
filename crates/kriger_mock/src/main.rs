@@ -219,8 +219,6 @@ async fn autotick(fs: Arc<FlagStore>, duration: Option<u64>) -> TickerControl {
     let (tx, mut rx) = tokio::sync::mpsc::channel(1);
 
     if let Some(duration) = duration {
-        fs.tick.store(u32::MAX, std::sync::atomic::Ordering::SeqCst);
-
         tokio::task::spawn(async move {
             loop {
                 let ticker = async {
