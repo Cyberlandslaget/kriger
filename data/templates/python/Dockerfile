@@ -1,7 +1,7 @@
 ARG REGISTRY="r.o99.no"
 
 # https://github.com/astral-sh/uv/pkgs/container/uv
-FROM ghcr.io/astral-sh/uv:0.2.24 as uv
+FROM ghcr.io/astral-sh/uv:0.2.24 AS uv
 
 FROM $REGISTRY/kriger/exploit-base:python
 
