@@ -26,7 +26,7 @@ jobs:
 
       - name: Log in to the OCI registry
         run: |
-          oras login -u "$REGISTRY_USER" -p "$REGISTRY_PASS" r.o99.no
+          oras login -u "$REGISTRY_USER" --password-stdin r.o99.no <<<"$REGISTRY_PASS"
         env:
           REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
           REGISTRY_PASS: ${{ secrets.REGISTRY_PASS }}
