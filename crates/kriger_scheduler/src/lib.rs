@@ -1,6 +1,8 @@
 mod utils;
 
+use crate::utils::get_current_tick;
 use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine};
+use chrono::Utc;
 use color_eyre::eyre::{Context, ContextCompat, Result};
 use kriger_common::messaging::model::{
     CompetitionConfig, ExecutionRequest, Exploit, Service, Team,
@@ -102,7 +104,11 @@ pub async fn main(runtime: AppRuntime) -> Result<()> {
                 return Ok(());
             }
         }
-        debug!("ticking");
+        let tick = get_current_tick(config.start, Utc::now(), config.tick);
+        info! {
+            current_tick = tick,
+            "ticking"
+        }
         // TODO: Send tick message
 
         // O(|Exploits| * |Services| * |Teams|) - I hope?
@@ -113,7 +119,6 @@ pub async fn main(runtime: AppRuntime) -> Result<()> {
 
             // Used as the key in our K/V store since the service name can be unpredictable
             let service_name_b64 = STANDARD_NO_PAD.encode(&exploit.manifest.service);
-            debug!("service name encoded: {service_name_b64}");
             match services.get(&service_name_b64) {
                 Some(service) => {
                     // If the service has hints / flag ids, then we don't schedule the executions now.
