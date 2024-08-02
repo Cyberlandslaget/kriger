@@ -45,7 +45,8 @@ jobs:
           push: true
           tags: r.o99.no/${{ matrix.tag }}:latest,r.o99.no/${{ matrix.tag }}:${{ github.run_number }}
           cache-from: type=registry,ref=r.o99.no/${{ matrix.tag }}:buildcache
-          cache-to: type=registry,ref=r.o99.no/${{ matrix.tag }}:buildcache,mode=max
+          # See https://github.com/goharbor/harbor/pull/18105#issuecomment-1811951274 for the Harbor workaround
+          cache-to: type=registry,ref=r.o99.no/${{ matrix.tag }}:buildcache,mode=max,image-manifest=true,oci-mediatypes=true
           builder: ${{ steps.builder.outputs.name }}
 
   build_exploit_base:
