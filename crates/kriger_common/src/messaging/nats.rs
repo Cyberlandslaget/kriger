@@ -237,38 +237,57 @@ impl Bucket for NatsBucket {
             })
             .await?;
 
+        let num_pending = consumer.cached_info().num_pending;
         let mut stream = consumer.messages().await?;
 
-        let mut map = DashMap::<String, T>::new();
-        while let Some(Ok(msg)) = stream.next().await {
-            let info = msg.info()?;
-            let operation = kv_operation_from_message(&msg).unwrap_or(Operation::Put);
+        let map = DashMap::<String, T>::new();
 
-            let key = msg
-                .subject
-                .strip_prefix(&self.store.prefix)
-                .map(|s| s.to_string())
-                .unwrap();
+        // Consume all latest messages per key up until the point of the consumer creation.
+        // We want to only do this if `num_pending` is greater than zero, otherwise this will wait
+        // until the first message arrives.
+        if num_pending > 0 {
+            debug! {
+                pending = num_pending,
+                "consuming the initial k/v pairs"
+            }
+            while let Some(Ok(msg)) = stream.next().await {
+                let info = msg.info()?;
+                let operation = kv_operation_from_message(&msg).unwrap_or(Operation::Put);
 
-            match operation {
-                // The put operation will not have any headers in the message
-                Operation::Put => match serde_json::from_slice::<T>(msg.payload.as_ref()) {
-                    Ok(payload) => {
-                        map.insert(key, payload);
+                let key = msg
+                    .subject
+                    .strip_prefix(&self.store.prefix)
+                    .map(|s| s.to_string())
+                    .unwrap();
+
+                match operation {
+                    // The put operation will not have any headers in the message
+                    Operation::Put => match serde_json::from_slice::<T>(msg.payload.as_ref()) {
+                        Ok(payload) => {
+                            map.insert(key, payload);
+                        }
+                        Err(err) => {
+                            warn!("malformed message: {err:?}");
+                        }
+                    },
+                    Operation::Delete | Operation::Purge => {
+                        map.remove(&key);
                     }
-                    Err(err) => {
-                        warn!("malformed message: {err:?}");
-                    }
-                },
-                Operation::Delete | Operation::Purge => {
-                    map.remove(&key);
+                }
+
+                debug! {
+                    pending = info.pending,
+                    "peeking stream"
+                }
+                // We've caught up with the history
+                if info.pending == 0 {
+                    break;
                 }
             }
-
-            // We've caught up with the history
-            if info.pending == 0 {
-                break;
-            }
+        } else {
+            debug!(
+                "the consumer does not have any pending messages, skipping the initial population"
+            );
         }
 
         let arc = Arc::new(map);
