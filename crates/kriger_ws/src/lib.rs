@@ -12,8 +12,8 @@ use hyper::service::service_fn;
 use hyper::{Request, Response};
 use hyper_util::rt::{TokioExecutor, TokioIo};
 use hyper_util::server::conn::auto::Builder;
-use kriger_common::messaging::model::{FlagSubmission, FlagSubmissionResult};
-use kriger_common::messaging::{AckPolicy, Bucket, DeliverPolicy, Message, Messaging};
+use kriger_common::messaging::model::{FlagSubmission, FlagSubmissionResult, SchedulingTick};
+use kriger_common::messaging::{AckPolicy, Bucket, DeliverPolicy, Message, Messaging, Stream};
 use kriger_common::runtime::AppRuntime;
 use serde::Serialize;
 use std::net::SocketAddr;
@@ -150,6 +150,12 @@ async fn subscribe_all(runtime: AppRuntime, tx: Sender<WebSocketEvent>) -> eyre:
         .await
         .context("unable to retrieve flags bucket")?;
 
+    let scheduling = runtime
+        .messaging
+        .scheduling()
+        .await
+        .context("unable to retrieve the scheduling stream")?;
+
     // TODO: Deliver messages from the last N ticks
     let flag_submissions_stream = flags
         .watch_key::<FlagSubmission>(
@@ -179,10 +185,24 @@ async fn subscribe_all(runtime: AppRuntime, tx: Sender<WebSocketEvent>) -> eyre:
             res.ok()
                 .map(|msg| WebSocketEvent::FlagSubmissionResult(msg.into_payload()))
         });
+    let scheduling_start_stream = scheduling
+        .subscribe::<SchedulingTick>(
+            None,
+            Some("scheduling.start".to_string()),
+            AckPolicy::None,
+            DeliverPolicy::Last,
+        )
+        .await
+        .context("unable to subscribe to scheduling start messages")?
+        .filter_map(|res| async {
+            res.ok()
+                .map(|msg| WebSocketEvent::SchedulingStart(msg.into_payload()))
+        });
 
     let mut fused_stream = select_all(vec![
         flag_submissions_stream.boxed(),
         flag_results_stream.boxed(),
+        scheduling_start_stream.boxed(),
     ]);
     while let Some(event) = fused_stream.next().await {
         tx.send_async(event).await.context("send error")?;
@@ -196,4 +216,5 @@ async fn subscribe_all(runtime: AppRuntime, tx: Sender<WebSocketEvent>) -> eyre:
 enum WebSocketEvent {
     FlagSubmission(FlagSubmission),
     FlagSubmissionResult(FlagSubmissionResult),
+    SchedulingStart(SchedulingTick),
 }

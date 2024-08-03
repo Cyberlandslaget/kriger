@@ -69,6 +69,16 @@ impl NatsMessaging {
             })
             .await?;
 
+        debug!("creating scheduling stream");
+        self.context
+            .create_stream(stream::Config {
+                name: "scheduling".to_string(),
+                subjects: vec!["scheduling.>".to_string()],
+                discard: stream::DiscardPolicy::Old,
+                ..Default::default()
+            })
+            .await?;
+
         info!("creating kev/value buckets");
 
         debug!("creating exploits bucket");
@@ -407,6 +417,11 @@ impl Messaging for NatsMessaging {
 
     async fn executions_wq(&self) -> Result<impl messaging::Stream, MessagingError> {
         let stream = self.context.get_stream("executions_wq").await?;
+        Ok(NatsStream { stream })
+    }
+
+    async fn scheduling(&self) -> Result<impl messaging::Stream, MessagingError> {
+        let stream = self.context.get_stream("scheduling").await?;
         Ok(NatsStream { stream })
     }
 

@@ -9,6 +9,7 @@ edition = "2021"
 base64.workspace = true
 chrono.workspace = true
 color-eyre.workspace = true
+dashmap.workspace = true
 kriger_common.path = "../kriger_common"
 tokio.workspace = true
 tracing.workspace = true

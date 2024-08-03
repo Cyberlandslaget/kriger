@@ -154,10 +154,7 @@ impl FlagSubmissionStatus {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Tick {
+pub struct SchedulingTick {
     #[serde(rename = "i")]
-    pub tick: i32,
-    /// Milliseconds since Unix Epoch in UTC
-    #[serde(rename = "t")]
-    pub timestamp: i32,
+    pub tick: i64,
 }

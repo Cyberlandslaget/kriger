@@ -79,6 +79,8 @@ pub trait Messaging: Clone {
 
     fn executions_wq(&self) -> impl Future<Output = Result<impl Stream, MessagingError>>;
 
+    fn scheduling(&self) -> impl Future<Output = Result<impl Stream, MessagingError>>;
+
     fn publish<T>(
         &self,
         subject: String,
