@@ -16,5 +16,8 @@
     "parser": {
       "allowComments": true
     }
+  },
+  "files": {
+    "ignore": ["dist/**", "src/**/*.gen.ts"]
   }
 }
