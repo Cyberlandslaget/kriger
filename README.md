@@ -51,7 +51,10 @@ docker compose down
 Run the server components:
 
 ```bash
-cargo r server ---single
+cargo r server # This will run the NATS migration for the first time
+docker compose start nats-init # This will seed the K/V store with test data
+
+cargo r server --single
 ```
 
 Run the competition mock:
