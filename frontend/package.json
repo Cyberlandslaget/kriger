@@ -13,10 +13,12 @@
     "@fontsource/b612-mono": "^5.0.19",
     "@monaco-editor/react": "^4.6.0",
     "@tanstack/react-router": "^1.45.0",
+    "clsx": "^2.1.1",
     "jotai": "^2.9.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "shiki": "^1.10.3"
+    "shiki": "^1.10.3",
+    "usehooks-ts": "^3.1.0"
   },
   "devDependencies": {
     "@biomejs/biome": "1.8.3",

@@ -1,7 +1,9 @@
 import { FLAG_CODE, SERVICE_STATUS } from "./enums";
 import type { FlagSubmissionResult } from "./types";
 
-export const CONFIG = {};
+export const CONFIG = {
+  webSocketUrl: import.meta.env.VITE_WS_URL ?? "http://localhost:8001",
+};
 
 // Dummy data constants
 export const DUMMY_SCOREBOARD_DATA = {
