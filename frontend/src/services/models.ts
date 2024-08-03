@@ -200,3 +200,23 @@ export const mapWebSocketMessage = (
       throw new Error(`Unsupported message: ${JSON.stringify(raw)}`);
   }
 };
+
+export type APISuccessResponse<T> = {
+  data: T;
+};
+
+export type APIErrorResponse = {
+  error: {
+    message: string;
+  };
+};
+
+export type APIResponse<T> = APISuccessResponse<T> | APIErrorResponse;
+
+export type CompetitionConfig = {
+  start: string;
+  tick: number;
+  tick_start: number;
+  flag_validity: number;
+  flag_format: string;
+};

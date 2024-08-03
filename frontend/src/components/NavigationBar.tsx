@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useAtomValue } from "jotai";
-import { statusAtom } from "../utils/atoms";
+import { competitionConfigAtom, statusAtom } from "../utils/atoms";
 import { useInterval } from "usehooks-ts";
 import { useMemo, useState } from "react";
 import clsx from "clsx";
@@ -15,21 +15,24 @@ const ROUTES = [
 
 function NavigationBar() {
   const status = useAtomValue(statusAtom);
+  const competitionConfig = useAtomValue(competitionConfigAtom);
+
   const startTime = useMemo(
-    () => new Date(status.start).getTime(),
-    [status.start],
+    () => new Date(competitionConfig.start).getTime(),
+    [competitionConfig.start],
   );
   const tickStart = useMemo(
-    () => startTime + status.currentTick * status.roundTime * 1000,
-    [startTime, status.currentTick, status.roundTime],
+    () => startTime + status.currentTick * competitionConfig.tick * 1000,
+    [startTime, status.currentTick, competitionConfig.tick],
   );
   const [currentTime, setCurrentTime] = useState<number>(tickStart);
 
   // Values in the range [0, inf). Values below 1 represents tick progress.
   // Values greater than or equal to 1 represents ticks that are waiting for the server.
   const tickProgress = useMemo(
-    () => Math.max((currentTime - tickStart) / status.roundTime / 1000, 0),
-    [currentTime, tickStart, status.roundTime],
+    () =>
+      Math.max((currentTime - tickStart) / competitionConfig.tick / 1000, 0),
+    [currentTime, tickStart, competitionConfig.tick],
   );
 
   // JavaScript timers are inaccurate by nature
@@ -76,7 +79,7 @@ function NavigationBar() {
           {/* We don't support end round yet */}
           {/* / {status.rounds}{" "} */}
           <span className="font-normal text-slate-300">
-            ({status.roundTime}s)
+            ({competitionConfig.tick}s)
           </span>
         </div>
       </div>

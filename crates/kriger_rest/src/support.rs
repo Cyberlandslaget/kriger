@@ -15,6 +15,8 @@ pub(crate) enum AppError {
     MessagingError(#[from] MessagingError),
     #[error("{0}")]
     JsonRejection(#[from] JsonRejection),
+    #[error("Not found")]
+    NotFound,
 }
 
 impl AppError {
@@ -23,6 +25,9 @@ impl AppError {
             // User errors
             AppError::BadInput(_) => StatusCode::BAD_REQUEST,
             AppError::JsonRejection(_) => StatusCode::BAD_REQUEST,
+
+            // General errors
+            AppError::NotFound => StatusCode::NOT_FOUND,
 
             // Server errors
             AppError::MessagingError(_) => StatusCode::SERVICE_UNAVAILABLE,

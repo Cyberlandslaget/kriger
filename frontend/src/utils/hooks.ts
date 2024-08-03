@@ -2,9 +2,10 @@ import { useCallback, useEffect, useRef } from "react";
 import { WebSocketService } from "../services/webSocket";
 import type { WebSocketMessage } from "../services/models";
 import { useSetAtom } from "jotai";
-import { currentTickAtom } from "./atoms";
+import { competitionConfigAtom, currentTickAtom } from "./atoms";
+import { useCompetitionConfig } from "../services/rest";
 
-export const useWebSocket = (url: string) => {
+export const useWebSocketProvider = (url: string) => {
   const setCurrentTick = useSetAtom(currentTickAtom);
 
   const handleMessage = useCallback(
@@ -30,4 +31,20 @@ export const useWebSocket = (url: string) => {
     });
     return () => service.close();
   }, [url]);
+};
+
+export const useConfigProvider = () => {
+  const setCompetitionConfig = useSetAtom(competitionConfigAtom);
+  const { data } = useCompetitionConfig();
+
+  useEffect(() => {
+    if (!data) return;
+
+    const { data: config } = data;
+    setCompetitionConfig({
+      start: config.start,
+      tick: config.tick,
+      flagFormat: config.flag_format,
+    });
+  }, [data, setCompetitionConfig]);
 };
