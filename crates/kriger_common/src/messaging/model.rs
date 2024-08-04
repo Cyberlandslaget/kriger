@@ -143,7 +143,7 @@ pub enum FlagSubmissionStatus {
 }
 
 impl FlagSubmissionStatus {
-    fn should_retry(&self) -> bool {
+    pub fn should_retry(&self) -> bool {
         match self {
             FlagSubmissionStatus::Resubmit
             | FlagSubmissionStatus::Error

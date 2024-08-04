@@ -209,6 +209,7 @@ impl CiniSubmitter {
                     "received flag submission response"
                 };
                 // TODO: Can't we move??
+                let should_retry = status.should_retry();
                 let res = callback
                     .submit(
                         &payload.flag,
@@ -224,7 +225,11 @@ impl CiniSubmitter {
                     .await;
                 match res {
                     Ok(_) => {
-                        let _ = message.ack().await;
+                        if should_retry {
+                            let _ = message.nak().await;
+                        } else {
+                            let _ = message.ack().await;
+                        }
                     }
                     Err(error) => {
                         warn! {
