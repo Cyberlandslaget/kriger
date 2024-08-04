@@ -37,6 +37,11 @@ pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
         .route("/exploits", get(routes::exploits::get_exploits))
         .route("/exploits/:name", put(routes::exploits::update_exploit))
         .route(
+            "/competition/services",
+            get(routes::competition::get_services),
+        )
+        .route("/competition/teams", get(routes::competition::get_teams))
+        .route(
             "/config/competition",
             get(routes::config::get_competition_config),
         )
