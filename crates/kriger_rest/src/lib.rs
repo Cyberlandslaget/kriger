@@ -34,6 +34,7 @@ pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
     let state = AppState { runtime };
 
     let mut app = Router::new()
+        .route("/exploits", get(routes::exploits::get_exploits))
         .route("/exploits/:name", put(routes::exploits::update_exploit))
         .route(
             "/config/competition",

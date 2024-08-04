@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::future::Future;
 use std::sync::Arc;
@@ -93,6 +94,13 @@ pub trait Messaging: Clone {
 
 pub trait Bucket: Clone + 'static {
     fn get<T>(&self, key: &str) -> impl Future<Output = Result<Option<T>, MessagingError>> + Send
+    where
+        T: DeserializeOwned + Send + Sync + 'static;
+
+    fn list<T>(
+        &self,
+        key_filter: Option<&str>,
+    ) -> impl Future<Output = Result<HashMap<String, T>, MessagingError>> + Send
     where
         T: DeserializeOwned + Send + Sync + 'static;
 

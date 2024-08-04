@@ -1,5 +1,6 @@
 use crate::messaging;
 use crate::messaging::{Bucket, Message, Messaging, MessagingError};
+use crate::utils::data::MapWriter;
 use async_nats::jetstream;
 use async_nats::jetstream::consumer::{AckPolicy, DeliverPolicy, ReplayPolicy};
 use async_nats::jetstream::kv::{CreateErrorKind, Operation, Store};
@@ -9,6 +10,7 @@ use dashmap::DashMap;
 use futures::{Stream, StreamExt};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -16,6 +18,7 @@ use tokio::spawn;
 use tracing::{debug, info, warn};
 
 const KV_OPERATION: &str = "KV-Operation";
+const ALL_KEYS: &str = ">";
 
 impl Into<AckPolicy> for messaging::AckPolicy {
     fn into(self) -> AckPolicy {
@@ -164,6 +167,47 @@ impl Bucket for NatsBucket {
         }
     }
 
+    async fn list<T>(&self, key_filter: Option<&str>) -> Result<HashMap<String, T>, MessagingError>
+    where
+        T: DeserializeOwned + Send + Sync + 'static,
+    {
+        let consumer = self
+            .store
+            .stream
+            .create_consumer(jetstream::consumer::pull::OrderedConfig {
+                filter_subject: format!("{}{}", &self.store.prefix, key_filter.unwrap_or(ALL_KEYS)),
+                replay_policy: ReplayPolicy::Instant,
+                deliver_policy: DeliverPolicy::LastPerSubject,
+                ..Default::default()
+            })
+            .await?;
+
+        let num_pending = consumer.cached_info().num_pending;
+        if num_pending == 0 {
+            return Ok(HashMap::with_capacity(0));
+        }
+
+        let mut stream = consumer.messages().await?;
+
+        let mut map = HashMap::new();
+        while let Some(Ok(msg)) = stream.next().await {
+            // FIXME: mut is not really required here..
+            handle_watch_message(&msg, &mut map, &self.store.prefix);
+
+            let info = msg.info()?;
+            debug! {
+                pending = info.pending,
+                "peeking stream"
+            }
+            // We've caught up with the history
+            if info.pending == 0 {
+                break;
+            }
+        }
+
+        Ok(map)
+    }
+
     async fn watch_key<T>(
         &self,
         key: &str,
@@ -235,13 +279,12 @@ impl Bucket for NatsBucket {
     where
         T: Sized + DeserializeOwned + Send + Sync + 'static,
     {
-        let mut consumer = self
+        let consumer = self
             .store
             .stream
-            .create_consumer(jetstream::consumer::pull::Config {
+            .create_consumer(jetstream::consumer::pull::OrderedConfig {
                 filter_subject: format!("{}>", &self.store.prefix),
                 replay_policy: ReplayPolicy::Instant,
-                ack_policy: AckPolicy::None,
                 deliver_policy: DeliverPolicy::LastPerSubject,
                 ..Default::default()
             })
@@ -251,6 +294,7 @@ impl Bucket for NatsBucket {
         let mut stream = consumer.messages().await?;
 
         let map = DashMap::<String, T>::new();
+        let mut arc = Arc::new(map);
 
         // Consume all latest messages per key up until the point of the consumer creation.
         // We want to only do this if `num_pending` is greater than zero, otherwise this will wait
@@ -261,30 +305,10 @@ impl Bucket for NatsBucket {
                 "consuming the initial k/v pairs"
             }
             while let Some(Ok(msg)) = stream.next().await {
+                // FIXME: mut is not really required here..
+                handle_watch_message(&msg, &mut arc, &self.store.prefix);
+
                 let info = msg.info()?;
-                let operation = kv_operation_from_message(&msg).unwrap_or(Operation::Put);
-
-                let key = msg
-                    .subject
-                    .strip_prefix(&self.store.prefix)
-                    .map(|s| s.to_string())
-                    .unwrap();
-
-                match operation {
-                    // The put operation will not have any headers in the message
-                    Operation::Put => match serde_json::from_slice::<T>(msg.payload.as_ref()) {
-                        Ok(payload) => {
-                            map.insert(key, payload);
-                        }
-                        Err(err) => {
-                            warn!("malformed message: {err:?}");
-                        }
-                    },
-                    Operation::Delete | Operation::Purge => {
-                        map.remove(&key);
-                    }
-                }
-
                 debug! {
                     pending = info.pending,
                     "peeking stream"
@@ -300,7 +324,6 @@ impl Bucket for NatsBucket {
             );
         }
 
-        let arc = Arc::new(map);
         let weak_ref = Arc::downgrade(&arc);
 
         // TODO: Better error handling? What happens if the subscription drops randomly? Is there a way to recover?
@@ -310,33 +333,8 @@ impl Bucket for NatsBucket {
                 // FIXME: This will STILL wait for an element when the weak reference is dropped
                 match stream.next().await {
                     Some(Ok(msg)) => {
-                        let key = msg
-                            .subject
-                            .strip_prefix(&prefix)
-                            .map(|s| s.to_string())
-                            .unwrap();
-
                         match weak_ref.upgrade() {
-                            Some(map) => {
-                                let operation =
-                                    kv_operation_from_message(&msg).unwrap_or(Operation::Put);
-                                match operation {
-                                    // The put operation will not have any headers in the message
-                                    Operation::Put => {
-                                        match serde_json::from_slice::<T>(msg.payload.as_ref()) {
-                                            Ok(payload) => {
-                                                map.insert(key, payload);
-                                            }
-                                            Err(err) => {
-                                                warn!("malformed message: {err:?}");
-                                            }
-                                        }
-                                    }
-                                    Operation::Delete | Operation::Purge => {
-                                        map.remove(&key);
-                                    }
-                                }
-                            }
+                            Some(mut map) => handle_watch_message(&msg, &mut map, &prefix),
                             // There are no strong references anymore, we can stop the subscription
                             None => {
                                 debug!("strong references lost");
@@ -523,4 +521,35 @@ fn kv_operation_from_message(message: &async_nats::Message) -> Option<Operation>
     let val = headers.get(KV_OPERATION)?;
 
     Operation::from_str(val.as_str()).ok()
+}
+
+fn handle_watch_message<T>(
+    msg: &jetstream::Message,
+    map: &mut impl MapWriter<String, T>,
+    store_prefix: impl AsRef<str>,
+) where
+    T: DeserializeOwned,
+{
+    let operation = kv_operation_from_message(&msg).unwrap_or(Operation::Put);
+
+    let key = msg
+        .subject
+        .strip_prefix(store_prefix.as_ref())
+        .map(|s| s.to_string())
+        .unwrap();
+
+    match operation {
+        // The put operation will not have any headers in the message
+        Operation::Put => match serde_json::from_slice::<T>(msg.payload.as_ref()) {
+            Ok(payload) => {
+                map.insert(key, payload);
+            }
+            Err(err) => {
+                warn!("malformed message: {err:?}");
+            }
+        },
+        Operation::Delete | Operation::Purge => {
+            map.remove(&key);
+        }
+    }
 }
