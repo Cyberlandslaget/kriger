@@ -11,7 +11,7 @@ use axum::{
     Json, Router,
 };
 use clap::Parser;
-use rand::{distributions::DistString, Rng, SeedableRng};
+use rand::{distributions::DistString, SeedableRng};
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use tracing::debug;
@@ -312,7 +312,12 @@ async fn flag_id(
                             ticks
                                 .clone()
                                 .map(|t| {
-                                    (t, [("hint", get_hint_thing(&state.fs.hasher, s, i, t))].into_iter().collect())
+                                    (
+                                        t,
+                                        [("hint", get_hint_thing(&state.fs.hasher, s, i, t))]
+                                            .into_iter()
+                                            .collect(),
+                                    )
                                 })
                                 .collect(),
                         )

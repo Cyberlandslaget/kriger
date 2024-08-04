@@ -49,6 +49,7 @@ impl Runner {
     #[instrument(skip_all, fields(idx))]
     pub(crate) async fn worker(
         self,
+        #[allow(unused_variables)] // This is used by tracing's `instrument` macro
         idx: usize,
         callback: impl RunnerCallback,
         token: CancellationToken,

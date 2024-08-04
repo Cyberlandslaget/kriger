@@ -102,7 +102,7 @@ async fn handle_client(
     runtime: AppRuntime,
 ) -> Result<(), WebSocketError> {
     let ws = fut.await?;
-    let (mut ws_rx, mut ws_tx) = ws.split(tokio::io::split);
+    let (_ws_rx, mut ws_tx) = ws.split(tokio::io::split);
 
     // FIXME: Should probably handle backpressure somehow, eg. the websocket connection being slow.
     let (tx, rx) = flume::unbounded::<WebSocketEvent>();

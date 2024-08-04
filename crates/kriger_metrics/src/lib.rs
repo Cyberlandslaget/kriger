@@ -24,7 +24,7 @@ fn init_metrics() -> opentelemetry::metrics::Result<SdkMeterProvider> {
 }
 
 #[instrument(skip_all)]
-pub async fn main(runtime: AppRuntime, args: Args) -> Result<()> {
+pub async fn main(runtime: AppRuntime, _args: Args) -> Result<()> {
     info!("starting metrics exporter");
 
     let executions_wq = runtime

@@ -1,3 +1,6 @@
+// TODO: Remove once things are implemented
+#![allow(dead_code)]
+
 mod fetcher;
 
 use color_eyre::eyre::Result;
@@ -7,7 +10,7 @@ use tokio::time::MissedTickBehavior;
 use tracing::{info, instrument};
 
 #[instrument(skip_all)]
-pub async fn main(runtime: AppRuntime) -> Result<()> {
+pub async fn main(_runtime: AppRuntime) -> Result<()> {
     info!("starting data fetcher");
 
     let tick_duration = time::Duration::from_secs(60);
