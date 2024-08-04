@@ -84,6 +84,7 @@ jobs:
           file: ${{ matrix.path }}/Dockerfile
           push: true
           tags: r.o99.no/${{ matrix.tag }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=registry,ref=r.o99.no/${{ matrix.tag }}-buildcache
+          # See https://github.com/goharbor/harbor/pull/18105#issuecomment-1811951274 for the Harbor workaround
+          cache-to: type=registry,ref=r.o99.no/${{ matrix.tag }}-buildcache,mode=max,image-manifest=true,oci-mediatypes=true
           builder: ${{ steps.builder.outputs.name }}
