@@ -1,11 +1,16 @@
 import { createRootRoute, Outlet } from "@tanstack/react-router";
 import NavigationBar from "../components/NavigationBar";
-import { useWebSocketProvider, useConfigProvider } from "../utils/hooks";
+import {
+  useWebSocketProvider,
+  useConfigProvider,
+  useCompetition,
+} from "../utils/hooks";
 import { CONFIG } from "../utils/constants";
 
 export const RootComponent = () => {
   useWebSocketProvider(CONFIG.webSocketUrl);
   useConfigProvider();
+  useCompetition();
 
   return (
     <>

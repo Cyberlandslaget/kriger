@@ -2,11 +2,26 @@ import { useCallback, useEffect, useRef } from "react";
 import { WebSocketService } from "../services/webSocket";
 import type { WebSocketMessage } from "../services/models";
 import { useSetAtom } from "jotai";
-import { competitionConfigAtom, currentTickAtom } from "./atoms";
-import { useCompetitionConfig } from "../services/rest";
+import {
+  competitionConfigAtom,
+  currentTickAtom,
+  servicesAtom,
+  teamFlagSubmissionDispatch,
+  teamFlagSubmissionResultDispatch,
+  teamsAtom,
+} from "./atoms";
+import {
+  useCompetitionConfig,
+  useCompetitionServices,
+  useCompetitionTeams,
+} from "../services/rest";
 
 export const useWebSocketProvider = (url: string) => {
   const setCurrentTick = useSetAtom(currentTickAtom);
+  const flagSubmissionDispatch = useSetAtom(teamFlagSubmissionDispatch);
+  const flagSubmissionResultDispatch = useSetAtom(
+    teamFlagSubmissionResultDispatch,
+  );
 
   const handleMessage = useCallback(
     (event: WebSocketMessage) => {
@@ -14,9 +29,15 @@ export const useWebSocketProvider = (url: string) => {
         case "scheduling_start":
           setCurrentTick(event.tick);
           break;
+        case "flag_submission":
+          flagSubmissionDispatch(event);
+          break;
+        case "flag_submission_result":
+          flagSubmissionResultDispatch(event);
+          break;
       }
     },
-    [setCurrentTick],
+    [setCurrentTick, flagSubmissionDispatch, flagSubmissionResultDispatch],
   );
 
   const handleMessageRef = useRef<typeof handleMessage>();
@@ -36,7 +57,6 @@ export const useWebSocketProvider = (url: string) => {
 export const useConfigProvider = () => {
   const setCompetitionConfig = useSetAtom(competitionConfigAtom);
   const { data } = useCompetitionConfig();
-
   useEffect(() => {
     if (!data) return;
 
@@ -47,4 +67,24 @@ export const useConfigProvider = () => {
       flagFormat: config.flag_format,
     });
   }, [data, setCompetitionConfig]);
+};
+
+export const useCompetition = () => {
+  const setTeams = useSetAtom(teamsAtom);
+  const setServices = useSetAtom(servicesAtom);
+
+  const { data: teams } = useCompetitionTeams();
+  const { data: services } = useCompetitionServices();
+
+  useEffect(() => {
+    if (teams?.data) {
+      setTeams(teams?.data);
+    }
+  }, [teams, setTeams]);
+
+  useEffect(() => {
+    if (services?.data) {
+      setServices(services?.data);
+    }
+  }, [services, setServices]);
 };

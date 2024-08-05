@@ -4,6 +4,8 @@ import type {
   APIErrorResponse,
   APISuccessResponse,
   CompetitionConfig,
+  Service,
+  Team,
 } from "./models";
 
 const fetcher = async <T>(path: string): Promise<APISuccessResponse<T>> => {
@@ -34,5 +36,17 @@ const fetcher = async <T>(path: string): Promise<APISuccessResponse<T>> => {
 export const useCompetitionConfig = () =>
   useSWR<APISuccessResponse<CompetitionConfig>, APIErrorResponse>(
     "/config/competition",
+    fetcher,
+  );
+
+export const useCompetitionServices = () =>
+  useSWR<APISuccessResponse<Service[]>, APIErrorResponse>(
+    "/competition/services",
+    fetcher,
+  );
+
+export const useCompetitionTeams = () =>
+  useSWR<APISuccessResponse<Record<string, Team>>, APIErrorResponse>(
+    "/competition/teams",
     fetcher,
   );

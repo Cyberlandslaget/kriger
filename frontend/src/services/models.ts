@@ -220,3 +220,36 @@ export type CompetitionConfig = {
   flag_validity: number;
   flag_format: string;
 };
+
+export type Service = {
+  name: string;
+  has_hint: boolean;
+};
+
+export type Team = {
+  name: string | null;
+  ip_address: string | null;
+  services: Record<string, string>;
+};
+
+export type Exploit = {
+  manifest: ExploitManifest;
+  image: string;
+};
+
+export type ExploitManifest = {
+  name: string;
+  service: string;
+  replicas: number;
+  workers: number | null;
+  enabled: boolean;
+  resources: ExploitResources;
+};
+
+export type ExploitResources = {
+  cpu_request: string | null;
+  mem_request: string | null;
+  cpu_limit: string;
+  mem_limit: string;
+  timeout: number;
+};

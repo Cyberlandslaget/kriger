@@ -1,5 +1,11 @@
 import { atom } from "jotai";
-import type { ExploitType } from "./types";
+import type {
+  FlagSubmissionMessage,
+  FlagSubmissionResultMessage,
+  Service,
+  Team,
+} from "../services/models";
+import type { ExploitType, TeamFlagMap } from "./types";
 
 export const competitionConfigAtom = atom({
   start: "1990-01-01T08:00:00.000Z",
@@ -22,3 +28,53 @@ export const currentTickAtom = atom(
 
 export const exploitsAtom = atom<ExploitType[] | null>(null);
 export const executionsAtom = atom<ExploitType[] | null>(null);
+
+export const teamsAtom = atom<Record<string, Team>>({});
+export const servicesAtom = atom<Service[]>([]);
+
+export const teamFlagStatusAtom = atom<TeamFlagMap>({});
+
+export const teamFlagSubmissionDispatch = atom(
+  null,
+  (get, set, message: FlagSubmissionMessage) => {
+    const prev = get(teamFlagStatusAtom);
+
+    if (!message.teamId) {
+      return;
+    }
+
+    set(teamFlagStatusAtom, {
+      ...prev,
+      [message.teamId]: {
+        ...prev[message.teamId],
+        [message.flag]: {
+          // We don't know the status yet.
+          status: undefined,
+        },
+      },
+    });
+  },
+);
+
+export const teamFlagSubmissionResultDispatch = atom(
+  null,
+  (get, set, message: FlagSubmissionResultMessage) => {
+    const prev = get(teamFlagStatusAtom);
+
+    console.log(message);
+
+    if (!message.teamId) {
+      return;
+    }
+
+    set(teamFlagStatusAtom, {
+      ...prev,
+      [message.teamId]: {
+        ...prev[message.teamId],
+        [message.flag]: {
+          status: message.status,
+        },
+      },
+    });
+  },
+);
