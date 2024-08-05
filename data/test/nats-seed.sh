@@ -19,5 +19,5 @@ nats kv put services U2VydmljZSAxIENoZWNrZXIgMQ '{"name": "service 1 Checker 1",
 
 for i in `seq 0 9`
 do
-  nats kv put teams "$i" "{\"ip_address\": \"10.60.$i.1\", \"services\":{}}"
+  nats kv put teams "$i" "{\"name\": \"Team $i\", \"ip_address\": \"10.60.$i.1\", \"services\":{}}"
 done
