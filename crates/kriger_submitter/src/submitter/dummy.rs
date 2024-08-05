@@ -66,9 +66,9 @@ impl DummySubmitter {
         let payload = msg.payload();
         let result = FlagSubmissionResult {
             flag: payload.flag.to_string(),
-            team_id: None,
-            service: None,
-            exploit: None,
+            team_id: payload.team_id.clone(),
+            service: payload.service.clone(),
+            exploit: payload.exploit.clone(),
             status,
             points: None,
         };
@@ -86,12 +86,12 @@ impl DummySubmitter {
         let mut rng = rand::thread_rng();
         let r = rng.gen_range(0..=99);
         match r {
-            0..=49 => FlagSubmissionStatus::Ok,
-            50..=59 => FlagSubmissionStatus::Duplicate,
-            60..=69 => FlagSubmissionStatus::Own,
-            70..=79 => FlagSubmissionStatus::Old,
-            80..=89 => FlagSubmissionStatus::Invalid,
-            90..=99 => FlagSubmissionStatus::Error,
+            0..=69 => FlagSubmissionStatus::Ok,
+            70..=74 => FlagSubmissionStatus::Duplicate,
+            75..=79 => FlagSubmissionStatus::Own,
+            80..=84 => FlagSubmissionStatus::Old,
+            85..=94 => FlagSubmissionStatus::Invalid,
+            95..=99 => FlagSubmissionStatus::Error,
             _ => unreachable!(),
         }
     }
