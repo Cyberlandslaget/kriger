@@ -15,7 +15,7 @@ nats kv put config competition '{
 }'
 
 # TODO: Remove once the fetcher is functional
-nats kv put services U2VydmljZSAxIENoZWNrZXIgMQ '{"name": "service 1 Checker 1", "has_hint": false}'
+nats kv put services U2VydmljZSAxIENoZWNrZXIgMQ '{"name": "Service 1 Checker 1", "has_hint": false}'
 
 for i in `seq 0 9`
 do
