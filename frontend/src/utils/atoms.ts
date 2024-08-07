@@ -48,7 +48,7 @@ export const teamFlagSubmissionDispatch = atom(
       [message.teamId]: {
         ...prev[message.teamId],
         [message.service]: {
-          ...prev[message.teamId][message.service],
+          ...prev[message.teamId]?.[message.service],
           [message.flag]: {
             status: "status" in message ? message.status : undefined,
           },

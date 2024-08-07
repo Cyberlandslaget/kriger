@@ -43,11 +43,17 @@ export class WebSocketService {
       }, delay);
     };
     this.#ws.onmessage = (event) => {
+      let message: WebSocketMessage;
       try {
-        const message = mapWebSocketMessage(JSON.parse(event.data));
+        message = mapWebSocketMessage(JSON.parse(event.data));
+      } catch (error) {
+        console.warn("[ws] malformed data received", event.data, error);
+        return;
+      }
+      try {
         this.#messageHandler(message);
       } catch (error) {
-        console.warn("[ws] malformed data received", event.data);
+        console.warn("[ws] unable to handle message", message, error);
       }
     };
   }
