@@ -110,6 +110,15 @@ pub async fn main(runtime: AppRuntime) -> eyre::Result<()> {
                 )
                 .await?;
         }
+        Submitters::Faust(submitter) => {
+            submitter
+                .run(
+                    flag_submissions.boxed(),
+                    callback,
+                    runtime.cancellation_token,
+                )
+                .await?;
+        }
     }
     Ok(())
 }

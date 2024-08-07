@@ -1,139 +1,175 @@
-use std::{str::FromStr, time::Instant};
-
-use super::{SubmitError, Submitter};
-use kriger_common::messaging::model::FlagSubmissionStatus;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
-use tracing::{debug, warn};
+use super::{SubmitError, Submitter, SubmitterCallback};
+use async_trait::async_trait;
+use futures::{Stream, StreamExt};
+use kriger_common::messaging::model::{FlagSubmission, FlagSubmissionResult, FlagSubmissionStatus};
+use kriger_common::messaging::Message;
+use std::pin::Pin;
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufStream};
+use tokio::net::TcpStream;
+use tokio::select;
+use tokio_util::sync::CancellationToken;
+use tracing::{instrument, warn};
 
 #[derive(Clone, Debug)]
-pub struct FaustSubmitter {
-    host: String,
+pub(crate) struct FaustSubmitter {
+    pub(crate) host: String,
 }
 
 impl FaustSubmitter {
     pub fn new(host: String) -> Self {
         Self { host }
     }
-}
 
-impl Submitter for FaustSubmitter {
-    async fn submit(
-        &self,
-        flags: Vec<String>,
-    ) -> Result<Vec<(String, FlagSubmissionStatus)>, SubmitError> {
-        if flags.is_empty() {
-            return Ok(Vec::new());
-        }
-
-        let inst = Instant::now();
-
-        let socket = tokio::net::TcpStream::connect(&self.host).await?;
-
+    #[instrument(skip_all)]
+    async fn create_connection(&self) -> Result<BufStream<TcpStream>, SubmitError> {
+        let socket = TcpStream::connect(&self.host).await?;
         // bufread over it
-        let mut socket = tokio::io::BufStream::new(socket);
-
-        debug!("Opened socket.");
-
-        // read header
+        let mut socket = BufStream::new(socket);
         let mut header: Vec<u8> = Vec::new();
-
         // https://ctf-gameserver.org/submission/
         while !header.ends_with(b"\n\n") {
             socket.read_until(b'\n', &mut header).await?;
         }
-        debug!("Header read.");
 
-        // send all flags
-        let all_flags = flags.join("\n") + "\n";
-        socket.write_all(all_flags.as_bytes()).await?;
-        socket.flush().await?;
+        Ok(socket)
+    }
 
-        // read all data
-        let response = {
-            let mut total_text = String::new();
+    #[instrument(skip_all, fields(flag))]
+    async fn submit(
+        &self,
+        stream: &mut BufStream<TcpStream>,
+        flag: String,
+    ) -> Result<FlagSubmissionStatus, SubmitError> {
+        // Send flags
+        stream.write_all((flag + "\n").as_bytes()).await?;
+        stream.flush().await?;
 
-            loop {
-                if total_text.trim().lines().count() == flags.len() {
-                    debug!("Got all {} flags, so stopping.", flags.len());
-                    break;
-                }
-
-                match socket.read_line(&mut total_text).await {
-                    Ok(n) => {
-                        if n == 0 {
-                            // TODO return here saying try to resubmit
-                            warn!("EOF when reading from socket");
-                            break;
-                        }
-                    }
-                    Err(e) => {
-                        return Err(e.into());
-                    }
+        // Read the data
+        let mut response = String::new();
+        match stream.read_line(&mut response).await {
+            Ok(n) => {
+                if n == 0 {
+                    return Err(SubmitError::Unknown("reached eof"));
                 }
             }
-
-            total_text
-        };
-
-        // extract responses
-        let lines = {
-            let body = response.trim();
-            let lines = body.split('\n').collect::<Vec<_>>();
-
-            if lines.len() != flags.len() {
-                warn!(
-                    "Got {} lines, but expected {}. Content {}",
-                    lines.len(),
-                    flags.len(),
-                    response
-                );
-                return Err(SubmitError::FormatError);
-            }
-
-            lines
-        };
-
-        let mut statuses = Vec::new();
-        for line in lines {
-            // split twice on space to get 3 variables
-            let (flag, rest) = line.split_once(' ').ok_or(SubmitError::FormatError)?;
-
-            // msg is optional
-            let (code, _msg) = {
-                match rest.split_once(' ') {
-                    Some((code, msg)) => (code, Some(msg)),
-                    None => (rest, None),
-                }
-            };
-
-            let status = match code {
-                "OK" => FlagSubmissionStatus::Ok,
-                "DUP" => FlagSubmissionStatus::Duplicate,
-                "OWN" => FlagSubmissionStatus::Own,
-                "OLD" => FlagSubmissionStatus::Old,
-                "INV" => FlagSubmissionStatus::Invalid,
-                "ERR" => FlagSubmissionStatus::Error,
-                code => FlagSubmissionStatus::Unknown(code.to_string()),
-            };
-
-            if let FlagSubmissionStatus::Unknown(..) = status {
-                warn!(
-                    "Unknown flag status: {} for flag {}, putting ERR",
-                    code, flag
-                );
-            }
-
-            statuses.push((flag.to_string(), status));
+            Err(err) => return Err(err.into()),
         }
 
-        let elapsed = inst.elapsed();
+        // Parse the data
+        // split twice on space to get 3 variables
+        let (flag, rest) = response.split_once(' ').ok_or(SubmitError::FormatError)?;
 
-        debug!(
-            "Submitted {} flags in {}ms",
-            flags.len(),
-            elapsed.as_millis()
-        );
+        // msg is optional
+        let (code, _msg) = {
+            match rest.split_once(' ') {
+                Some((code, msg)) => (code, Some(msg)),
+                None => (rest, None),
+            }
+        };
 
-        Ok(statuses)
+        let status = match code {
+            "OK" => FlagSubmissionStatus::Ok,
+            "DUP" => FlagSubmissionStatus::Duplicate,
+            "OWN" => FlagSubmissionStatus::Own,
+            "OLD" => FlagSubmissionStatus::Old,
+            "INV" => FlagSubmissionStatus::Invalid,
+            "ERR" => FlagSubmissionStatus::Error,
+            _ => FlagSubmissionStatus::Unknown,
+        };
+
+        if let FlagSubmissionStatus::Unknown = status {
+            warn! {
+                code,
+                flag,
+                "received unknown status from the submission api",
+            }
+        }
+
+        Ok(status)
+    }
+}
+
+#[async_trait]
+impl Submitter for FaustSubmitter {
+    async fn run(
+        &self,
+        mut flags: Pin<
+            Box<
+                dyn Stream<Item = (impl Message<Payload = FlagSubmission> + Sync + 'static)> + Send,
+            >,
+        >,
+        callback: impl SubmitterCallback + Send + Sync + 'static,
+        cancellation_token: CancellationToken,
+    ) -> color_eyre::Result<()> {
+        // We return an error if the initial connection fails
+        let mut stream = self.create_connection().await?;
+
+        loop {
+            select! {
+                _ = cancellation_token.cancelled() => {
+                    return Ok(())
+                }
+                maybe_message = flags.next() => {
+                    if let Some(message) = maybe_message {
+                        let payload = message.payload();
+                        if let Err(error) = message.progress().await{
+                            warn! {
+                                ?error,
+                                "unable to ack the message"
+                            }
+                        }
+
+                        match self.submit(&mut stream, payload.flag.to_string()).await {
+                            Ok(status) => {
+                                let result = FlagSubmissionResult {
+                                    flag: payload.flag.to_string(),
+                                    team_id: payload.team_id.clone(),
+                                    service: payload.service.clone(),
+                                    exploit: payload.exploit.clone(),
+                                    status,
+                                    points: None,
+                                };
+                                match callback.submit(&payload.flag, result).await {
+                                    Ok(_) => {
+                                        if let Err(error) = message.ack().await {
+                                            warn! {
+                                                ?error,
+                                                "unable to ack the message"
+                                            }
+                                        }
+                                    }
+                                    Err(error) => {
+                                        warn! {
+                                            ?error,
+                                            "unable to send the submission message"
+                                        }
+                                        if let Err(error) = message.nak().await {
+                                            warn! {
+                                                ?error,
+                                                "unable to ack the message"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            Err(error) => {
+                                warn! {
+                                    ?error,
+                                    "unable to submit flag"
+                                }
+                                if let Err(error) = message.nak().await {
+                                    warn! {
+                                        ?error,
+                                        "unable to ack the message"
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        return Ok(())
+                    }
+                }
+            }
+        }
     }
 }

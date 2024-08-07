@@ -11,9 +11,9 @@ use tokio_util::sync::CancellationToken;
 
 // TODO: Port
 //mod dctf;
-//mod faust;
 mod cini;
 mod dummy;
+mod faust;
 
 // TODO: Devise a more ergonomic way to deal with this.
 pub(crate) trait SubmitterCallback {
@@ -29,6 +29,7 @@ pub(crate) trait SubmitterCallback {
 pub(crate) enum Submitters {
     Dummy(dummy::DummySubmitter),
     Cini(cini::CiniSubmitter),
+    Faust(faust::FaustSubmitter),
 }
 
 /// The submitter will be responsible for handling the flag submission lifecycle with the given
@@ -61,6 +62,9 @@ pub enum SubmitterConfig {
         /// The team token used to authenticate with the flag submission API.
         token: String,
     },
+    Faust {
+        host: String,
+    },
 }
 
 impl SubmitterConfig {
@@ -73,6 +77,7 @@ impl SubmitterConfig {
                 batch,
                 token,
             } => Submitters::Cini(cini::CiniSubmitter::new(url, interval, batch, token)),
+            SubmitterConfig::Faust { host } => Submitters::Faust(faust::FaustSubmitter { host }),
         }
     }
 }
@@ -80,13 +85,15 @@ impl SubmitterConfig {
 /// Did not manage to submit
 #[derive(Error, Debug)]
 pub enum SubmitError {
-    #[error("Network error")]
+    #[error("network error")]
     NetworkError(#[from] std::io::Error),
-    #[error("Format error")]
+    #[error("format error")]
     /// The format of the response was not as expected
     FormatError,
     #[error("serde")]
     SerdeJson(#[from] serde_json::Error),
     #[error("reqwest")]
     Reqwest(#[from] reqwest::Error),
+    #[error("unknown error: {0}")]
+    Unknown(&'static str),
 }
