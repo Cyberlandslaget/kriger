@@ -1817,6 +1817,7 @@ dependencies = [
  "chrono",
  "color-eyre",
  "dashmap",
+ "futures",
  "kriger_common",
  "tokio",
  "tracing",

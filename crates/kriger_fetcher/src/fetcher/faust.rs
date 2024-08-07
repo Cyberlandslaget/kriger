@@ -59,12 +59,17 @@ impl FaustFetcher {
     ) {
         match serde_json::to_vec(&hint) {
             Ok(serialized) => {
+                let key = format!(
+                    "{}.{}.{}",
+                    STANDARD_NO_PAD.encode(&service),
+                    team_id,
+                    STANDARD_NO_PAD.encode(&serialized)
+                );
                 let data = FlagHint {
                     team_id,
                     service,
                     hint,
                 };
-                let key = STANDARD_NO_PAD.encode(&serialized);
                 match bucket.create(&key, &data).await {
                     Err(MessagingError::KeyValueConflictError) => {
                         // Ignore
@@ -98,7 +103,7 @@ impl Fetcher for FaustFetcher {
     ) -> Result<(), FetcherError> {
         let hints_bucket = runtime.messaging.data_hints().await?;
         let info = self.get_attack_into().await?;
-        
+
         debug! {
             team_count = info.teams.len(),
             service_count = info.flag_ids.len(),

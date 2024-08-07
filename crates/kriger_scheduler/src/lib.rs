@@ -3,20 +3,25 @@ mod utils;
 use crate::utils::get_current_tick;
 use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine};
 use chrono::Utc;
-use color_eyre::eyre::{Context, ContextCompat, Result};
+use color_eyre::eyre;
+use color_eyre::eyre::{Context, ContextCompat};
 use dashmap::DashMap;
+use futures::StreamExt;
+use kriger_common::messaging;
 use kriger_common::messaging::model::{
-    CompetitionConfig, ExecutionRequest, Exploit, SchedulingTick, Service, Team,
+    CompetitionConfig, ExecutionRequest, Exploit, FlagHint, SchedulingTick, Service, Team,
 };
-use kriger_common::messaging::{Bucket, Messaging};
+use kriger_common::messaging::{AckPolicy, Bucket, DeliverPolicy, Message, Messaging};
 use kriger_common::runtime::AppRuntime;
+use std::sync::Arc;
 use std::time::Duration;
-use tokio::select;
+use tokio::task::JoinSet;
 use tokio::time::{interval_at, MissedTickBehavior};
-use tracing::{debug, info, instrument, warn};
+use tokio::{pin, select};
+use tracing::{debug, error, info, instrument, warn};
 
 #[instrument(skip_all)]
-pub async fn main(runtime: AppRuntime) -> Result<()> {
+pub async fn main(runtime: AppRuntime) -> eyre::Result<()> {
     info!("starting scheduler");
 
     debug!("retrieving buckets");
@@ -40,6 +45,11 @@ pub async fn main(runtime: AppRuntime) -> Result<()> {
         .teams()
         .await
         .context("unable to retrieve the teams bucket")?;
+    let data_hints_bucket = runtime
+        .messaging
+        .data_hints()
+        .await
+        .context("unable to retrieve the data_hints bucket")?;
 
     debug!("retrieving the competition config");
     // TODO: Provide a more elegant way to retrieve this and add support for live reload
@@ -68,6 +78,35 @@ pub async fn main(runtime: AppRuntime) -> Result<()> {
         .await
         .context("unable to subscribe to teams")?;
 
+    let mut set = JoinSet::new();
+    set.spawn(handle_scheduling(
+        config.clone(),
+        runtime.clone(),
+        exploits.clone(),
+        services,
+        teams.clone(),
+    ));
+    set.spawn(handle_hint_scheduling(
+        runtime,
+        data_hints_bucket,
+        exploits,
+        teams,
+    ));
+
+    while let Some(res) = set.join_next().await {
+        res??;
+    }
+
+    Ok(())
+}
+
+async fn handle_scheduling(
+    config: CompetitionConfig,
+    runtime: AppRuntime,
+    exploits: Arc<DashMap<String, Exploit>>,
+    services: Arc<DashMap<String, Service>>,
+    teams: Arc<DashMap<String, Team>>,
+) -> eyre::Result<()> {
     info!(
         "start: {:?} (d = {}), tick duration: {} s",
         &config.start, config.tick_start, config.tick
@@ -97,6 +136,7 @@ pub async fn main(runtime: AppRuntime) -> Result<()> {
     interval.tick().await;
 
     // TODO: Add scheduling for services with hints
+
     loop {
         select! {
             _ = interval.tick() => {}
@@ -106,7 +146,6 @@ pub async fn main(runtime: AppRuntime) -> Result<()> {
         }
         let tick = get_current_tick(config.start, Utc::now(), config.tick);
 
-        debug!("waht");
         handle_tick(tick, &runtime, &exploits, &services, &teams).await;
     }
 }
@@ -223,4 +262,118 @@ async fn handle_tick(
             }
         }
     }
+}
+
+#[instrument(skip_all)]
+async fn handle_hint_scheduling(
+    runtime: AppRuntime,
+    data_hints_bucket: impl Bucket,
+    exploits: Arc<DashMap<String, Exploit>>,
+    teams: Arc<DashMap<String, Team>>,
+) -> eyre::Result<()> {
+    let data_hints = data_hints_bucket
+        .watch_all::<FlagHint>(
+            Some("scheduler".to_string()),
+            AckPolicy::Explicit,
+            DeliverPolicy::New,
+        )
+        .await
+        .context("unable to watch flag hints")?;
+    pin!(data_hints);
+
+    loop {
+        select! {
+            _ = runtime.cancellation_token.cancelled() => {
+                return Ok(())
+            }
+            maybe_message = data_hints.next() => {
+                match maybe_message {
+                    Some(Ok(message)) => {
+                        // TODO: Make this more efficient.
+                        if let Err(error) = handle_hint_schedule(&runtime, &teams, &exploits, &message).await {
+                            error! {
+                                ?error,
+                                "scheduling error"
+                            }
+                            if let Err(error) = message.nak().await {
+                                error! {
+                                    ?error,
+                                    "unable to ack message"
+                                }
+                            }
+                        } else {
+                            if let Err(error) = message.ack().await {
+                                error! {
+                                    ?error,
+                                    "unable to ack message"
+                                }
+                            }
+                        }
+                    }
+                    Some(Err(error)) => {
+                        error! {
+                            ?error,
+                            "unexpected messaging error"
+                        }
+                    }
+                    None => {
+                        return Ok(())
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[instrument(
+    skip_all,
+    fields(
+        team.id = message.payload().team_id,
+        service.name = message.payload().service)
+    )
+]
+async fn handle_hint_schedule(
+    runtime: &AppRuntime,
+    teams: &DashMap<String, Team>,
+    exploits: &DashMap<String, Exploit>,
+    message: &impl messaging::Message<Payload = FlagHint>,
+) -> eyre::Result<()> {
+    message.progress().await?;
+
+    let payload = message.payload();
+
+    let team = teams.get(&payload.team_id).context("unknown team id")?;
+    let ip_address = team
+        .services
+        .get(&payload.service)
+        .or(team.ip_address.as_ref())
+        .context("unknown target ip address")?;
+
+    let request = ExecutionRequest {
+        ip_address: ip_address.clone(),
+        flag_hint: Some(payload.hint.clone()),
+        team_id: Some(team.key().clone()),
+    };
+
+    debug! {
+        ?request,
+        "sending execution request"
+    }
+
+    for exploit in exploits.iter() {
+        if !exploit.manifest.enabled {
+            continue;
+        }
+
+        runtime
+            .messaging
+            .publish(
+                format!("executions.{}.request", &exploit.manifest.name),
+                &request,
+                false,
+            )
+            .await?;
+    }
+
+    Ok(())
 }
