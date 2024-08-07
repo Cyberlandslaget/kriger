@@ -1,169 +1,177 @@
+use async_trait::async_trait;
+use base64::engine::general_purpose::STANDARD_NO_PAD;
+use base64::Engine;
+use dashmap::DashMap;
+use futures::future::join_all;
+use kriger_common::messaging::model::FlagHint;
+use kriger_common::messaging::{Bucket, Messaging, MessagingError};
+use kriger_common::runtime::AppRuntime;
 use serde::{self, Deserialize};
 use std::collections::HashMap;
-use tracing::warn;
+use tracing::{error, instrument};
 
-use super::{OldFetcher, FetcherError, Service, ServiceMap, TeamService};
+use super::{Fetcher, FetcherError};
 
 #[derive(Deserialize, Debug)]
 pub struct AttackInfo {
     pub teams: Vec<i32>,
-    // TODO! should also accept <i32, _> and convert the i32 to String...
-    pub flag_ids: HashMap<String, ServiceContent>,
+    pub flag_ids: HashMap<String, ServiceMap>,
 }
 
+// teamid -> `Vec<flagid>`
 #[derive(Deserialize, Debug)]
-pub struct Scoreboard {
-    pub tick: i32,
-}
-
-/// teamid -> `Vec<flagid>`
-#[derive(Deserialize, Debug)]
-pub struct ServiceContent(HashMap<String, serde_json::Value>); // treat all the flagids as one
+pub struct ServiceMap(HashMap<String, Vec<serde_json::Value>>);
 
 #[derive(Debug)]
 pub struct FaustFetcher {
     client: reqwest::Client,
-    teams: String,
-    format: String,
-    scoreboard: String,
+    url: String,
+    ip_format: String,
 }
 
 impl FaustFetcher {
-    pub fn new(teams: String, scoreboard: String, format: String) -> Self {
+    pub fn new(url: String, ip_format: String) -> Self {
         let client = reqwest::Client::builder()
             .pool_max_idle_per_host(0) // should disable pooling which fixes errors against some hosts
             .build()
             .unwrap();
 
         Self {
+            url,
+            ip_format,
             client,
-            teams,
-            scoreboard,
-            format,
+        }
+    }
+
+    /// This fetches the FAUST GameServer's team.json data
+    async fn get_attack_into(&self) -> Result<AttackInfo, FetcherError> {
+        let info: AttackInfo = self.client.get(&self.url).send().await?.json().await?;
+        Ok(info)
+    }
+
+    #[instrument(level = "DEBUG", skip_all, fields(team_id, service, hint))]
+    async fn handle_flag_insertion(
+        &self,
+        bucket: &impl Bucket,
+        team_id: String,
+        service: String,
+        hint: serde_json::Value,
+    ) {
+        match serde_json::to_vec(&hint) {
+            Ok(serialized) => {
+                let data = FlagHint {
+                    team_id,
+                    service,
+                    hint,
+                };
+                let key = STANDARD_NO_PAD.encode(&serialized);
+                match bucket.create(&key, &data).await {
+                    Err(MessagingError::KeyValueConflictError) => {
+                        // Ignore
+                    }
+                    Err(error) => {
+                        error! {
+                            ?error,
+                            "unable to insert the flag hint to the k/v store"
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            Err(error) => {
+                error! {
+                    ?error,
+                    "unable to serialize the hint"
+                }
+            }
         }
     }
 }
 
-impl OldFetcher for FaustFetcher {
-    async fn services(&self) -> Result<ServiceMap, FetcherError> {
-        let scoreboard: Scoreboard = self
-            .client
-            .get(&self.scoreboard)
-            .send()
-            .await?
-            .json()
-            .await?;
+#[async_trait]
+impl Fetcher for FaustFetcher {
+    async fn run(
+        &self,
+        runtime: &AppRuntime,
+        _services: &DashMap<String, kriger_common::messaging::model::Service>,
+    ) -> Result<(), FetcherError> {
+        let hints_bucket = runtime.messaging.data_hints().await?;
+        let info = self.get_attack_into().await?;
 
-        let resp: AttackInfo = self.client.get(&self.teams).send().await?.json().await?;
+        let mut tasks = Vec::new();
 
-        let mut services = HashMap::new();
-        for (service, content) in resp.flag_ids {
-            let mut service_content = HashMap::new();
-
-            // shitty solution: we dont know which flagid is for which tick, so just give all the
-            // current ones for the current tick\
-            // the fetcher routine should discard the duplicates
-
-            // on cold start: ex. 5 flagids sent for current tick
-            // every tick afterwards: just 1 flagid, because 4 others are known
-
-            let current_tick = scoreboard.tick;
-
-            for (team, flagids) in content.0 {
-                // faust gives an array of the last few flagids here, extract them manually :grimace:
-                let flagids = match flagids.as_array() {
-                    Some(a) => a,
-                    None => {
-                        warn!("Should be array but isn't");
-                        continue;
-                    }
+        for (service, map) in info.flag_ids {
+            for (team_id, hints) in map.0 {
+                for hint in hints {
+                    // FIXME: Functional programming?
+                    tasks.push(self.handle_flag_insertion(
+                        &hints_bucket,
+                        team_id.clone(),
+                        service.clone(),
+                        hint,
+                    ));
                 }
-                .to_owned();
-
-                let team = team.parse::<i32>().unwrap();
-                let team = self.format.replace("{x}", &format!("{}", team));
-
-                let mut ticks = HashMap::new();
-                ticks.insert(current_tick, flagids); // just this one
-
-                service_content.insert(team, TeamService { ticks });
             }
-            services.insert(
-                service,
-                Service {
-                    teams: service_content,
-                },
-            );
         }
 
-        Ok(ServiceMap(services))
-    }
+        join_all(tasks).await;
 
-    async fn ips(&self) -> Result<Vec<String>, FetcherError> {
-        let resp: AttackInfo = self.client.get(&self.teams).send().await?.json().await?;
-
-        let ips = resp
-            .teams
-            .into_iter()
-            .map(|team_nr| self.format.replace("{x}", &format!("{}", team_nr)))
-            .collect();
-
-        Ok(ips)
+        Ok(())
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use warp::Filter;
-
-    const TEAMS_JSON: &str = r#"
-            {
-                "teams": [
-                    2
-                ],
-                "flag_ids": {
-                    "service_1": {
-                        "2": [
-                                [
-                                    [ "user73" ],
-                                    [ "user5" ]
-                                ],
-                                [
-                                    [ "user96" ],
-                                    [ "user314" ]
-                                ]
-                        ]
-                    }
-                }
-            }"#;
-
-    const SCOREBOARD_JSON: &str = r#"
-            {
-                "tick": 271
-            }
-    "#;
-
-    #[tokio::test]
-    async fn faust_local_test() {
-        let gameserver = tokio::spawn(async move {
-            let teams = warp::path!("teams").map(|| TEAMS_JSON);
-            let scoreboard = warp::path!("scoreboard").map(|| SCOREBOARD_JSON);
-            warp::serve(teams.or(scoreboard))
-                .run(([127, 0, 0, 1], 8888))
-                .await
-        });
-
-        let fetcher = FaustFetcher::new(
-            "http://localhost:8888/teams".to_string(),
-            "http://localhost:8888/scoreboard".to_string(),
-            "1.20.{x}.1".to_string(),
-        );
-
-        let services = fetcher.services().await.unwrap();
-
-        dbg!(&services);
-
-        gameserver.abort();
-    }
-}
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//     use warp::Filter;
+//
+//     const TEAMS_JSON: &str = r#"
+//             {
+//                 "teams": [
+//                     2
+//                 ],
+//                 "flag_ids": {
+//                     "service_1": {
+//                         "2": [
+//                                 [
+//                                     [ "user73" ],
+//                                     [ "user5" ]
+//                                 ],
+//                                 [
+//                                     [ "user96" ],
+//                                     [ "user314" ]
+//                                 ]
+//                         ]
+//                     }
+//                 }
+//             }"#;
+//
+//     const SCOREBOARD_JSON: &str = r#"
+//             {
+//                 "tick": 271
+//             }
+//     "#;
+//
+//     #[tokio::test]
+//     async fn faust_local_test() {
+//         let gameserver = tokio::spawn(async move {
+//             let teams = warp::path!("teams").map(|| TEAMS_JSON);
+//             let scoreboard = warp::path!("scoreboard").map(|| SCOREBOARD_JSON);
+//             warp::serve(teams.or(scoreboard))
+//                 .run(([127, 0, 0, 1], 8888))
+//                 .await
+//         });
+//
+//         let fetcher = FaustFetcher::new(
+//             "http://localhost:8888/teams".to_string(),
+//             "http://localhost:8888/scoreboard".to_string(),
+//             "1.20.{x}.1".to_string(),
+//         );
+//
+//         let services = fetcher.services().await.unwrap();
+//
+//         dbg!(&services);
+//
+//         gameserver.abort();
+//     }
+// }

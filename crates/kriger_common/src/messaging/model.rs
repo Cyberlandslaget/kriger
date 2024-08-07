@@ -62,7 +62,14 @@ pub struct Team {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct FlagHint {}
+pub struct FlagHint {
+    #[serde(rename = "t")]
+    pub team_id: String,
+    #[serde(rename = "s")]
+    pub service: String,
+    #[serde(rename = "h")]
+    pub hint: serde_json::Value,
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ExecutionRequest {
