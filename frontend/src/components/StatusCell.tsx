@@ -1,8 +1,8 @@
 import { FLAG_CODE } from "../utils/enums";
-import type { TeamFlags } from "../utils/types";
+import type { TeamServiceFlags } from "../utils/types";
 
 type StatusCellProps = {
-  flags: TeamFlags;
+  flags: TeamServiceFlags;
 };
 
 export const StatusCell = ({ flags }: StatusCellProps) => {

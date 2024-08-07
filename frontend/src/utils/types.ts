@@ -1,10 +1,14 @@
 import type { FLAG_CODE } from "./enums";
 
 export type TeamFlagMap = {
-  [teamId: string]: TeamFlags;
+  [teamId: string]: TeamServiceMap;
 };
 
-export type TeamFlags = {
+export type TeamServiceMap = {
+  [service: string]: TeamServiceFlags;
+};
+
+export type TeamServiceFlags = {
   [flag: string]: TeamFlagStatus;
 };
 

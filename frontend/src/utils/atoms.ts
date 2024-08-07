@@ -36,10 +36,10 @@ export const teamFlagStatusAtom = atom<TeamFlagMap>({});
 
 export const teamFlagSubmissionDispatch = atom(
   null,
-  (get, set, message: FlagSubmissionMessage) => {
+  (get, set, message: FlagSubmissionMessage | FlagSubmissionResultMessage) => {
     const prev = get(teamFlagStatusAtom);
 
-    if (!message.teamId) {
+    if (!message.teamId || !message.service) {
       return;
     }
 
@@ -47,32 +47,11 @@ export const teamFlagSubmissionDispatch = atom(
       ...prev,
       [message.teamId]: {
         ...prev[message.teamId],
-        [message.flag]: {
-          // We don't know the status yet.
-          status: undefined,
-        },
-      },
-    });
-  },
-);
-
-export const teamFlagSubmissionResultDispatch = atom(
-  null,
-  (get, set, message: FlagSubmissionResultMessage) => {
-    const prev = get(teamFlagStatusAtom);
-
-    console.log(message);
-
-    if (!message.teamId) {
-      return;
-    }
-
-    set(teamFlagStatusAtom, {
-      ...prev,
-      [message.teamId]: {
-        ...prev[message.teamId],
-        [message.flag]: {
-          status: message.status,
+        [message.service]: {
+          ...prev[message.teamId][message.service],
+          [message.flag]: {
+            status: "status" in message ? message.status : undefined,
+          },
         },
       },
     });

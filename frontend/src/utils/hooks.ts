@@ -7,7 +7,6 @@ import {
   currentTickAtom,
   servicesAtom,
   teamFlagSubmissionDispatch,
-  teamFlagSubmissionResultDispatch,
   teamsAtom,
 } from "./atoms";
 import {
@@ -19,9 +18,6 @@ import {
 export const useWebSocketProvider = (url: string) => {
   const setCurrentTick = useSetAtom(currentTickAtom);
   const flagSubmissionDispatch = useSetAtom(teamFlagSubmissionDispatch);
-  const flagSubmissionResultDispatch = useSetAtom(
-    teamFlagSubmissionResultDispatch,
-  );
 
   const handleMessage = useCallback(
     (event: WebSocketMessage) => {
@@ -30,14 +26,12 @@ export const useWebSocketProvider = (url: string) => {
           setCurrentTick(event.tick);
           break;
         case "flag_submission":
-          flagSubmissionDispatch(event);
-          break;
         case "flag_submission_result":
-          flagSubmissionResultDispatch(event);
+          flagSubmissionDispatch(event);
           break;
       }
     },
-    [setCurrentTick, flagSubmissionDispatch, flagSubmissionResultDispatch],
+    [setCurrentTick, flagSubmissionDispatch],
   );
 
   const handleMessageRef = useRef<typeof handleMessage>();
