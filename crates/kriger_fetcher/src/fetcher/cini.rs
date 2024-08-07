@@ -1,7 +1,6 @@
 use crate::fetcher::{Fetcher, FetcherError};
 use async_trait::async_trait;
 use color_eyre::eyre;
-use color_eyre::owo_colors::OwoColorize;
 use dashmap::DashMap;
 use futures::future::join_all;
 use kriger_common::messaging::model;
@@ -52,8 +51,7 @@ impl CiniFetcher {
     async fn handle_service<S: AsRef<str>>(&self, runtime: AppRuntime, service: S) {
         match self.get_flag_ids_by_service(service.as_ref()).await {
             Ok(res) => match res.get(service.as_ref()) {
-                Some(map) => {
-                }
+                Some(map) => {}
                 None => {
                     warn! {
                         "unable to find the service in the flag ids response"

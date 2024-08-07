@@ -8,7 +8,7 @@ use kriger_common::messaging::{Bucket, Messaging, MessagingError};
 use kriger_common::runtime::AppRuntime;
 use serde::{self, Deserialize};
 use std::collections::HashMap;
-use tracing::{error, instrument};
+use tracing::{debug, error, instrument};
 
 use super::{Fetcher, FetcherError};
 
@@ -90,6 +90,7 @@ impl FaustFetcher {
 
 #[async_trait]
 impl Fetcher for FaustFetcher {
+    #[instrument(skip_all)]
     async fn run(
         &self,
         runtime: &AppRuntime,
@@ -97,6 +98,12 @@ impl Fetcher for FaustFetcher {
     ) -> Result<(), FetcherError> {
         let hints_bucket = runtime.messaging.data_hints().await?;
         let info = self.get_attack_into().await?;
+        
+        debug! {
+            team_count = info.teams.len(),
+            service_count = info.flag_ids.len(),
+            "fetched attack info"
+        }
 
         let mut tasks = Vec::new();
 

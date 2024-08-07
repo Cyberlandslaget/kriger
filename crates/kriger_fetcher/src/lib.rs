@@ -3,14 +3,13 @@
 
 mod fetcher;
 
-use crate::fetcher::{FetcherConfig, Service};
+use crate::fetcher::FetcherConfig;
 use color_eyre::eyre::{Context, ContextCompat, Result};
 use kriger_common::messaging::model::CompetitionConfig;
 use kriger_common::messaging::{model, Bucket, Messaging};
 use kriger_common::runtime::AppRuntime;
-use std::ops::Deref;
-use tokio::time;
 use tokio::time::MissedTickBehavior;
+use tokio::{select, time};
 use tracing::{info, instrument, warn};
 
 #[instrument(skip_all)]
@@ -54,7 +53,12 @@ pub async fn main(runtime: AppRuntime) -> Result<()> {
     interval.tick().await; // The first tick will immediately complete
 
     loop {
-        interval.tick().await;
+        select! {
+            _ = interval.tick() => {}
+            _ = runtime.cancellation_token.cancelled() => {
+                return Ok(())
+            }
+        }
 
         if let Err(error) = fetcher.run(&runtime, &services).await {
             warn! {
