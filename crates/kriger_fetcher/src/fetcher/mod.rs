@@ -1,8 +1,13 @@
+mod cini;
 pub mod enowars;
 pub mod faust;
 pub mod statisk;
-mod cini;
 
+use crate::fetcher::cini::CiniFetcher;
+use async_trait::async_trait;
+use dashmap::DashMap;
+use kriger_common::messaging::model;
+use kriger_common::runtime::AppRuntime;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -54,15 +59,42 @@ pub struct TeamService {
 pub enum FetcherError {
     #[error("reqwest failed")]
     Reqwest(#[from] reqwest::Error),
-    #[error("general error")]
-    // useful for testing
-    General,
+    #[error("unknown error")]
+    Unknown,
 }
 
 /// Implements fetching flagids and hosts
-pub trait Fetcher {
+pub trait OldFetcher {
     /// services (with flagids)
     async fn services(&self) -> Result<ServiceMap, FetcherError>;
     /// "backup" raw get all ips
     async fn ips(&self) -> Result<Vec<String>, FetcherError>;
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub(crate) enum FetcherConfig {
+    Dummy,
+    Cini {
+        /// The URL of the "flag ids" service endpoint.
+        url: String,
+    },
+}
+
+impl FetcherConfig {
+    pub(crate) fn into_fetcher(self) -> Box<dyn Fetcher> {
+        match self {
+            FetcherConfig::Dummy => unimplemented!(),
+            FetcherConfig::Cini { url } => Box::new(CiniFetcher::new(url)),
+        }
+    }
+}
+
+#[async_trait]
+pub(crate) trait Fetcher {
+    async fn run(
+        &self,
+        runtime: &AppRuntime,
+        services: &DashMap<String, model::Service>,
+    ) -> Result<(), FetcherError>;
 }

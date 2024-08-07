@@ -62,6 +62,9 @@ pub struct Team {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct FlagHint {}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ExecutionRequest {
     #[serde(rename = "a")]
     pub ip_address: String,

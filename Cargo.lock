@@ -1725,8 +1725,11 @@ dependencies = [
 name = "kriger_fetcher"
 version = "0.0.1"
 dependencies = [
+ "async-trait",
  "chrono",
  "color-eyre",
+ "dashmap",
+ "futures",
  "kriger_common",
  "reqwest",
  "serde",

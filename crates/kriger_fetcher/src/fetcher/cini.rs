@@ -1,7 +1,15 @@
+use crate::fetcher::{Fetcher, FetcherError};
+use async_trait::async_trait;
 use color_eyre::eyre;
+use color_eyre::owo_colors::OwoColorize;
+use dashmap::DashMap;
+use futures::future::join_all;
+use kriger_common::messaging::model;
+use kriger_common::runtime::AppRuntime;
 use serde::Deserialize;
 use serde_json::Value;
 use std::collections::HashMap;
+use tracing::{instrument, warn};
 
 pub(crate) struct CiniFetcher {
     client: reqwest::Client,
@@ -38,6 +46,50 @@ impl CiniFetcher {
         let flag_ids: FlagIdsResponse = res.json().await?;
 
         Ok(flag_ids)
+    }
+
+    #[instrument(skip_all, fields(service))]
+    async fn handle_service<S: AsRef<str>>(&self, runtime: AppRuntime, service: S) {
+        match self.get_flag_ids_by_service(service.as_ref()).await {
+            Ok(res) => match res.get(service.as_ref()) {
+                Some(map) => {
+                }
+                None => {
+                    warn! {
+                        "unable to find the service in the flag ids response"
+                    }
+                }
+            },
+            Err(error) => {
+                warn! {
+                    ?error,
+                    "unable to fetch flag ids"
+                }
+            }
+        }
+    }
+}
+
+#[async_trait]
+impl Fetcher for CiniFetcher {
+    async fn run(
+        &self,
+        runtime: &AppRuntime,
+        services: &DashMap<String, model::Service>,
+    ) -> Result<(), FetcherError> {
+        let mut tasks = Vec::new();
+
+        for service in services.iter() {
+            if !service.has_hint {
+                continue;
+            }
+
+            tasks.push(self.handle_service(runtime.clone(), service.name.clone()));
+        }
+
+        join_all(tasks).await;
+
+        Ok(())
     }
 }
 

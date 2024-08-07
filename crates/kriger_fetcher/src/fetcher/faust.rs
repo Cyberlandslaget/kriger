@@ -2,7 +2,7 @@ use serde::{self, Deserialize};
 use std::collections::HashMap;
 use tracing::warn;
 
-use super::{Fetcher, FetcherError, Service, ServiceMap, TeamService};
+use super::{OldFetcher, FetcherError, Service, ServiceMap, TeamService};
 
 #[derive(Deserialize, Debug)]
 pub struct AttackInfo {
@@ -44,7 +44,7 @@ impl FaustFetcher {
     }
 }
 
-impl Fetcher for FaustFetcher {
+impl OldFetcher for FaustFetcher {
     async fn services(&self) -> Result<ServiceMap, FetcherError> {
         let scoreboard: Scoreboard = self
             .client
