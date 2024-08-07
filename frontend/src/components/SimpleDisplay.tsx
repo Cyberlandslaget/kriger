@@ -41,7 +41,7 @@ function SimpleDisplay() {
                       key={teamId}
                     >
                       <StatusCell
-                        flags={teamFlagMap[teamId][service.name] ?? {}}
+                        flags={teamFlagMap[teamId]?.[service.name] ?? {}}
                       />
                     </div>
                   );
