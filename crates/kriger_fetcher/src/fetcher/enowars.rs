@@ -1,4 +1,4 @@
-use super::{Fetcher, FetcherError, Service, ServiceMap, ServiceOld, TeamService};
+use super::{OldFetcher, FetcherError, Service, ServiceMap, ServiceOld, TeamService};
 use serde::{self, Deserialize};
 use std::collections::HashMap;
 
@@ -63,7 +63,7 @@ impl EnowarsFetcher {
     }
 }
 
-impl Fetcher for EnowarsFetcher {
+impl OldFetcher for EnowarsFetcher {
     async fn services(&self) -> Result<ServiceMap, FetcherError> {
         // TODO handle failures more gracefully (retry?)
         let resp: AttackInfo = self.client.get(&self.endpoint).send().await?.json().await?;

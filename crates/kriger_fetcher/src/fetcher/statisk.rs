@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 
-use super::{Fetcher, FetcherError, ServiceMap};
+use super::{OldFetcher, FetcherError, ServiceMap};
 
 #[derive(Debug)]
 pub struct StaticFetcher {
     pub ids: Vec<u8>,
 }
 
-impl Fetcher for StaticFetcher {
+impl OldFetcher for StaticFetcher {
     async fn services(&self) -> Result<ServiceMap, FetcherError> {
         Ok(ServiceMap(HashMap::new()))
     }

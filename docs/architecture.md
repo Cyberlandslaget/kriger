@@ -80,13 +80,14 @@ The *metrics* component is not explicitly listed as a consumer, but it'll consum
 
 **Key/Value:**
 
-| Bucket   | Key           | Description                                       | Data owner / data handling pattern                  | Consumer (s) |
-|----------|---------------|---------------------------------------------------|-----------------------------------------------------|--------------|
-| exploits | {name}        | Exploit manifests                                 | rest. Optimistic concurrency control.               | controller   |   
-| teams    | {name}        | Team data                                         | fetcher                                             | scheduler    |   
-| services | {name}        | Service data                                      | fetcher                                             | scheduler    |   
-| flags    | {flag}.submit | Flags submitted by exploits or manually submitted | rest, runner, rest. Optimistic concurrency control. | submitter    | 
-| flags    | {flag}.result | Flag submission results                           | submitter                                           |              | 
+| Bucket     | Key                            | Description                                       | Data owner / data handling pattern                  | Consumer (s)    |
+|------------|--------------------------------|---------------------------------------------------|-----------------------------------------------------|-----------------|
+| exploits   | {name}                         | Exploit manifests                                 | rest. Optimistic concurrency control.               | controller      |   
+| teams      | {name}                         | Team data                                         | fetcher                                             | scheduler       |   
+| services   | {name}                         | Service data                                      | fetcher                                             | scheduler       |   
+| flags      | {flag}.submit                  | Flags submitted by exploits or manually submitted | rest, runner, rest. Optimistic concurrency control. | submitter       | 
+| flags      | {flag}.result                  | Flag submission results                           | submitter                                           |                 | 
+| data_hints | {service}.{net team id}.{hash} | Flag hints                                        | fetcher                                             | scheduler, rest | 
 
 *\*Base64 encoding is used for segments with unpredictable names.*
 

@@ -78,6 +78,8 @@ pub trait Messaging: Clone {
 
     fn teams(&self) -> impl Future<Output = Result<impl Bucket, MessagingError>>;
 
+    fn data_hints(&self) -> impl Future<Output = Result<impl Bucket + 'static, MessagingError>>;
+
     fn executions_wq(&self) -> impl Future<Output = Result<impl Stream, MessagingError>>;
 
     fn scheduling(&self) -> impl Future<Output = Result<impl Stream, MessagingError>>;

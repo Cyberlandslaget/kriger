@@ -115,6 +115,14 @@ impl NatsMessaging {
                 ..Default::default()
             })
             .await?;
+        self.context
+            .create_key_value(jetstream::kv::Config {
+                bucket: "data_hints".to_string(),
+                // TODO: Don't hardcode
+                max_age: Duration::from_secs(900),
+                ..Default::default()
+            })
+            .await?;
 
         info!("nats migration complete");
         Ok(())
@@ -410,6 +418,11 @@ impl Messaging for NatsMessaging {
 
     async fn teams(&self) -> Result<impl Bucket, MessagingError> {
         let store = self.context.get_key_value("teams").await?;
+        Ok(NatsBucket { store })
+    }
+
+    async fn data_hints(&self) -> Result<impl Bucket + 'static, MessagingError> {
+        let store = self.context.get_key_value("data_hints").await?;
         Ok(NatsBucket { store })
     }
 
