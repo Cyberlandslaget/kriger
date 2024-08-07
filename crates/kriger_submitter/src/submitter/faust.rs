@@ -121,6 +121,7 @@ impl Submitter for FaustSubmitter {
 
                         match self.submit(&mut stream, payload.flag.to_string()).await {
                             Ok(status) => {
+                                let should_retry = status.should_retry();
                                 let result = FlagSubmissionResult {
                                     flag: payload.flag.to_string(),
                                     team_id: payload.team_id.clone(),
@@ -131,10 +132,19 @@ impl Submitter for FaustSubmitter {
                                 };
                                 match callback.submit(&payload.flag, result).await {
                                     Ok(_) => {
-                                        if let Err(error) = message.ack().await {
-                                            warn! {
-                                                ?error,
-                                                "unable to ack the message"
+                                        if should_retry {
+                                            if let Err(error) = message.nak().await {
+                                                warn! {
+                                                    ?error,
+                                                    "unable to ack the message"
+                                                }
+                                            }
+                                        } else {
+                                            if let Err(error) = message.ack().await {
+                                                warn! {
+                                                    ?error,
+                                                    "unable to ack the message"
+                                                }
                                             }
                                         }
                                     }
@@ -161,6 +171,18 @@ impl Submitter for FaustSubmitter {
                                     warn! {
                                         ?error,
                                         "unable to ack the message"
+                                    }
+                                }
+
+                                match self.create_connection().await {
+                                    Ok(new_stream) => {
+                                        stream = new_stream;
+                                    }
+                                    Err(error) => {
+                                        warn! {
+                                            ?error,
+                                            "unable to create a new connection"
+                                        }
                                     }
                                 }
                             }
