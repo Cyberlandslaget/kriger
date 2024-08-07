@@ -57,7 +57,7 @@ impl FaustSubmitter {
 
         // Parse the data
         // split twice on space to get 3 variables
-        let (flag, rest) = response.split_once(' ').ok_or(SubmitError::FormatError)?;
+        let (flag, rest) = response.trim().split_once(' ').ok_or(SubmitError::FormatError)?;
 
         // msg is optional
         let (code, _msg) = {
