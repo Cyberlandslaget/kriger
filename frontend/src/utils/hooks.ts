@@ -28,7 +28,10 @@ export const useWebSocketProvider = (url: string) => {
         case "scheduling_start":
           setCurrentTick(event.tick);
           flagPurgeDispatch(
-            event.published - competitionConfig.tick * 1000 * 5,
+            new Date(competitionConfig.start).getTime() +
+              (event.tick - competitionConfig.flagValidity + 1) *
+                competitionConfig.tick *
+                1000,
           );
           break;
         case "flag_submission":
@@ -41,7 +44,9 @@ export const useWebSocketProvider = (url: string) => {
       setCurrentTick,
       flagSubmissionDispatch,
       flagPurgeDispatch,
-      competitionConfig,
+      competitionConfig.start,
+      competitionConfig.tick,
+      competitionConfig.flagValidity,
     ],
   );
 
@@ -69,6 +74,7 @@ export const useConfigProvider = () => {
     setCompetitionConfig({
       start: config.start,
       tick: config.tick,
+      flagValidity: config.flag_validity,
       flagFormat: config.flag_format,
     });
   }, [data, setCompetitionConfig]);

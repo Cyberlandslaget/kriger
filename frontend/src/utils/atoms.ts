@@ -11,6 +11,7 @@ export const competitionConfigAtom = atom({
   start: "1990-01-01T08:00:00.000Z",
   tick: 120,
   flagFormat: "",
+  flagValidity: 5,
 });
 
 export const statusAtom = atom({
