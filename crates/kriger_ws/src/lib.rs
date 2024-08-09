@@ -168,8 +168,10 @@ async fn subscribe_all(runtime: AppRuntime, tx: Sender<WebSocketEvent>) -> eyre:
         .await
         .context("unable to watch flags")?
         .filter_map(|res| async {
-            res.ok()
-                .map(|msg| WebSocketEvent::FlagSubmission(msg.into_payload()))
+            res.ok().map(|msg| WebSocketEvent {
+                published: msg.published(),
+                payload: WebSocketPayload::FlagSubmission(msg.into_payload()),
+            })
         });
     let flag_results_stream = flags
         .watch_key::<FlagSubmissionResult>(
@@ -182,8 +184,10 @@ async fn subscribe_all(runtime: AppRuntime, tx: Sender<WebSocketEvent>) -> eyre:
         .await
         .context("unable to watch flags")?
         .filter_map(|res| async {
-            res.ok()
-                .map(|msg| WebSocketEvent::FlagSubmissionResult(msg.into_payload()))
+            res.ok().map(|msg| WebSocketEvent {
+                published: msg.published(),
+                payload: WebSocketPayload::FlagSubmissionResult(msg.into_payload()),
+            })
         });
     let scheduling_start_stream = scheduling
         .subscribe::<SchedulingTick>(
@@ -195,8 +199,10 @@ async fn subscribe_all(runtime: AppRuntime, tx: Sender<WebSocketEvent>) -> eyre:
         .await
         .context("unable to subscribe to scheduling start messages")?
         .filter_map(|res| async {
-            res.ok()
-                .map(|msg| WebSocketEvent::SchedulingStart(msg.into_payload()))
+            res.ok().map(|msg| WebSocketEvent {
+                published: msg.published(),
+                payload: WebSocketPayload::SchedulingStart(msg.into_payload()),
+            })
         });
 
     let mut fused_stream = select_all(vec![
@@ -212,8 +218,17 @@ async fn subscribe_all(runtime: AppRuntime, tx: Sender<WebSocketEvent>) -> eyre:
 }
 
 #[derive(Serialize, Debug)]
+struct WebSocketEvent {
+    /// Unix timestamp in UTC
+    #[serde(rename = "p")]
+    published: i64,
+    #[serde(flatten)]
+    payload: WebSocketPayload,
+}
+
+#[derive(Serialize, Debug)]
 #[serde(tag = "t", content = "d", rename_all = "snake_case")]
-enum WebSocketEvent {
+enum WebSocketPayload {
     FlagSubmission(FlagSubmission),
     FlagSubmissionResult(FlagSubmissionResult),
     SchedulingStart(SchedulingTick),

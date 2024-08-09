@@ -16,6 +16,7 @@ http-body-util = "0.1.2"
 hyper = { workspace = true, features = ["server", "http1", "http2"] }
 hyper-util = { workspace = true, features = ["tokio", "server", "http1", "http2"] }
 kriger_common = { path = "../kriger_common" }
+time.workspace = true
 tokio = { workspace = true, features = ["rt", "net"] }
 serde.workspace = true
 serde_json.workspace = true

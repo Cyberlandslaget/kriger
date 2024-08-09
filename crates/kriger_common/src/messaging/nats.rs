@@ -14,6 +14,7 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
+use time::UtcOffset;
 use tokio::spawn;
 use tracing::{debug, info, warn};
 
@@ -462,13 +463,28 @@ impl Messaging for NatsMessaging {
 pub struct NatsMessage<T: DeserializeOwned> {
     payload: T,
     message: jetstream::Message,
+    /// Unix timestamp in UTC
+    published: i64,
+    sequence: u64,
 }
 
 impl<T: DeserializeOwned> NatsMessage<T> {
     pub fn from(message: jetstream::Message) -> Result<Self, MessagingError> {
+        let info = message.info()?;
+        let published = (info
+            .published
+            .to_offset(UtcOffset::UTC)
+            .unix_timestamp_nanos()
+            / 1_000_000) as i64;
+        let sequence = info.stream_sequence;
         let payload = serde_json::from_slice(message.payload.as_ref())?;
 
-        Ok(Self { payload, message })
+        Ok(Self {
+            payload,
+            message,
+            published,
+            sequence,
+        })
     }
 }
 
@@ -483,6 +499,14 @@ impl<T: DeserializeOwned + Send + Sync + 'static> Message for NatsMessage<T> {
 
     fn into_payload(self) -> Self::Payload {
         self.payload
+    }
+
+    fn published(&self) -> i64 {
+        self.published
+    }
+
+    fn sequence(&self) -> u64 {
+        self.sequence
     }
 
     async fn ack(&self) -> Result<(), MessagingError> {
