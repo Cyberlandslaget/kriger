@@ -12,6 +12,10 @@ type RawWebSocketMessageTemplate<
    * The payload of the message
    */
   d: TPayload;
+  /**
+   * The publishing time of the message in Unix millis timestamp (UTC)
+   */
+  p: number;
 };
 type RawSchedulingStartMessage = RawWebSocketMessageTemplate<
   "scheduling_start",
@@ -79,11 +83,13 @@ type RawWebSocketMessage =
 
 export type SchedulingStartMessage = {
   type: "scheduling_start";
+  published: number;
   tick: number;
 };
 
 export type FlagSubmissionMessage = {
   type: "flag_submission";
+  published: number;
   flag: string;
   teamId: string | null;
   service: string | null;
@@ -92,6 +98,7 @@ export type FlagSubmissionMessage = {
 
 export type FlagSubmissionResultMessage = {
   type: "flag_submission_result";
+  published: number;
   flag: string;
   teamId: string | null;
   service: string | null;
@@ -116,6 +123,10 @@ export class SchedulingStartMessageWrapper implements SchedulingStartMessage {
     return this.#raw.t;
   }
 
+  get published() {
+    return this.#raw.p;
+  }
+
   get tick() {
     return this.#raw.d.i;
   }
@@ -129,6 +140,10 @@ export class FlagSubmissionMessageWrapper implements FlagSubmissionMessage {
 
   get type() {
     return this.#raw.t;
+  }
+
+  get published() {
+    return this.#raw.p;
   }
 
   get flag() {
@@ -159,6 +174,10 @@ export class FlagSubmissionResultMessageWrapper
 
   get type() {
     return this.#raw.t;
+  }
+
+  get published() {
+    return this.#raw.p;
   }
 
   get flag() {

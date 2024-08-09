@@ -14,6 +14,7 @@ export type TeamServiceFlags = {
 
 export type TeamFlagStatus = {
   status?: FLAG_CODE;
+  published: number;
 };
 
 export type ScoreboardType = {

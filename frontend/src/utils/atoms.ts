@@ -51,9 +51,37 @@ export const teamFlagSubmissionDispatch = atom(
           ...prev[message.teamId]?.[message.service],
           [message.flag]: {
             status: "status" in message ? message.status : undefined,
+            published:
+              "status" in message
+                ? (prev[message.teamId]?.[message.service]?.[message.flag]
+                    ?.published ?? message.service)
+                : message.published,
           },
         },
       },
     });
   },
 );
+
+export const teamFlagPurgeDispatch = atom(null, (get, set, oldest: number) => {
+  set(
+    teamFlagStatusAtom,
+    Object.fromEntries(
+      Object.entries(get(teamFlagStatusAtom)).map(
+        ([teamId, teamServiceMap]) => [
+          teamId,
+          Object.fromEntries(
+            Object.entries(teamServiceMap).map(([service, flags]) => [
+              service,
+              Object.fromEntries(
+                Object.entries(flags).filter(
+                  ([_, entry]) => entry.published > oldest,
+                ),
+              ),
+            ]),
+          ),
+        ],
+      ),
+    ),
+  );
+});

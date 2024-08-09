@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef } from "react";
 import { WebSocketService } from "../services/webSocket";
 import type { WebSocketMessage } from "../services/models";
-import { useSetAtom } from "jotai";
+import { useAtomValue, useSetAtom } from "jotai";
 import {
   competitionConfigAtom,
   currentTickAtom,
   servicesAtom,
+  teamFlagPurgeDispatch,
   teamFlagSubmissionDispatch,
   teamsAtom,
 } from "./atoms";
@@ -18,12 +19,17 @@ import {
 export const useWebSocketProvider = (url: string) => {
   const setCurrentTick = useSetAtom(currentTickAtom);
   const flagSubmissionDispatch = useSetAtom(teamFlagSubmissionDispatch);
+  const flagPurgeDispatch = useSetAtom(teamFlagPurgeDispatch);
+  const competitionConfig = useAtomValue(competitionConfigAtom);
 
   const handleMessage = useCallback(
     (event: WebSocketMessage) => {
       switch (event.type) {
         case "scheduling_start":
           setCurrentTick(event.tick);
+          flagPurgeDispatch(
+            event.published - competitionConfig.tick * 1000 * 5,
+          );
           break;
         case "flag_submission":
         case "flag_submission_result":
@@ -31,7 +37,12 @@ export const useWebSocketProvider = (url: string) => {
           break;
       }
     },
-    [setCurrentTick, flagSubmissionDispatch],
+    [
+      setCurrentTick,
+      flagSubmissionDispatch,
+      flagPurgeDispatch,
+      competitionConfig,
+    ],
   );
 
   const handleMessageRef = useRef<typeof handleMessage>();
