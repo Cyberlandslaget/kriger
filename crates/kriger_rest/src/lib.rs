@@ -3,9 +3,12 @@ mod routes;
 mod support;
 
 use crate::config::Config;
+use axum::http::header::InvalidHeaderValue;
+use axum::http::HeaderValue;
 use axum::routing::get;
 use axum::{routing::put, Router};
-use color_eyre::eyre::{Context, Result};
+use color_eyre::eyre;
+use color_eyre::eyre::Context;
 use kriger_common::runtime::AppRuntime;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::net::TcpListener;
@@ -18,7 +21,7 @@ struct AppState {
 }
 
 #[instrument(skip_all)]
-pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
+pub async fn main(runtime: AppRuntime, config: Config) -> eyre::Result<()> {
     info!("starting rest server");
 
     let addr: SocketAddr = config
@@ -33,7 +36,14 @@ pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
     let cancellation_token = runtime.cancellation_token.clone();
     let state = AppState { runtime };
 
-    let mut app = Router::new()
+    let origins = config
+        .rest_cors_origins
+        .into_iter()
+        .map(|origin| origin.parse())
+        .collect::<Result<Vec<HeaderValue>, InvalidHeaderValue>>()
+        .context("unable to parse cors origins")?;
+
+    let app = Router::new()
         .route("/exploits", get(routes::exploits::get_exploits))
         .route("/exploits/:name", put(routes::exploits::update_exploit))
         .route(
@@ -45,12 +55,9 @@ pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
             "/config/competition",
             get(routes::config::get_competition_config),
         )
-        .layer(TraceLayer::new_for_http());
-    #[cfg(debug_assertions)]
-    {
-        app = app.layer(cors::CorsLayer::new().allow_origin(cors::Any))
-    }
-    let app = app.with_state(Arc::new(state));
+        .layer(TraceLayer::new_for_http())
+        .layer(cors::CorsLayer::new().allow_origin(origins))
+        .with_state(Arc::new(state));
 
     axum::serve(listener, app)
         .with_graceful_shutdown(async move {
