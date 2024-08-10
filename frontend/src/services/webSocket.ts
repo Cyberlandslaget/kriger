@@ -2,17 +2,21 @@ import { mapWebSocketMessage } from "./models";
 import type { WebSocketMessage } from "./models";
 
 export class WebSocketService {
-  #url: string;
+  readonly #url: string;
+  readonly #fromProvider: () => number;
+  readonly #messageHandler: (message: WebSocketMessage) => void;
+
   #ws: WebSocket | undefined;
   #closed = false;
   #timer: number | undefined;
-  #messageHandler: (message: WebSocketMessage) => void;
 
   constructor(
     url: string,
+    fromProvider: () => number,
     messageHandler: (message: WebSocketMessage) => void,
   ) {
     this.#url = url;
+    this.#fromProvider = fromProvider;
     this.#messageHandler = messageHandler;
     this.connect();
   }
@@ -26,7 +30,10 @@ export class WebSocketService {
 
     console.info("[ws] connecting");
 
-    this.#ws = new WebSocket(this.#url);
+    const url = new URL(this.#url);
+    url.searchParams.append("from", this.#fromProvider().toString());
+
+    this.#ws = new WebSocket(url);
     this.#ws.onopen = () => {
       console.info("[ws] connected");
     };

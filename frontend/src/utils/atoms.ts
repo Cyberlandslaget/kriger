@@ -1,5 +1,6 @@
 import { atom } from "jotai";
 import type {
+  CompetitionConfig,
   FlagSubmissionMessage,
   FlagSubmissionResultMessage,
   Service,
@@ -8,12 +9,9 @@ import type {
 import type { ExploitType, TeamFlagMap } from "./types";
 import { FLAG_CODE } from "./enums";
 
-export const competitionConfigAtom = atom({
-  start: "1990-01-01T08:00:00.000Z",
-  tick: 120,
-  flagFormat: "",
-  flagValidity: 5,
-});
+export const competitionConfigAtom = atom<CompetitionConfig | undefined>(
+  undefined,
+);
 
 export const statusAtom = atom({
   currentTick: -1,
@@ -21,11 +19,11 @@ export const statusAtom = atom({
 
 export const currentTickAtom = atom(
   (get) => get(statusAtom).currentTick,
-  (get, set, currentTick: number) =>
-    set(statusAtom, {
-      ...get(statusAtom),
+  (_get, set, currentTick: number) =>
+    set(statusAtom, (current) => ({
+      ...current,
       currentTick,
-    }),
+    })),
 );
 
 export const exploitsAtom = atom<ExploitType[] | null>(null);
@@ -38,54 +36,64 @@ export const teamFlagStatusAtom = atom<TeamFlagMap>({});
 
 export const teamFlagSubmissionDispatch = atom(
   null,
-  (get, set, message: FlagSubmissionMessage | FlagSubmissionResultMessage) => {
-    const prev = get(teamFlagStatusAtom);
+  (_get, set, message: FlagSubmissionMessage | FlagSubmissionResultMessage) => {
+    set(teamFlagStatusAtom, (prev) => {
+      if (!message.teamId || !message.service) {
+        return prev;
+      }
+      const prevStatus =
+        prev[message.teamId]?.[message.service]?.[message.flag];
 
-    if (!message.teamId || !message.service) {
-      return;
-    }
+      if (prevStatus && !("status" in message)) {
+        return prev;
+      }
 
-    set(teamFlagStatusAtom, {
-      ...prev,
-      [message.teamId]: {
-        ...prev[message.teamId],
-        [message.service]: {
-          ...prev[message.teamId]?.[message.service],
-          [message.flag]: {
-            status: "status" in message ? message.status : undefined,
-            published:
-              "status" in message
-                ? (prev[message.teamId]?.[message.service]?.[message.flag]
-                    ?.published ?? message.service)
+      return {
+        ...prev,
+        [message.teamId]: {
+          ...prev[message.teamId],
+          [message.service]: {
+            ...prev[message.teamId]?.[message.service],
+            [message.flag]: {
+              // Pending SHOULD NOT overide any other statuses
+              status:
+                // If the message is a submission result message and if either:
+                // - status was not defined previously
+                // - the message's status has a higher precedence over the previous status
+                "status" in message &&
+                (!prevStatus?.status || message.status < prevStatus?.status)
+                  ? message.status
+                  : prevStatus?.status,
+              // Keep the timestamp of when the flag was originally submitted.
+              published: prevStatus?.published
+                ? Math.min(prevStatus.published, message.published)
                 : message.published,
+            },
           },
         },
-      },
+      };
     });
   },
 );
 
-export const teamFlagPurgeDispatch = atom(null, (get, set, oldest: number) => {
-  set(
-    teamFlagStatusAtom,
-    Object.fromEntries(
-      Object.entries(get(teamFlagStatusAtom)).map(
-        ([teamId, teamServiceMap]) => [
-          teamId,
-          Object.fromEntries(
-            Object.entries(teamServiceMap).map(([service, flags]) => [
-              service,
-              Object.fromEntries(
-                Object.entries(flags).filter(
-                  ([_, entry]) => entry.published > oldest,
-                ),
+export const teamFlagPurgeDispatch = atom(null, (_get, set, oldest: number) => {
+  set(teamFlagStatusAtom, (current) => {
+    return Object.fromEntries(
+      Object.entries(current).map(([teamId, teamServiceMap]) => [
+        teamId,
+        Object.fromEntries(
+          Object.entries(teamServiceMap).map(([service, flags]) => [
+            service,
+            Object.fromEntries(
+              Object.entries(flags).filter(
+                ([_, entry]) => entry.published >= oldest,
               ),
-            ]),
-          ),
-        ],
-      ),
-    ),
-  );
+            ),
+          ]),
+        ),
+      ]),
+    );
+  });
 });
 
 // TODO: Add tiered caching? We are aggregating everything every time 'teamFlagStatusAtom' updates.

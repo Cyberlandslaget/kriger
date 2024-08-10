@@ -17,10 +17,11 @@ use kriger_common::messaging::{AckPolicy, Bucket, DeliverPolicy, Message, Messag
 use kriger_common::runtime::AppRuntime;
 use serde::Serialize;
 use std::net::SocketAddr;
+use time::OffsetDateTime;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::task::JoinSet;
 use tokio::{select, spawn};
-use tracing::{info, instrument, warn};
+use tracing::{debug, info, instrument, warn};
 
 #[instrument(skip_all)]
 pub async fn main(runtime: AppRuntime, config: Config) -> eyre::Result<()> {
@@ -83,10 +84,22 @@ async fn handle_request(
     mut req: Request<Incoming>,
     runtime: AppRuntime,
 ) -> Result<Response<Empty<Bytes>>, WebSocketError> {
+    // FIXME: This is kind of ugly
+    let from: Option<i64> = req
+        .uri()
+        .query()
+        .map_or(None, |query| {
+            form_urlencoded::parse(query.as_bytes())
+                .into_owned()
+                .collect::<Vec<(String, String)>>()
+                .into_iter()
+                .find(|(key, _)| key == "from")
+        })
+        .and_then(|(_, value)| value.parse().ok());
     let (response, fut) = upgrade::upgrade(&mut req)?;
 
     spawn(async move {
-        if let Err(error) = tokio::task::unconstrained(handle_client(fut, runtime)).await {
+        if let Err(error) = tokio::task::unconstrained(handle_client(fut, runtime, from)).await {
             warn! {
                 ?error,
                 "websocket error"
@@ -100,6 +113,7 @@ async fn handle_request(
 async fn handle_client(
     fut: upgrade::UpgradeFut,
     runtime: AppRuntime,
+    from: Option<i64>,
 ) -> Result<(), WebSocketError> {
     let ws = fut.await?;
     let (_ws_rx, mut ws_tx) = ws.split(tokio::io::split);
@@ -108,7 +122,10 @@ async fn handle_client(
     let (tx, rx) = flume::unbounded::<WebSocketEvent>();
 
     let mut set = JoinSet::new();
-    set.spawn(subscribe_all(runtime, tx));
+    // TODO: We may want to share a set of consumer for all WS connections to reduce I/O
+    // However, clients will most likely connect at different points in time and we want to
+    // replay relevant messages to them.
+    set.spawn(subscribe_all(runtime, from, tx));
     set.spawn(async move {
         let mut rx = rx.into_stream();
         while let Some(msg) = rx.next().await {
@@ -143,7 +160,25 @@ async fn handle_client(
     Ok(())
 }
 
-async fn subscribe_all(runtime: AppRuntime, tx: Sender<WebSocketEvent>) -> eyre::Result<()> {
+async fn subscribe_all(
+    runtime: AppRuntime,
+    from: Option<i64>,
+    tx: Sender<WebSocketEvent>,
+) -> eyre::Result<()> {
+    let deliver_policy = match from {
+        Some(timestamp) => {
+            match OffsetDateTime::from_unix_timestamp_nanos((timestamp as i128) * 1_000_000) {
+                Ok(start_time) => DeliverPolicy::ByStartTime { start_time },
+                _ => DeliverPolicy::New,
+            }
+        }
+        None => DeliverPolicy::New,
+    };
+    debug! {
+        ?deliver_policy,
+        "consuming messages with deliver policy"
+    }
+
     let flags = runtime
         .messaging
         .flags()
@@ -158,13 +193,7 @@ async fn subscribe_all(runtime: AppRuntime, tx: Sender<WebSocketEvent>) -> eyre:
 
     // TODO: Deliver messages from the last N ticks
     let flag_submissions_stream = flags
-        .watch_key::<FlagSubmission>(
-            "*.submit",
-            None,
-            AckPolicy::None,
-            DeliverPolicy::New,
-            vec![],
-        )
+        .watch_key::<FlagSubmission>("*.submit", None, AckPolicy::None, deliver_policy, vec![])
         .await
         .context("unable to watch flags")?
         .filter_map(|res| async {
@@ -178,7 +207,7 @@ async fn subscribe_all(runtime: AppRuntime, tx: Sender<WebSocketEvent>) -> eyre:
             "*.result",
             None,
             AckPolicy::None,
-            DeliverPolicy::New,
+            deliver_policy,
             vec![],
         )
         .await

@@ -21,3 +21,4 @@ tokio = { workspace = true, features = ["rt", "net"] }
 serde.workspace = true
 serde_json.workspace = true
 tracing.workspace = true
+form_urlencoded = "1.2.1"

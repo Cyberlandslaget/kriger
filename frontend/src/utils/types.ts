@@ -17,18 +17,6 @@ export type TeamFlagStatus = {
   published: number;
 };
 
-export type ScoreboardType = {
-  teams: {
-    [key: string]: {
-      ip_address: string;
-      name?: string;
-      services: {
-        [key: string]: number;
-      };
-    };
-  };
-};
-
 export type ExecutionType = {
   id: number;
   exploit_id: number;
@@ -52,14 +40,4 @@ export type ExploitType = {
   docker_image: string;
   docker_containers: string[];
   blacklist: string[];
-};
-
-export type FlagSubmissionResult = {
-  flag: string; // f
-  team_id?: string; // t
-  service?: string; // s
-  exploit?: string; // e
-  status: FLAG_CODE; // r
-  points?: number; // p
-  tick: number; // c
 };

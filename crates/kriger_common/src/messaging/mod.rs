@@ -19,6 +19,7 @@ pub enum AckPolicy {
     None,
 }
 
+#[derive(Clone, Copy, Debug)]
 pub enum DeliverPolicy {
     All,
     Last,

@@ -18,22 +18,36 @@ function NavigationBar() {
   const competitionConfig = useAtomValue(competitionConfigAtom);
 
   const startTime = useMemo(
-    () => new Date(competitionConfig.start).getTime(),
-    [competitionConfig.start],
+    () =>
+      competitionConfig
+        ? new Date(competitionConfig.start).getTime()
+        : undefined,
+    [competitionConfig],
   );
   const tickStart = useMemo(
-    () => startTime + status.currentTick * competitionConfig.tick * 1000,
-    [startTime, status.currentTick, competitionConfig.tick],
+    () =>
+      startTime && competitionConfig
+        ? startTime + status.currentTick * competitionConfig.tick * 1000
+        : undefined,
+    [startTime, status.currentTick, competitionConfig],
   );
-  const [currentTime, setCurrentTime] = useState<number>(tickStart);
+  const [currentTime, setCurrentTime] = useState<number | undefined>(tickStart);
 
   // Values in the range [0, inf). Values below 1 represents tick progress.
   // Values greater than or equal to 1 represents ticks that are waiting for the server.
   const tickProgress = useMemo(
     () =>
-      Math.max((currentTime - tickStart) / competitionConfig.tick / 1000, 0),
-    [currentTime, tickStart, competitionConfig.tick],
+      currentTime && tickStart && competitionConfig
+        ? Math.max((currentTime - tickStart) / competitionConfig.tick / 1000, 0)
+        : 0,
+    [currentTime, tickStart, competitionConfig],
   );
+
+  const timeUntilNextTick = useMemo(() => {
+    return tickProgress && competitionConfig
+      ? (1 - tickProgress) * competitionConfig.tick
+      : undefined;
+  }, [tickProgress, competitionConfig]);
 
   // JavaScript timers are inaccurate by nature
   useInterval(() => {
@@ -79,7 +93,7 @@ function NavigationBar() {
           {/* We don't support end round yet */}
           {/* / {status.rounds}{" "} */}
           <span className="font-normal text-slate-300">
-            ({competitionConfig.tick}s)
+            ({timeUntilNextTick?.toFixed(0) ?? "∞"}s)
           </span>
         </div>
       </div>
