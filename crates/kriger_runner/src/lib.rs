@@ -133,18 +133,25 @@ pub async fn main(args: Config) -> Result<()> {
             maybe_permit = semaphore.clone().acquire_owned() => {
                 let permit = maybe_permit.context("permit acquisition failed")?;
                 debug!("permit acquired: {permit:?}");
-                match stream.next().await.context("end of stream")? {
-                    Ok(message) => {
-                        let job = Job {
-                            request: Box::new(message),
-                            _permit: permit,
-                        };
-                        if let Err(err) = tx.send(job).await {
-                            bail!("channel closed: {err:?}");
-                        }
+                select! {
+                    _ = cancellation_token.cancelled() => {
+                        return Ok(());
                     }
-                    Err(err) => warn!("unable to parse message: {err:?}"),
-                };
+                    maybe_message = stream.next() => {
+                        match maybe_message.context("end of stream")? {
+                            Ok(message) => {
+                                let job = Job {
+                                    request: Box::new(message),
+                                    _permit: permit,
+                                };
+                                if let Err(err) = tx.send(job).await {
+                                    bail!("channel closed: {err:?}");
+                                }
+                            }
+                            Err(err) => warn!("unable to parse message: {err:?}"),
+                        };
+                    }
+                }
             }
         }
     }
