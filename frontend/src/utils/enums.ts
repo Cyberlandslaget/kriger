@@ -1,4 +1,5 @@
 export enum FLAG_CODE {
+  Pending = -1,
   Ok = 1, // ACCEPTED: flag claimed
   Duplicate = 2, // DENIED: flag already claimed
   Own = 3, // DENIED: flag is your own
@@ -23,3 +24,7 @@ export enum SERVICE_STATUS {
   DOWN = 1,
   SYSTEM_ERROR = -1,
 }
+
+export const flagCodeLookup = new Map<FLAG_CODE | string, string>(
+  Object.entries(FLAG_CODE).map(([k, v]) => [v, k]),
+);
