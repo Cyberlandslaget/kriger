@@ -95,7 +95,7 @@ export const useCompetition = () => {
 
   useEffect(() => {
     if (services?.data) {
-      setServices(services?.data);
+      setServices(services?.data?.sort((a, b) => a.name.localeCompare(b.name)));
     }
   }, [services, setServices]);
 };
