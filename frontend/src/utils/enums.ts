@@ -1,5 +1,7 @@
 export enum FLAG_CODE {
+  // Internal status code used by the frontend to represent "pending" flags
   Pending = -1,
+
   Ok = 1, // ACCEPTED: flag claimed
   Duplicate = 2, // DENIED: flag already claimed
   Own = 3, // DENIED: flag is your own

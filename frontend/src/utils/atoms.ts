@@ -6,6 +6,7 @@ import type {
   Team,
 } from "../services/models";
 import type { ExploitType, TeamFlagMap } from "./types";
+import { FLAG_CODE } from "./enums";
 
 export const competitionConfigAtom = atom({
   start: "1990-01-01T08:00:00.000Z",
@@ -85,4 +86,30 @@ export const teamFlagPurgeDispatch = atom(null, (get, set, oldest: number) => {
       ),
     ),
   );
+});
+
+// TODO: Add tiered caching? We are aggregating everything every time 'teamFlagStatusAtom' updates.
+// Premature optimization here can lead to inconsistent aggregation. We have to deeal with status updates,
+// purging and the message delivery order.
+export const flagStatusAggregateAtom = atom((get) => {
+  const flagStatus = get(teamFlagStatusAtom);
+
+  let count = 0;
+  const map = new Map<FLAG_CODE, number>();
+
+  // We probably don't want to do FP here to avoid a lot of extra allocations
+  for (const [_, serviceMap] of Object.entries(flagStatus)) {
+    for (const [_, serviceFlags] of Object.entries(serviceMap)) {
+      for (const [_, status] of Object.entries(serviceFlags)) {
+        const key = status.status ?? FLAG_CODE.Pending;
+        map.set(key, (map.get(key) ?? 0) + 1);
+        ++count;
+      }
+    }
+  }
+
+  return {
+    count,
+    statusMap: map,
+  };
 });

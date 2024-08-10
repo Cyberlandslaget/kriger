@@ -1,24 +1,34 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
+import { useAtomValue } from "jotai";
 import SimpleDisplay from "../components/SimpleDisplay";
-import {
-  DUMMY_FLAGSUBMISSION_LOG,
-  DUMMY_SCOREBOARD_DATA,
-} from "../utils/constants";
-import type { FlagSubmissionResult } from "../utils/types";
+import { flagStatusAggregateAtom } from "../utils/atoms";
+import { FLAG_CODE } from "../utils/enums";
 
-const BOX = [
-  { title: "Executions in queue", value: "26" },
-  { title: "Exploits", value: "3" },
-  { title: "Flags received", value: "27" },
-  { title: "Accepted", value: "395" },
-  { title: "Rejected", value: "22" },
-  { title: "Duplicates", value: "1" },
-];
-export const Route = createLazyFileRoute("/")({
-  component: () => (
+function DashboardPage() {
+  const flagStatusAggregate = useAtomValue(flagStatusAggregateAtom);
+
+  const statCards = [
+    { title: "Executions in queue", value: "26" },
+    { title: "Exploits", value: "3" },
+    { title: "Flags received", value: flagStatusAggregate.count },
+    {
+      title: "Accepted flags",
+      value: flagStatusAggregate.statusMap.get(FLAG_CODE.Ok) ?? 0,
+    },
+    {
+      title: "Rejected flags",
+      value: flagStatusAggregate.statusMap.get(FLAG_CODE.Invalid) ?? 0,
+    },
+    {
+      title: "Pending flags",
+      value: flagStatusAggregate.statusMap.get(FLAG_CODE.Pending) ?? 0,
+    },
+  ];
+
+  return (
     <main className="flex flex-col gap-3">
       <div className="grid grid-cols-6 gap-3">
-        {BOX.map((box) => (
+        {statCards.map((box) => (
           <div
             key={box.title}
             className="px-3 py-2 shadow-inner bg-slate-950 bg-opacity-30 border-slate-950 border-opacity-20 border-2 rounded-sm flex flex-col"
@@ -28,12 +38,11 @@ export const Route = createLazyFileRoute("/")({
           </div>
         ))}
       </div>
-      <SimpleDisplay
-        data={{
-          scoreboard: DUMMY_SCOREBOARD_DATA,
-          flag: DUMMY_FLAGSUBMISSION_LOG as FlagSubmissionResult[],
-        }}
-      />
+      <SimpleDisplay />
     </main>
-  ),
+  );
+}
+
+export const Route = createLazyFileRoute("/")({
+  component: DashboardPage,
 });
