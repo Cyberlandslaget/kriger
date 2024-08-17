@@ -1,82 +1,117 @@
-use super::{SubmitError, Submitter, SubmitterCallback};
+use super::{FormatErrorKind, SubmitError, Submitter};
 use async_trait::async_trait;
-use futures::{Stream, StreamExt};
-use kriger_common::messaging::model::{FlagSubmission, FlagSubmissionResult, FlagSubmissionStatus};
-use kriger_common::messaging::Message;
-use std::pin::Pin;
+use kriger_common::messaging::model::FlagSubmissionStatus;
+use std::collections::HashMap;
+use std::ops::DerefMut;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufStream};
 use tokio::net::TcpStream;
-use tokio::select;
-use tokio_util::sync::CancellationToken;
-use tracing::{instrument, warn};
+use tokio::sync::RwLock;
+use tracing::{debug, instrument, warn};
 
-#[derive(Clone, Debug)]
 pub(crate) struct FaustSubmitter {
-    pub(crate) host: String,
+    host: String,
+    stream: RwLock<Option<BufStream<TcpStream>>>,
+}
+
+#[async_trait]
+impl Submitter for FaustSubmitter {
+    #[instrument(skip_all, fields(flag_count = flags.len()))]
+    async fn submit(
+        &self,
+        flags: &[&str],
+    ) -> Result<HashMap<String, FlagSubmissionStatus>, SubmitError> {
+        let mut stream_ref = self.stream.write().await;
+
+        // TODO: Improve this mess?
+        let mut stream = match stream_ref.deref_mut() {
+            Some(stream) => stream,
+            opt => {
+                let stream = self.create_connection().await?;
+                opt.insert(stream)
+            }
+        };
+
+        match submit_internal(&mut stream, flags).await {
+            Ok(map) => Ok(map),
+            Err(error) => {
+                // Drop the connection and propagate the error. This should trigger a retry and a
+                // new connection will be created on the next attempt.
+                stream_ref.deref_mut().take();
+                Err(error)
+            }
+        }
+    }
 }
 
 impl FaustSubmitter {
     pub fn new(host: String) -> Self {
-        Self { host }
+        Self {
+            host,
+            stream: RwLock::new(None),
+        }
     }
 
     #[instrument(skip_all)]
     async fn create_connection(&self) -> Result<BufStream<TcpStream>, SubmitError> {
+        debug!("created a new connection");
         let socket = TcpStream::connect(&self.host).await?;
-        // bufread over it
         let mut socket = BufStream::new(socket);
         let mut header: Vec<u8> = Vec::new();
+
         // https://ctf-gameserver.org/submission/
+        // The server MUST indicate that the welcome sequence has finished by sending two subsequent newlines (\n\n).
         while !header.ends_with(b"\n\n") {
             socket.read_until(b'\n', &mut header).await?;
         }
 
         Ok(socket)
     }
+}
 
-    #[instrument(skip_all, fields(flag))]
-    async fn submit(
-        &self,
-        stream: &mut BufStream<TcpStream>,
-        flag: String,
-    ) -> Result<FlagSubmissionStatus, SubmitError> {
-        // Send flags
-        stream.write_all((flag + "\n").as_bytes()).await?;
-        stream.flush().await?;
+async fn submit_internal(
+    stream: &mut BufStream<TcpStream>,
+    flags: &[&str],
+) -> Result<HashMap<String, FlagSubmissionStatus>, SubmitError> {
+    for &flag in flags {
+        // - To submit a flag, the client MUST send the flag followed by a single newline.
+        // - During a single connection, the client MAY submit an arbitrary number of flags.
+        // - The client MAY send flags without waiting for the welcome sequence or responses to previously submitted flags.
+        stream.write_all(flag.as_bytes()).await?;
+        stream.write_u8(b'\n').await?;
+    }
+    stream.flush().await?;
 
-        // Read the data
+    let mut map = HashMap::with_capacity(flags.len());
+
+    // We expect |flags| responses from the submission server
+    for _ in 0..flags.len() {
         let mut response = String::new();
         match stream.read_line(&mut response).await {
             Ok(n) => {
                 if n == 0 {
-                    return Err(SubmitError::Unknown("reached eof"));
+                    return Err(SubmitError::FormatError(FormatErrorKind::EOF));
                 }
             }
             Err(err) => return Err(err.into()),
         }
 
-        // Parse the data
-        // split twice on space to get 3 variables
-        let (flag, rest) = response.trim().split_once(' ').ok_or(SubmitError::FormatError)?;
+        // The server's response MUST consist of:
+        // - A repetition of the submitted flag (1)
+        // - Whitespace
+        // - One of the response codes defined below (2)
+        // - Optionally: Whitespace, followed by a custom message consisting of any characters except newlines (3)
+        // - Newline
+        let mut split = response.trim().splitn(3, ' ');
 
-        // msg is optional
-        let (code, _msg) = {
-            match rest.split_once(' ') {
-                Some((code, msg)) => (code, Some(msg)),
-                None => (rest, None),
-            }
-        };
+        // TODO: Do we want to localize the failure to a single flag submission only?
+        let flag = split
+            .next()
+            .ok_or_else(|| SubmitError::FormatError(FormatErrorKind::MissingField("flag")))?;
+        let code = split
+            .next()
+            .ok_or_else(|| SubmitError::FormatError(FormatErrorKind::MissingField("code")))?;
 
-        let status = match code {
-            "OK" => FlagSubmissionStatus::Ok,
-            "DUP" => FlagSubmissionStatus::Duplicate,
-            "OWN" => FlagSubmissionStatus::Own,
-            "OLD" => FlagSubmissionStatus::Old,
-            "INV" => FlagSubmissionStatus::Invalid,
-            "ERR" => FlagSubmissionStatus::Error,
-            _ => FlagSubmissionStatus::Unknown,
-        };
-
+        let status = map_status_code(code);
         if let FlagSubmissionStatus::Unknown = status {
             warn! {
                 code,
@@ -85,113 +120,20 @@ impl FaustSubmitter {
             }
         }
 
-        Ok(status)
+        map.insert(flag.to_owned(), status);
     }
+
+    Ok(map)
 }
 
-#[async_trait]
-impl Submitter for FaustSubmitter {
-    async fn run(
-        &self,
-        mut flags: Pin<
-            Box<
-                dyn Stream<Item = (impl Message<Payload = FlagSubmission> + Sync + 'static)> + Send,
-            >,
-        >,
-        callback: impl SubmitterCallback + Send + Sync + 'static,
-        cancellation_token: CancellationToken,
-    ) -> color_eyre::Result<()> {
-        // We return an error if the initial connection fails
-        let mut stream = self.create_connection().await?;
-
-        loop {
-            select! {
-                _ = cancellation_token.cancelled() => {
-                    return Ok(())
-                }
-                maybe_message = flags.next() => {
-                    if let Some(message) = maybe_message {
-                        let payload = message.payload();
-                        if let Err(error) = message.progress().await{
-                            warn! {
-                                ?error,
-                                "unable to ack the message"
-                            }
-                        }
-
-                        match self.submit(&mut stream, payload.flag.to_string()).await {
-                            Ok(status) => {
-                                let should_retry = status.should_retry();
-                                let result = FlagSubmissionResult {
-                                    flag: payload.flag.to_string(),
-                                    team_id: payload.team_id.clone(),
-                                    service: payload.service.clone(),
-                                    exploit: payload.exploit.clone(),
-                                    status,
-                                    points: None,
-                                };
-                                match callback.submit(&payload.flag, result).await {
-                                    Ok(_) => {
-                                        if should_retry {
-                                            if let Err(error) = message.nak().await {
-                                                warn! {
-                                                    ?error,
-                                                    "unable to ack the message"
-                                                }
-                                            }
-                                        } else {
-                                            if let Err(error) = message.ack().await {
-                                                warn! {
-                                                    ?error,
-                                                    "unable to ack the message"
-                                                }
-                                            }
-                                        }
-                                    }
-                                    Err(error) => {
-                                        warn! {
-                                            ?error,
-                                            "unable to send the submission message"
-                                        }
-                                        if let Err(error) = message.nak().await {
-                                            warn! {
-                                                ?error,
-                                                "unable to ack the message"
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            Err(error) => {
-                                warn! {
-                                    ?error,
-                                    "unable to submit flag"
-                                }
-                                if let Err(error) = message.nak().await {
-                                    warn! {
-                                        ?error,
-                                        "unable to ack the message"
-                                    }
-                                }
-
-                                match self.create_connection().await {
-                                    Ok(new_stream) => {
-                                        stream = new_stream;
-                                    }
-                                    Err(error) => {
-                                        warn! {
-                                            ?error,
-                                            "unable to create a new connection"
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        return Ok(())
-                    }
-                }
-            }
-        }
+fn map_status_code(code: &str) -> FlagSubmissionStatus {
+    match code {
+        "OK" => FlagSubmissionStatus::Ok,
+        "DUP" => FlagSubmissionStatus::Duplicate,
+        "OWN" => FlagSubmissionStatus::Own,
+        "OLD" => FlagSubmissionStatus::Old,
+        "INV" => FlagSubmissionStatus::Invalid,
+        "ERR" => FlagSubmissionStatus::Error,
+        _ => FlagSubmissionStatus::Unknown,
     }
 }

@@ -7,12 +7,12 @@ use std::task::{Context, Poll};
 #[must_use]
 pub(crate) struct PollPending<'a, St: ?Sized + Stream> {
     stream: &'a mut St,
-    limit: usize,
+    limit: Option<usize>,
     buf: Vec<St::Item>,
 }
 
 impl<'a, St: ?Sized + Stream> PollPending<'a, St> {
-    pub(crate) fn new(stream: &'a mut St, limit: usize) -> Self {
+    pub(crate) fn new(stream: &'a mut St, limit: Option<usize>) -> Self {
         Self {
             stream,
             limit,
@@ -33,11 +33,15 @@ impl<St: ?Sized + Stream + Unpin> Future for PollPending<'_, St> {
             match self.stream.poll_next_unpin(cx) {
                 Poll::Ready(Some(item)) => {
                     self.buf.push(item);
-                    if self.buf.len() >= self.limit {
-                        return Poll::Ready(std::mem::take(&mut self.buf));
+                    if let Some(limit) = self.limit {
+                        if self.buf.len() >= limit {
+                            return Poll::Ready(std::mem::take(&mut self.buf));
+                        }
                     }
                 }
-                Poll::Ready(None) | Poll::Pending => return Poll::Ready(std::mem::take(&mut self.buf)),
+                Poll::Ready(None) | Poll::Pending => {
+                    return Poll::Ready(std::mem::take(&mut self.buf))
+                }
             }
         }
     }

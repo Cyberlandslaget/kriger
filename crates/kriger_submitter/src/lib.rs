@@ -1,33 +1,23 @@
 mod submitter;
 mod utils;
 
-use crate::submitter::{Submitter, SubmitterCallback, SubmitterConfig, Submitters};
+use crate::submitter::{Submitter, SubmitterConfig};
+use crate::utils::futures::PollPending;
 use base64::engine::general_purpose::STANDARD_NO_PAD;
 use base64::Engine;
 use color_eyre::eyre;
 use color_eyre::eyre::{Context, ContextCompat};
+use futures::future::join_all;
 use futures::StreamExt;
-use kriger_common::messaging::model::{CompetitionConfig, FlagSubmission, FlagSubmissionResult};
-use kriger_common::messaging::{AckPolicy, Bucket, DeliverPolicy, Messaging, MessagingError};
+use kriger_common::messaging::model::{
+    CompetitionConfig, FlagSubmission, FlagSubmissionResult, FlagSubmissionStatus,
+};
+use kriger_common::messaging::{AckPolicy, Bucket, DeliverPolicy, Message, Messaging};
 use kriger_common::runtime::AppRuntime;
 use std::time::Duration;
-use tracing::{debug, info, instrument, warn};
-
-struct SubmitterCallbackImpl<B: Bucket + Send + Sync> {
-    // NOTE this ought to be an Arc or something once the Box::leak is removed
-    bucket: &'static B,
-}
-
-impl<B: Bucket + Send + Sync> SubmitterCallback for SubmitterCallbackImpl<B> {
-    async fn submit(&self, flag: &str, result: FlagSubmissionResult) -> Result<(), MessagingError> {
-        debug!("flag submission result: {result:?}");
-
-        let flag_b64 = STANDARD_NO_PAD.encode(flag);
-        let key = format!("{}.result", &flag_b64);
-        self.bucket.put(&key, &result).await?;
-        Ok(())
-    }
-}
+use tokio::select;
+use tokio::time::{interval_at, Instant, MissedTickBehavior};
+use tracing::{debug, error, info, instrument, warn};
 
 #[instrument(skip_all)]
 pub async fn main(runtime: AppRuntime) -> eyre::Result<()> {
@@ -54,7 +44,7 @@ pub async fn main(runtime: AppRuntime) -> eyre::Result<()> {
     let flags_bucket = Box::leak(Box::new(flags_bucket));
     // TODO FIXME Using Box::leak is ugly, avoid doing that
 
-    let flag_submissions = flags_bucket
+    let mut flag_submissions = flags_bucket
         .watch_key::<FlagSubmission>(
             "*.submit",
             Some("submitter".to_string()),
@@ -82,43 +72,136 @@ pub async fn main(runtime: AppRuntime) -> eyre::Result<()> {
                     None
                 }
             }
-        });
-
-    let callback = SubmitterCallbackImpl {
-        bucket: flags_bucket,
-    };
+        })
+        .boxed(); // FIXME: Does actually have to be boxed?
 
     let config: SubmitterConfig = serde_json::from_value(competition_config.submitter)
         .context("unable to parse the flag submitter config")?;
 
-    match config.into_submitter() {
-        Submitters::Dummy(submitter) => {
-            submitter
-                .run(
-                    flag_submissions.boxed(),
-                    callback,
-                    runtime.cancellation_token,
-                )
-                .await?;
+    let submitter = config.inner.into_submitter();
+
+    let mut interval = interval_at(Instant::now(), Duration::from_secs(config.interval));
+    interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+
+    // The first tick completes immediately
+    interval.tick().await;
+
+    loop {
+        debug!("submitter tick");
+        select! {
+            _ = runtime.cancellation_token.cancelled() => {
+                return Ok(());
+            }
+            _ = interval.tick() => {}
         }
-        Submitters::Cini(submitter) => {
-            submitter
-                .run(
-                    flag_submissions.boxed(),
-                    callback,
-                    runtime.cancellation_token,
+
+        // TODO: Is `PollPending` the best solution here, or should we just use the consumer's pending count?
+        // TODO: Handle backpressure somehow
+        let requests = PollPending::new(&mut flag_submissions, config.batch).await;
+        handle_submit(submitter.as_ref(), requests, flags_bucket).await;
+    }
+}
+#[instrument(skip_all, fields(flag_count = %requests.len()))]
+async fn handle_submit(
+    submitter: &(dyn Submitter + Send + Sync),
+    requests: Vec<impl Message<Payload = FlagSubmission>>,
+    flags_bucket: &impl Bucket,
+) {
+    if requests.len() == 0 {
+        debug!("there are no flags to submit, skipping");
+        return;
+    }
+
+    info! {
+        flags.count = requests.len(),
+        "preparing to submit flags"
+    }
+
+    // TODO: Investigate why duplicate flags were received?
+    let flags: Vec<&str> = requests
+        .iter()
+        .map(|msg| msg.payload().flag.as_ref())
+        .collect();
+
+    // Indicate the work is in progress. We do this concurrently.
+    // FIXME: Indicating in-progress will only increase the ongoing period by another AckWait, maybe increase this periodically?
+    let progress_futures = requests.iter().map(|req| req.progress());
+    join_all(progress_futures).await;
+
+    match submitter.submit(&flags).await {
+        Ok(mut results) => {
+            let futures = requests.into_iter().map(|message| {
+                handle_result(
+                    flags_bucket,
+                    results.remove(message.payload().flag.as_str()),
+                    message,
                 )
-                .await?;
+            });
+            join_all(futures).await;
         }
-        Submitters::Faust(submitter) => {
-            submitter
-                .run(
-                    flag_submissions.boxed(),
-                    callback,
-                    runtime.cancellation_token,
-                )
-                .await?;
+        Err(error) => {
+            error! {
+                ?error,
+                "unable to submit flags"
+            }
+            let futures = requests.iter().map(|message| message.nak());
+            join_all(futures).await;
         }
     }
-    Ok(())
+}
+
+#[instrument(skip_all, fields(
+    flag = %message.payload().flag,
+    flag.status = ?maybe_status
+))]
+async fn handle_result(
+    flags_bucket: &impl Bucket,
+    maybe_status: Option<FlagSubmissionStatus>,
+    message: impl Message<Payload = FlagSubmission>,
+) {
+    let payload = message.payload();
+    let status = match maybe_status {
+        Some(status) => status,
+        None => {
+            // How?
+            warn! {
+                flag = %payload.flag,
+                "submitted flag did not receive a response",
+            }
+            let _ = message.nak().await;
+            return;
+        }
+    };
+
+    debug!("received flag submission response");
+    // FIXME: Can't we move??
+    let should_retry = status.should_retry();
+    let result = FlagSubmissionResult {
+        flag: payload.flag.clone(),
+        team_id: payload.team_id.clone(),
+        service: payload.service.clone(),
+        exploit: payload.exploit.clone(),
+        status,
+        points: None,
+    };
+
+    debug!("flag submission result: {result:?}");
+
+    let flag_b64 = STANDARD_NO_PAD.encode(&payload.flag);
+    let key = format!("{}.result", &flag_b64);
+
+    if let Err(error) = flags_bucket.put(&key, &result).await {
+        warn! {
+            ?error,
+            "unable to publish flag submission result"
+        }
+        let _ = message.nak().await;
+        return;
+    }
+
+    if should_retry {
+        let _ = message.nak().await;
+    } else {
+        let _ = message.ack().await;
+    }
 }

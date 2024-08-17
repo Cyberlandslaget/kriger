@@ -407,7 +407,7 @@ impl Messaging for NatsMessaging {
         Ok(NatsBucket { store })
     }
 
-    async fn flags(&self) -> Result<impl Bucket + 'static, MessagingError> {
+    async fn flags(&self) -> Result<impl Bucket, MessagingError> {
         let store = self.context.get_key_value("flags").await?;
         Ok(NatsBucket { store })
     }

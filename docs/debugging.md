@@ -28,7 +28,8 @@ docker run --network kriger_default -e NATS_URL=nats://nats:4222 --rm -it natsio
   "flag_validity": 5,
   "flag_format": "[A-Z0-9]{31}=",
   "submitter": {
-    "type": "dummy"
+    "type": "dummy",
+    "interval": 1
   },
   "fetcher": {
     "type": "dummy"

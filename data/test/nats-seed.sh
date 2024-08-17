@@ -7,7 +7,8 @@ nats kv put config competition '{
   "flag_validity": 5,
   "flag_format": "[A-Z0-9]{31}=",
   "submitter": {
-    "type": "dummy"
+    "type": "dummy",
+    "interval": 1
   },
   "fetcher": {
     "type": "dummy"
