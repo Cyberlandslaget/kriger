@@ -14,13 +14,12 @@ use std::{net::SocketAddr, sync::Arc};
 use tokio::net::TcpListener;
 use tower_http::cors;
 use tower_http::trace::TraceLayer;
-use tracing::{info, instrument};
+use tracing::info;
 
 struct AppState {
     runtime: AppRuntime,
 }
 
-#[instrument(skip_all)]
 pub async fn main(runtime: AppRuntime, config: Config) -> eyre::Result<()> {
     info!("starting rest server");
 

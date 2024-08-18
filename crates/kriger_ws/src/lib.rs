@@ -21,9 +21,8 @@ use time::OffsetDateTime;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::task::JoinSet;
 use tokio::{select, spawn};
-use tracing::{debug, info, instrument, warn};
+use tracing::{debug, info, warn};
 
-#[instrument(skip_all)]
 pub async fn main(runtime: AppRuntime, config: Config) -> eyre::Result<()> {
     info!("starting websocket server");
 

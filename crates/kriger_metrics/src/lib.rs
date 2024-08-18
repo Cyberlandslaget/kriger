@@ -12,7 +12,7 @@ use opentelemetry_sdk::metrics::SdkMeterProvider;
 use opentelemetry_sdk::runtime;
 use std::time::Duration;
 use tokio::{pin, select};
-use tracing::{info, instrument, warn};
+use tracing::{info, warn};
 
 fn init_metrics() -> opentelemetry::metrics::Result<SdkMeterProvider> {
     opentelemetry_otlp::new_pipeline()
@@ -23,7 +23,6 @@ fn init_metrics() -> opentelemetry::metrics::Result<SdkMeterProvider> {
         .build()
 }
 
-#[instrument(skip_all)]
 pub async fn main(runtime: AppRuntime, _args: Args) -> Result<()> {
     info!("starting metrics exporter");
 

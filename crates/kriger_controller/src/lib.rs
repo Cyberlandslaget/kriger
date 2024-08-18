@@ -17,9 +17,8 @@ use kube::api::{Patch, PatchParams};
 use kube::{Api, Client};
 use std::collections::BTreeMap;
 use tokio::{pin, select};
-use tracing::{info, instrument, warn};
+use tracing::{info, warn};
 
-#[instrument(skip_all)]
 pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
     info!("starting controller");
 

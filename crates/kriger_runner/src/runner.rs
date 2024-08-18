@@ -46,10 +46,8 @@ pub trait RunnerCallback {
 }
 
 impl Runner {
-    #[instrument(skip_all, fields(idx))]
     pub(crate) async fn worker(
         self,
-        #[allow(unused_variables)] // This is used by tracing's `instrument` macro
         idx: usize,
         callback: impl RunnerCallback,
         token: CancellationToken,
@@ -63,7 +61,7 @@ impl Runner {
                 res = self.job_rx.recv() => {
                     // The channel has most likely been closed
                     let job = res.context("unable to receive job")?;
-                    if let Err(error) = self.handle_job(job, &callback).await {
+                    if let Err(error) = self.handle_job(idx, job, &callback).await {
                         error! {
                             ?error,
                             "unexpected job handling error"
@@ -76,11 +74,18 @@ impl Runner {
     }
 
     #[instrument(level = "debug", skip_all, fields(
+        worker = worker_idx,
         job.team_id = job.request.payload().team_id,
         job.ip_address = job.request.payload().ip_address,
         job.flag_hint = ?job.request.payload().flag_hint,
     ))]
-    async fn handle_job(&self, job: Job, callback: &impl RunnerCallback) -> Result<()> {
+    async fn handle_job(
+        &self,
+        #[allow(unused_variables)] // This is used by tracing's `instrument` macro
+        worker_idx: usize,
+        job: Job,
+        callback: &impl RunnerCallback,
+    ) -> Result<()> {
         job.request.progress().await.context("unable to ack")?;
         match self.execute(job.request.payload(), callback).await {
             Err(error) => {

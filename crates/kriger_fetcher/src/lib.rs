@@ -10,9 +10,8 @@ use kriger_common::messaging::{model, Bucket, Messaging};
 use kriger_common::runtime::AppRuntime;
 use tokio::time::MissedTickBehavior;
 use tokio::{select, time};
-use tracing::{info, instrument, warn};
+use tracing::{info, warn};
 
-#[instrument(skip_all)]
 pub async fn main(runtime: AppRuntime) -> Result<()> {
     info!("starting data fetcher");
 

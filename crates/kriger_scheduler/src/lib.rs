@@ -20,7 +20,6 @@ use tokio::time::{interval_at, MissedTickBehavior};
 use tokio::{pin, select};
 use tracing::{debug, error, info, instrument, warn};
 
-#[instrument(skip_all)]
 pub async fn main(runtime: AppRuntime) -> eyre::Result<()> {
     info!("starting scheduler");
 
