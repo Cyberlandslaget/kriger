@@ -360,7 +360,7 @@ async fn handle_hint_schedule(
     }
 
     for exploit in exploits.iter() {
-        if !exploit.manifest.enabled {
+        if !exploit.manifest.enabled || exploit.manifest.service != payload.service {
             continue;
         }
 
