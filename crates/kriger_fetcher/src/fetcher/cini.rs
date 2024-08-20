@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use color_eyre::eyre;
 use dashmap::DashMap;
 use futures::future::join_all;
-use kriger_common::messaging::model;
+use kriger_common::models;
 use kriger_common::runtime::AppRuntime;
 use serde::Deserialize;
 use serde_json::Value;
@@ -73,7 +73,7 @@ impl Fetcher for CiniFetcher {
     async fn run(
         &self,
         runtime: &AppRuntime,
-        services: &DashMap<String, model::Service>,
+        services: &DashMap<String, models::Service>,
     ) -> Result<(), FetcherError> {
         let mut tasks = Vec::new();
 

@@ -6,9 +6,8 @@ pub mod statisk;
 
 use async_trait::async_trait;
 use dashmap::DashMap;
-use kriger_common::messaging;
-use kriger_common::messaging::model;
 use kriger_common::runtime::AppRuntime;
+use kriger_common::{messaging, models};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -114,6 +113,6 @@ pub(crate) trait Fetcher: Send {
     async fn run(
         &self,
         runtime: &AppRuntime,
-        services: &DashMap<String, model::Service>,
+        services: &DashMap<String, models::Service>,
     ) -> Result<(), FetcherError>;
 }

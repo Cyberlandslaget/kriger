@@ -6,11 +6,12 @@ use crate::runner::{Job, Runner, RunnerCallback};
 use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine};
 use color_eyre::eyre::{bail, Context, ContextCompat, Result};
 use futures::StreamExt;
-use kriger_common::messaging::model::{CompetitionConfig, ExecutionRequest, FlagSubmission};
+use kriger_common::messaging::model::{ExecutionRequest, FlagSubmission};
 use kriger_common::messaging::nats::NatsMessaging;
 use kriger_common::messaging::{
     AckPolicy, Bucket, DeliverPolicy, Messaging, MessagingError, Stream,
 };
+use kriger_common::models;
 use kriger_common::runtime::create_shutdown_cancellation_token;
 use regex::Regex;
 use std::str;
@@ -63,7 +64,7 @@ pub async fn main(args: Config) -> Result<()> {
 
     // TODO: Provide a more elegant way to retrieve this and add support for live reload
     let competition_config = config_bucket
-        .get::<CompetitionConfig>("competition")
+        .get::<models::CompetitionConfig>("competition")
         .await
         .context("unable to retrieve the competition config")?
         .context("the competition config does not exist")?;

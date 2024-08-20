@@ -24,9 +24,9 @@ docker run --network kriger_default -e NATS_URL=nats://nats:4222 --rm -it natsio
 {
   "start": "2024-01-01T08:00:00Z",
   "tick": 5,
-  "tick_start": 0,
-  "flag_validity": 5,
-  "flag_format": "[A-Z0-9]{31}=",
+  "tickStart": 0,
+  "flagValidity": 5,
+  "flagFormat": "[A-Z0-9]{31}=",
   "submitter": {
     "type": "dummy",
     "interval": 1
@@ -38,7 +38,7 @@ docker run --network kriger_default -e NATS_URL=nats://nats:4222 --rm -it natsio
 ```
 
 ```bash
-nats kv put config competition '{"start": "2024-01-01T08:00:00Z", "tick": 5, "tick_start": 0, "flag_validity": 5, "flag_format": "[A-Z0-9]{31}=", "submitter": {"type": "dummy"}, "fetcher": {"type": "dummy"}}'
+nats kv put config competition '{"start": "2024-01-01T08:00:00Z", "tick": 5, "tickStart": 0, "flagValidity": 5, "flagFormat": "[A-Z0-9]{31}=", "submitter": {"type": "dummy", "interval": 1}, "fetcher": {"type": "dummy"}}'
 ```
 
 #### Scheduler Testing
@@ -47,13 +47,13 @@ Team:
 
 ```json
 {
-  "ip_address": "127.0.0.1",
+  "ipAddress": "127.0.0.1",
   "services": {}
 }
 ```
 
 ```bash
-nats kv put teams 1 '{"ip_address": "127.0.0.1", "services":{}}'
+nats kv put teams 1 '{"ipAddress": "127.0.0.1", "services":{}}'
 ```
 
 Service:
@@ -61,12 +61,12 @@ Service:
 ```json
 {
   "name": "service 1 Checker 1",
-  "has_hint": false
+  "hasHint": false
 }
 ```
 
 ```bash
-nats kv put services U2VydmljZSAxIENoZWNrZXIgMQ '{"name": "service 1 Checker 1", "has_hint": false}'
+nats kv put services U2VydmljZSAxIENoZWNrZXIgMQ '{"name": "service 1 Checker 1", "hasHint": false}'
 ```
 
 #### Controller Testing
@@ -79,8 +79,8 @@ nats kv put services U2VydmljZSAxIENoZWNrZXIgMQ '{"name": "service 1 Checker 1",
     "replicas": 4,
     "enabled": true,
     "resources": {
-      "cpu_limit": "1",
-      "mem_limit": "512M"
+      "cpuLimit": "1",
+      "memLimit": "512M"
     }
   },
   "image": "r.o99.no/kriger-exploits/test"
@@ -88,7 +88,7 @@ nats kv put services U2VydmljZSAxIENoZWNrZXIgMQ '{"name": "service 1 Checker 1",
 ```
 
 ```bash
-nats kv put exploits test '{"manifest":{"name":"test","service":"Service 1 Checker 1","replicas":4,"enabled":true,"resources":{"cpu_limit":"1","mem_limit":"512M"}},"image":"r.o99.no/kriger-exploits/test"}'
+nats kv put exploits test '{"manifest":{"name":"test","service":"Service 1 Checker 1","replicas":4,"enabled":true,"resources":{"cpuLimit":"1","memLimit":"512M"}},"image":"r.o99.no/kriger-exploits/test"}'
 ```
 
 ### Submitter Testing

@@ -6,7 +6,7 @@ use console::style;
 use futures::stream::select_all;
 use futures::StreamExt;
 use indicatif::ProgressBar;
-use kriger_common::messaging::model::Exploit;
+use kriger_common::models;
 use reqwest::{Method, StatusCode};
 use std::process::Stdio;
 use std::time::Duration;
@@ -82,7 +82,7 @@ async fn build_image(progress: &ProgressBar, tag: &str) -> Result<bool> {
     Ok(true)
 }
 
-async fn update_exploit(exploit: &Exploit, rest_url: &str) -> Result<()> {
+async fn update_exploit(exploit: &models::Exploit, rest_url: &str) -> Result<()> {
     let client = reqwest::Client::new();
     let response = client
         .request(
@@ -181,7 +181,7 @@ pub(crate) async fn main(args: args::Deploy) -> Result<()> {
     progress.set_message(format!("{} Deploying exploit...", emoji::ROCKET));
 
     let update_res = update_exploit(
-        &Exploit {
+        &models::Exploit {
             manifest: manifest.exploit,
             image: tag,
         },

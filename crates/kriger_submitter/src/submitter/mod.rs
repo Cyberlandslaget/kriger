@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use kriger_common::messaging::model::FlagSubmissionStatus;
+use kriger_common::models;
 use serde::Deserialize;
 use std::collections::HashMap;
 use thiserror::Error;
@@ -20,7 +20,7 @@ pub(crate) trait Submitter {
     async fn submit(
         &self,
         flags: &[&str],
-    ) -> Result<HashMap<String, FlagSubmissionStatus>, SubmitError>;
+    ) -> Result<HashMap<String, models::FlagSubmissionStatus>, SubmitError>;
 }
 
 #[derive(Deserialize, Debug)]

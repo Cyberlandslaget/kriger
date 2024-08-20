@@ -1,6 +1,6 @@
 use super::{FormatErrorKind, SubmitError, Submitter};
 use async_trait::async_trait;
-use kriger_common::messaging::model::FlagSubmissionStatus;
+use kriger_common::models;
 use std::collections::HashMap;
 use std::ops::DerefMut;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufStream};
@@ -19,7 +19,7 @@ impl Submitter for FaustSubmitter {
     async fn submit(
         &self,
         flags: &[&str],
-    ) -> Result<HashMap<String, FlagSubmissionStatus>, SubmitError> {
+    ) -> Result<HashMap<String, models::FlagSubmissionStatus>, SubmitError> {
         let mut stream_ref = self.stream.write().await;
 
         // TODO: Improve this mess?
@@ -71,7 +71,7 @@ impl FaustSubmitter {
 async fn submit_internal(
     stream: &mut BufStream<TcpStream>,
     flags: &[&str],
-) -> Result<HashMap<String, FlagSubmissionStatus>, SubmitError> {
+) -> Result<HashMap<String, models::FlagSubmissionStatus>, SubmitError> {
     for &flag in flags {
         // - To submit a flag, the client MUST send the flag followed by a single newline.
         // - During a single connection, the client MAY submit an arbitrary number of flags.
@@ -112,7 +112,7 @@ async fn submit_internal(
             .ok_or_else(|| SubmitError::FormatError(FormatErrorKind::MissingField("code")))?;
 
         let status = map_status_code(code);
-        if let FlagSubmissionStatus::Unknown = status {
+        if let models::FlagSubmissionStatus::Unknown = status {
             warn! {
                 code,
                 flag,
@@ -126,14 +126,14 @@ async fn submit_internal(
     Ok(map)
 }
 
-fn map_status_code(code: &str) -> FlagSubmissionStatus {
+fn map_status_code(code: &str) -> models::FlagSubmissionStatus {
     match code {
-        "OK" => FlagSubmissionStatus::Ok,
-        "DUP" => FlagSubmissionStatus::Duplicate,
-        "OWN" => FlagSubmissionStatus::Own,
-        "OLD" => FlagSubmissionStatus::Old,
-        "INV" => FlagSubmissionStatus::Invalid,
-        "ERR" => FlagSubmissionStatus::Error,
-        _ => FlagSubmissionStatus::Unknown,
+        "OK" => models::FlagSubmissionStatus::Ok,
+        "DUP" => models::FlagSubmissionStatus::Duplicate,
+        "OWN" => models::FlagSubmissionStatus::Own,
+        "OLD" => models::FlagSubmissionStatus::Old,
+        "INV" => models::FlagSubmissionStatus::Invalid,
+        "ERR" => models::FlagSubmissionStatus::Error,
+        _ => models::FlagSubmissionStatus::Unknown,
     }
 }

@@ -1,7 +1,7 @@
 use crate::fetcher::{Fetcher, FetcherError};
 use async_trait::async_trait;
 use dashmap::DashMap;
-use kriger_common::messaging::model::Service;
+use kriger_common::models;
 use kriger_common::runtime::AppRuntime;
 
 pub(crate) struct DummyFetcher;
@@ -11,7 +11,7 @@ impl Fetcher for DummyFetcher {
     async fn run(
         &self,
         _runtime: &AppRuntime,
-        _services: &DashMap<String, Service>,
+        _services: &DashMap<String, models::Service>,
     ) -> Result<(), FetcherError> {
         Ok(())
     }

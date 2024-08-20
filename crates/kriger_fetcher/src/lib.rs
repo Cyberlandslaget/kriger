@@ -5,8 +5,8 @@ mod fetcher;
 
 use crate::fetcher::FetcherConfig;
 use color_eyre::eyre::{Context, ContextCompat, Result};
-use kriger_common::messaging::model::CompetitionConfig;
-use kriger_common::messaging::{model, Bucket, Messaging};
+use kriger_common::messaging::{Bucket, Messaging};
+use kriger_common::models;
 use kriger_common::runtime::AppRuntime;
 use tokio::time::MissedTickBehavior;
 use tokio::{select, time};
@@ -23,7 +23,7 @@ pub async fn main(runtime: AppRuntime) -> Result<()> {
 
     // TODO: Provide a more elegant way to retrieve this and add support for live reload
     let competition_config = config_bucket
-        .get::<CompetitionConfig>("competition")
+        .get::<models::CompetitionConfig>("competition")
         .await
         .context("unable to retrieve the competition config")?
         .context("the competition config does not exist")?;
@@ -38,7 +38,7 @@ pub async fn main(runtime: AppRuntime) -> Result<()> {
         .context("unable to retrieve the services bucket")?;
 
     let services = services_bucket
-        .subscribe_all::<model::Service>()
+        .subscribe_all::<models::Service>()
         .await
         .context("unable to subscribe to services")?;
 

@@ -9,10 +9,9 @@ use color_eyre::eyre;
 use color_eyre::eyre::{Context, ContextCompat};
 use futures::future::join_all;
 use futures::StreamExt;
-use kriger_common::messaging::model::{
-    CompetitionConfig, FlagSubmission, FlagSubmissionResult, FlagSubmissionStatus,
-};
+use kriger_common::messaging::model::{FlagSubmission, FlagSubmissionResult};
 use kriger_common::messaging::{AckPolicy, Bucket, DeliverPolicy, Message, Messaging};
+use kriger_common::models;
 use kriger_common::runtime::AppRuntime;
 use std::time::Duration;
 use tokio::select;
@@ -30,7 +29,7 @@ pub async fn main(runtime: AppRuntime) -> eyre::Result<()> {
 
     // TODO: Provide a more elegant way to retrieve this and add support for live reload
     let competition_config = config_bucket
-        .get::<CompetitionConfig>("competition")
+        .get::<models::CompetitionConfig>("competition")
         .await
         .context("unable to retrieve the competition config")?
         .context("the competition config does not exist")?;
@@ -155,7 +154,7 @@ async fn handle_submit(
 ))]
 async fn handle_result(
     flags_bucket: &impl Bucket,
-    maybe_status: Option<FlagSubmissionStatus>,
+    maybe_status: Option<models::FlagSubmissionStatus>,
     message: impl Message<Payload = FlagSubmission>,
 ) {
     let payload = message.payload();

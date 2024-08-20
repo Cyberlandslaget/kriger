@@ -1,3 +1,4 @@
+use super::{Fetcher, FetcherError};
 use async_trait::async_trait;
 use base64::engine::general_purpose::STANDARD_NO_PAD;
 use base64::Engine;
@@ -5,12 +6,11 @@ use dashmap::DashMap;
 use futures::future::join_all;
 use kriger_common::messaging::model::FlagHint;
 use kriger_common::messaging::{Bucket, Messaging, MessagingError};
+use kriger_common::models;
 use kriger_common::runtime::AppRuntime;
 use serde::{self, Deserialize};
 use std::collections::HashMap;
 use tracing::{debug, error, instrument};
-
-use super::{Fetcher, FetcherError};
 
 #[derive(Deserialize, Debug)]
 pub struct AttackInfo {
@@ -99,7 +99,7 @@ impl Fetcher for FaustFetcher {
     async fn run(
         &self,
         runtime: &AppRuntime,
-        _services: &DashMap<String, kriger_common::messaging::model::Service>,
+        _services: &DashMap<String, models::Service>,
     ) -> Result<(), FetcherError> {
         let hints_bucket = runtime.messaging.data_hints().await?;
         let info = self.get_attack_into().await?;

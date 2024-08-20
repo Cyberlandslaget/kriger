@@ -10,8 +10,8 @@ use k8s_openapi::api::core::v1::{
 };
 use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta};
-use kriger_common::messaging::model::Exploit;
 use kriger_common::messaging::{AckPolicy, Bucket, DeliverPolicy, Message, Messaging};
+use kriger_common::models;
 use kriger_common::runtime::AppRuntime;
 use kube::api::{Patch, PatchParams};
 use kube::{Api, Client};
@@ -43,7 +43,7 @@ pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
     // Technically, we can use a durable consumer here, but this approach allows us to quickly fix
     // provisioning issue with the underlying orchestration platform.
     let exploits_stream = exploits
-        .watch_key::<Exploit>(
+        .watch_key::<models::Exploit>(
             "*",
             None,
             AckPolicy::Explicit,
@@ -86,7 +86,7 @@ pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
 
 async fn handle_message(
     deployments: &Api<Deployment>,
-    message: impl Message<Payload = Exploit>,
+    message: impl Message<Payload = models::Exploit>,
     config: &Config,
 ) -> Result<()> {
     let exploit = message.payload();
@@ -109,7 +109,7 @@ async fn handle_message(
 
 async fn reconcile(
     deployments: &Api<Deployment>,
-    exploit: &Exploit,
+    exploit: &models::Exploit,
     config: &Config,
 ) -> Result<()> {
     let mut labels = BTreeMap::<String, String>::new();

@@ -1,6 +1,6 @@
 use crate::submitter::{FormatErrorKind, SubmitError, Submitter};
 use async_trait::async_trait;
-use kriger_common::messaging::model::FlagSubmissionStatus;
+use kriger_common::models;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::time::Duration;
@@ -18,7 +18,7 @@ impl Submitter for CiniSubmitter {
     async fn submit(
         &self,
         flags: &[&str],
-    ) -> Result<HashMap<String, FlagSubmissionStatus>, SubmitError> {
+    ) -> Result<HashMap<String, models::FlagSubmissionStatus>, SubmitError> {
         debug! {
             flags = ?flags,
             "submitting flags"
@@ -54,14 +54,14 @@ impl Submitter for CiniSubmitter {
                 (
                     flag.flag,
                     match flag.status {
-                        FlagResponseStatus::Accepted => FlagSubmissionStatus::Ok,
+                        FlagResponseStatus::Accepted => models::FlagSubmissionStatus::Ok,
                         FlagResponseStatus::Denied => match flag.msg.split_once(' ') {
-                            None => FlagSubmissionStatus::Unknown,
+                            None => models::FlagSubmissionStatus::Unknown,
                             Some((_, msg)) => map_response_message(&msg.to_lowercase()),
                         },
-                        FlagResponseStatus::Resubmit => FlagSubmissionStatus::Resubmit,
-                        FlagResponseStatus::Error => FlagSubmissionStatus::Error,
-                        FlagResponseStatus::Unknown => FlagSubmissionStatus::Unknown,
+                        FlagResponseStatus::Resubmit => models::FlagSubmissionStatus::Resubmit,
+                        FlagResponseStatus::Error => models::FlagSubmissionStatus::Error,
+                        FlagResponseStatus::Unknown => models::FlagSubmissionStatus::Unknown,
                     },
                 )
             })
@@ -104,23 +104,23 @@ enum FlagResponseStatus {
     Unknown,
 }
 
-fn map_response_message(msg: &str) -> FlagSubmissionStatus {
+fn map_response_message(msg: &str) -> models::FlagSubmissionStatus {
     if msg.contains("invalid") {
-        return FlagSubmissionStatus::Invalid;
+        return models::FlagSubmissionStatus::Invalid;
     }
     if msg.contains("nop") {
-        return FlagSubmissionStatus::Nop;
+        return models::FlagSubmissionStatus::Nop;
     }
     if msg.contains("own") {
-        return FlagSubmissionStatus::Own;
+        return models::FlagSubmissionStatus::Own;
     }
     if msg.contains("old") {
-        return FlagSubmissionStatus::Old;
+        return models::FlagSubmissionStatus::Old;
     }
     if msg.contains("already claimed") {
-        return FlagSubmissionStatus::Duplicate;
+        return models::FlagSubmissionStatus::Duplicate;
     }
 
     warn!("unknown response message: {msg}");
-    FlagSubmissionStatus::Unknown
+    models::FlagSubmissionStatus::Unknown
 }

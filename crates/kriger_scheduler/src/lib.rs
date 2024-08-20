@@ -7,12 +7,10 @@ use color_eyre::eyre;
 use color_eyre::eyre::{Context, ContextCompat};
 use dashmap::DashMap;
 use futures::StreamExt;
-use kriger_common::messaging;
-use kriger_common::messaging::model::{
-    CompetitionConfig, ExecutionRequest, Exploit, FlagHint, SchedulingTick, Service, Team,
-};
+use kriger_common::messaging::model::{ExecutionRequest, FlagHint, SchedulingTick};
 use kriger_common::messaging::{AckPolicy, Bucket, DeliverPolicy, Message, Messaging};
 use kriger_common::runtime::AppRuntime;
+use kriger_common::{messaging, models};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::task::JoinSet;
@@ -53,19 +51,19 @@ pub async fn main(runtime: AppRuntime) -> eyre::Result<()> {
     debug!("retrieving the competition config");
     // TODO: Provide a more elegant way to retrieve this and add support for live reload
     let config = config_bucket
-        .get::<CompetitionConfig>("competition")
+        .get::<models::CompetitionConfig>("competition")
         .await
         .context("unable to retrieve the competition config")?
         .context("the competition config does not exist")?;
 
     debug!("subscribing to streams");
     let exploits = exploits_bucket
-        .subscribe_all::<Exploit>()
+        .subscribe_all::<models::Exploit>()
         .await
         .context("unable to subscribe to exploits")?;
 
     let services = services_bucket
-        .subscribe_all::<Service>()
+        .subscribe_all::<models::Service>()
         .await
         .context("unable to subscribe to exploits")?;
 
@@ -73,7 +71,7 @@ pub async fn main(runtime: AppRuntime) -> eyre::Result<()> {
     // There may be dozens or hundreds of teams, `subscribe_all` will continuously stream updates
     // and propagate the updates to a thread-safe map.
     let teams = teams_bucket
-        .subscribe_all::<Team>()
+        .subscribe_all::<models::Team>()
         .await
         .context("unable to subscribe to teams")?;
 
@@ -100,11 +98,11 @@ pub async fn main(runtime: AppRuntime) -> eyre::Result<()> {
 }
 
 async fn handle_scheduling(
-    config: CompetitionConfig,
+    config: models::CompetitionConfig,
     runtime: AppRuntime,
-    exploits: Arc<DashMap<String, Exploit>>,
-    services: Arc<DashMap<String, Service>>,
-    teams: Arc<DashMap<String, Team>>,
+    exploits: Arc<DashMap<String, models::Exploit>>,
+    services: Arc<DashMap<String, models::Service>>,
+    teams: Arc<DashMap<String, models::Team>>,
 ) -> eyre::Result<()> {
     info!(
         "start: {:?} (d = {}), tick duration: {} s",
@@ -161,9 +159,9 @@ async fn handle_scheduling(
 async fn handle_tick(
     tick: i64,
     runtime: &AppRuntime,
-    exploits: &DashMap<String, Exploit>,
-    services: &DashMap<String, Service>,
-    teams: &DashMap<String, Team>,
+    exploits: &DashMap<String, models::Exploit>,
+    services: &DashMap<String, models::Service>,
+    teams: &DashMap<String, models::Team>,
 ) {
     info!("ticking");
     let res = runtime
@@ -267,8 +265,8 @@ async fn handle_tick(
 async fn handle_hint_scheduling(
     runtime: AppRuntime,
     data_hints_bucket: impl Bucket,
-    exploits: Arc<DashMap<String, Exploit>>,
-    teams: Arc<DashMap<String, Team>>,
+    exploits: Arc<DashMap<String, models::Exploit>>,
+    teams: Arc<DashMap<String, models::Team>>,
 ) -> eyre::Result<()> {
     let data_hints = data_hints_bucket
         .watch_all::<FlagHint>(
@@ -333,8 +331,8 @@ async fn handle_hint_scheduling(
 ]
 async fn handle_hint_schedule(
     runtime: &AppRuntime,
-    teams: &DashMap<String, Team>,
-    exploits: &DashMap<String, Exploit>,
+    teams: &DashMap<String, models::Team>,
+    exploits: &DashMap<String, models::Exploit>,
     message: &impl messaging::Message<Payload = FlagHint>,
 ) -> eyre::Result<()> {
     message.progress().await?;
