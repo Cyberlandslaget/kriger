@@ -5,7 +5,7 @@ pub(crate) mod args;
 pub(crate) mod create;
 pub(crate) mod deploy;
 mod emoji;
-mod model;
+mod models;
 
 fn log(p: &ProgressBar, message: String) {
     p.suspend(|| {

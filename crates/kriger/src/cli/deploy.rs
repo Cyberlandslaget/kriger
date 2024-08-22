@@ -1,4 +1,4 @@
-use crate::cli::model::ExploitManifest;
+use crate::cli;
 use crate::cli::{args, emoji, format_duration_secs, log};
 use color_eyre::eyre::{bail, Context, ContextCompat};
 use color_eyre::Result;
@@ -17,7 +17,7 @@ use tokio::time::Instant;
 use tokio_stream::wrappers::LinesStream;
 use tracing::debug;
 
-async fn read_exploit_manifest() -> Result<ExploitManifest> {
+async fn read_exploit_manifest() -> Result<cli::models::ExploitManifest> {
     let raw = fs::read("exploit.toml").await?;
     let toml = std::str::from_utf8(&raw)?;
 
@@ -105,7 +105,8 @@ async fn update_exploit(exploit: &models::Exploit, rest_url: &str) -> Result<()>
 }
 
 pub(crate) async fn main(args: args::Deploy) -> Result<()> {
-    let manifest = match read_exploit_manifest().await {
+    // TODO: Honor the existing image in the CLI manifest
+    let cli_manifest = match read_exploit_manifest().await {
         Ok(manifest) => manifest,
         Err(err) => {
             eprintln!(
@@ -119,17 +120,21 @@ pub(crate) async fn main(args: args::Deploy) -> Result<()> {
             return Ok(());
         }
     };
+
+    // Convert the CLI manifest format to the common model format
+    let manifest: models::ExploitManifest = cli_manifest.exploit.into();
+
     println!(
         "  {} Preparing to deploy {}",
         emoji::ROCKET,
-        style(&manifest.exploit.name).green().bold()
+        style(&manifest.name).green().bold()
     );
 
     let date = chrono::Utc::now();
     let tag_version = format!("{}", date.timestamp());
     let tag = format!(
         "{}/kriger-exploits/{}:{}",
-        &args.registry, &manifest.exploit.name, tag_version
+        &args.registry, &manifest.name, tag_version
     );
 
     let progress = ProgressBar::new_spinner();
@@ -137,7 +142,7 @@ pub(crate) async fn main(args: args::Deploy) -> Result<()> {
     progress.set_message(format!(
         "{} Building {}...",
         emoji::HAMMER,
-        style(&manifest.exploit.name).green().bold()
+        style(&manifest.name).green().bold()
     ));
 
     // TODO: Set up a buildx instance first
@@ -182,7 +187,7 @@ pub(crate) async fn main(args: args::Deploy) -> Result<()> {
 
     let update_res = update_exploit(
         &models::Exploit {
-            manifest: manifest.exploit,
+            manifest,
             image: tag,
         },
         &args.rest_url,
