@@ -131,6 +131,7 @@ export class SchedulingStartMessageWrapper implements SchedulingStartMessage {
     return this.#raw.d.i;
   }
 }
+
 export class FlagSubmissionMessageWrapper implements FlagSubmissionMessage {
   #raw: RawFlagSubmissionMessage;
 
@@ -235,19 +236,19 @@ export type APIResponse<T> = APISuccessResponse<T> | APIErrorResponse;
 export type CompetitionConfig = {
   start: string;
   tick: number;
-  tick_start: number;
-  flag_validity: number;
-  flag_format: string;
+  tickStart: number;
+  flagValidity: number;
+  flagFormat: string;
 };
 
 export type Service = {
   name: string;
-  has_hint: boolean;
+  hasHint: boolean;
 };
 
 export type Team = {
   name: string | null;
-  ip_address: string | null;
+  ipAddress: string | null;
   services: Record<string, string>;
 };
 
@@ -266,9 +267,9 @@ export type ExploitManifest = {
 };
 
 export type ExploitResources = {
-  cpu_request: string | null;
-  mem_request: string | null;
-  cpu_limit: string;
-  mem_limit: string;
+  cpuRequest: string | null;
+  memRequest: string | null;
+  cpuLimit: string;
+  memLimit: string;
   timeout: number;
 };

@@ -39,7 +39,7 @@ export const useWebSocketProvider = (url: string) => {
           // and hope that old data gets purged once the currentTick state is updated
           const oldest =
             new Date(competitionConfig.start).getTime() +
-            (currentTick - competitionConfig.flag_validity + 1) *
+            (currentTick - competitionConfig.flagValidity + 1) *
               competitionConfig.tick *
               1000;
           if (event.published < oldest) {
@@ -63,7 +63,7 @@ export const useWebSocketProvider = (url: string) => {
 
     const oldest =
       new Date(competitionConfig.start).getTime() +
-      (currentTick - competitionConfig.flag_validity + 1) *
+      (currentTick - competitionConfig.flagValidity + 1) *
         competitionConfig.tick *
         1000;
     flagPurgeDispatch(oldest);
@@ -83,7 +83,7 @@ export const useWebSocketProvider = (url: string) => {
       url,
       () =>
         Date.now() -
-        competitionConfig.tick * (competitionConfig.flag_validity + 1) * 1000,
+        competitionConfig.tick * (competitionConfig.flagValidity + 1) * 1000,
       (message) => {
         handleMessageRef.current?.(message);
       },
