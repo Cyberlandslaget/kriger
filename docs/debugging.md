@@ -18,29 +18,6 @@ docker run --network kriger_default -e NATS_URL=nats://nats:4222 --rm -it natsio
 
 ### Sending Messages Manually
 
-#### Competition Config
-
-```json
-{
-  "start": "2024-01-01T08:00:00Z",
-  "tick": 5,
-  "tickStart": 0,
-  "flagValidity": 5,
-  "flagFormat": "[A-Z0-9]{31}=",
-  "submitter": {
-    "type": "dummy",
-    "interval": 1
-  },
-  "fetcher": {
-    "type": "dummy"
-  }
-}
-```
-
-```bash
-nats kv put config competition '{"start": "2024-01-01T08:00:00Z", "tick": 5, "tickStart": 0, "flagValidity": 5, "flagFormat": "[A-Z0-9]{31}=", "submitter": {"type": "dummy", "interval": 1}, "fetcher": {"type": "dummy"}}'
-```
-
 #### Scheduler Testing
 
 Team:

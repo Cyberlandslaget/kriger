@@ -1,7 +1,7 @@
-pub mod config;
+pub mod args;
 mod runner;
 
-use crate::config::Config;
+use crate::args::Args;
 use crate::runner::{Job, Runner, RunnerCallback};
 use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine};
 use color_eyre::eyre::{bail, Context, ContextCompat, Result};
@@ -11,8 +11,7 @@ use kriger_common::messaging::nats::NatsMessaging;
 use kriger_common::messaging::{
     AckPolicy, Bucket, DeliverPolicy, Messaging, MessagingError, Stream,
 };
-use kriger_common::models;
-use kriger_common::runtime::create_shutdown_cancellation_token;
+use kriger_common::server::runtime::create_shutdown_cancellation_token;
 use regex::Regex;
 use std::str;
 use std::sync::Arc;
@@ -52,24 +51,13 @@ impl<T: Bucket> RunnerCallback for RunnerCallbackImpl<T> {
     }
 }
 
-pub async fn main(args: Config) -> Result<()> {
+pub async fn main(args: Args) -> Result<()> {
     info!("initializing messaging");
     let messaging = NatsMessaging::new(&args.nats_url).await?;
     let cancellation_token = create_shutdown_cancellation_token();
 
-    let config_bucket = messaging
-        .config()
-        .await
-        .context("unable to retrieve the config bucket")?;
-
-    // TODO: Provide a more elegant way to retrieve this and add support for live reload
-    let competition_config = config_bucket
-        .get::<models::CompetitionConfig>("competition")
-        .await
-        .context("unable to retrieve the competition config")?
-        .context("the competition config does not exist")?;
-    let flag_format = Regex::new(&competition_config.flag_format)
-        .context("unable to parse the flag format regex")?;
+    let flag_format =
+        Regex::new(&args.flag_format).context("unable to parse the flag format regex")?;
 
     info!("using the flag format: `{flag_format}`");
     info!(

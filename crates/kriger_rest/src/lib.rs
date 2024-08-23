@@ -9,7 +9,7 @@ use axum::routing::get;
 use axum::{routing::put, Router};
 use color_eyre::eyre;
 use color_eyre::eyre::Context;
-use kriger_common::runtime::AppRuntime;
+use kriger_common::server::runtime::AppRuntime;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::net::TcpListener;
 use tower_http::cors;
@@ -50,10 +50,7 @@ pub async fn main(runtime: AppRuntime, config: Config) -> eyre::Result<()> {
             get(routes::competition::get_services),
         )
         .route("/competition/teams", get(routes::competition::get_teams))
-        .route(
-            "/config/competition",
-            get(routes::config::get_competition_config),
-        )
+        .route("/config/server", get(routes::config::get_server_config))
         .layer(TraceLayer::new_for_http())
         .layer(cors::CorsLayer::new().allow_origin(origins))
         .with_state(Arc::new(state));

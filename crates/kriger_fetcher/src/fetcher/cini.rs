@@ -4,7 +4,7 @@ use color_eyre::eyre;
 use dashmap::DashMap;
 use futures::future::join_all;
 use kriger_common::models;
-use kriger_common::runtime::AppRuntime;
+use kriger_common::server::runtime::AppRuntime;
 use serde::Deserialize;
 use serde_json::Value;
 use std::collections::HashMap;

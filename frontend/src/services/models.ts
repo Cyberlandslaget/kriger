@@ -233,6 +233,10 @@ export type APIErrorResponse = {
 
 export type APIResponse<T> = APISuccessResponse<T> | APIErrorResponse;
 
+export type ServerConfig = {
+  competition: CompetitionConfig;
+};
+
 export type CompetitionConfig = {
   start: string;
   tick: number;

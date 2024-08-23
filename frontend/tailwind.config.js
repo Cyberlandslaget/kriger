@@ -5,21 +5,21 @@ export default {
     extend: {
       colors: {
         "primary-bg": "#0f192e",
-        "red": {
+        red: {
           light: "#e8d7d7",
           DEFAULT: "#e78284",
-          dark: "#7b2021"
+          dark: "#7b2021",
         },
-        "green": {
+        green: {
           light: "#dfe7db",
           DEFAULT: "#a6d189",
-          dark: "#2d550f"
+          dark: "#2d550f",
         },
-        "yellow": {
+        yellow: {
           light: "#eae6df",
           DEFAULT: "#edda9b",
-          dark: "#83611d"
-        }
+          dark: "#83611d",
+        },
       },
     },
   },

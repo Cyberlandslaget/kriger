@@ -397,11 +397,6 @@ impl messaging::Stream for NatsStream {
 }
 
 impl Messaging for NatsMessaging {
-    async fn config(&self) -> Result<impl Bucket, MessagingError> {
-        let store = self.context.get_key_value("config").await?;
-        Ok(NatsBucket { store })
-    }
-
     async fn exploits(&self) -> Result<impl Bucket, MessagingError> {
         let store = self.context.get_key_value("exploits").await?;
         Ok(NatsBucket { store })

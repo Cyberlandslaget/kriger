@@ -3,7 +3,7 @@ import { CONFIG } from "../utils/constants";
 import type {
   APIErrorResponse,
   APISuccessResponse,
-  CompetitionConfig,
+  ServerConfig,
   Service,
   Team,
 } from "./models";
@@ -33,9 +33,9 @@ const fetcher = async <T>(path: string): Promise<APISuccessResponse<T>> => {
   }
 };
 
-export const useCompetitionConfig = () =>
-  useSWR<APISuccessResponse<CompetitionConfig>, APIErrorResponse>(
-    "/config/competition",
+export const useServerConfig = () =>
+  useSWR<APISuccessResponse<ServerConfig>, APIErrorResponse>(
+    "/config/server",
     fetcher,
   );
 

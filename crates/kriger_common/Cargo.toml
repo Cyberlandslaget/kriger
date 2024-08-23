@@ -4,6 +4,9 @@ version = "0.0.1"
 edition = "2021"
 
 [features]
+default = ["server", "client"]
+server = ["dep:toml"]
+client = []
 
 [dependencies]
 async-nats.workspace = true
@@ -18,6 +21,7 @@ thiserror.workspace = true
 time.workspace = true
 tokio = { workspace = true, features = ["signal"] }
 tokio-util.workspace = true
+toml = { workspace = true, optional = true }
 tracing.workspace = true
 serde.workspace = true
 serde_repr.workspace = true

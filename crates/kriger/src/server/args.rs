@@ -1,3 +1,4 @@
+use clap::ValueHint;
 use clap_derive::{Args, Parser};
 
 /// An exploit farm for attack/defense CTFs
@@ -8,7 +9,7 @@ pub(crate) struct Args {
     pub components: Components,
 
     #[command(flatten, next_help_heading = "Common configuration options")]
-    pub common: kriger_common::config::Config,
+    pub common: kriger_common::server::args::RuntimeArgs,
 
     #[cfg(feature = "controller")]
     #[command(flatten, next_help_heading = "Controller configuration options")]
@@ -25,6 +26,10 @@ pub(crate) struct Args {
     #[cfg(feature = "ws")]
     #[command(flatten, next_help_heading = "WebSocket server configuration options")]
     pub ws: kriger_ws::config::Config,
+
+    /// The server configuration file. Accepted file format: TOML.
+    #[arg(env, value_hint = ValueHint::FilePath)]
+    pub config_file: String,
 }
 
 /// Components

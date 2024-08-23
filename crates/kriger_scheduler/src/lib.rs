@@ -9,7 +9,7 @@ use dashmap::DashMap;
 use futures::StreamExt;
 use kriger_common::messaging::model::{ExecutionRequest, FlagHint, SchedulingTick};
 use kriger_common::messaging::{AckPolicy, Bucket, DeliverPolicy, Message, Messaging};
-use kriger_common::runtime::AppRuntime;
+use kriger_common::server::runtime::AppRuntime;
 use kriger_common::{messaging, models};
 use std::sync::Arc;
 use std::time::Duration;
@@ -22,11 +22,6 @@ pub async fn main(runtime: AppRuntime) -> eyre::Result<()> {
     info!("starting scheduler");
 
     debug!("retrieving buckets");
-    let config_bucket = runtime
-        .messaging
-        .config()
-        .await
-        .context("unable to retrieve the config bucket")?;
     let exploits_bucket = runtime
         .messaging
         .exploits()
@@ -47,14 +42,6 @@ pub async fn main(runtime: AppRuntime) -> eyre::Result<()> {
         .data_hints()
         .await
         .context("unable to retrieve the data_hints bucket")?;
-
-    debug!("retrieving the competition config");
-    // TODO: Provide a more elegant way to retrieve this and add support for live reload
-    let config = config_bucket
-        .get::<models::CompetitionConfig>("competition")
-        .await
-        .context("unable to retrieve the competition config")?
-        .context("the competition config does not exist")?;
 
     debug!("subscribing to streams");
     let exploits = exploits_bucket
@@ -77,7 +64,6 @@ pub async fn main(runtime: AppRuntime) -> eyre::Result<()> {
 
     let mut set = JoinSet::new();
     set.spawn(handle_scheduling(
-        config.clone(),
         runtime.clone(),
         exploits.clone(),
         services,
@@ -98,18 +84,18 @@ pub async fn main(runtime: AppRuntime) -> eyre::Result<()> {
 }
 
 async fn handle_scheduling(
-    config: models::CompetitionConfig,
     runtime: AppRuntime,
     exploits: Arc<DashMap<String, models::Exploit>>,
     services: Arc<DashMap<String, models::Service>>,
     teams: Arc<DashMap<String, models::Team>>,
 ) -> eyre::Result<()> {
+    let config = &runtime.config;
     info!(
         "start: {:?} (d = {}), tick duration: {} s",
-        &config.start, config.tick_start, config.tick
+        &config.competition.start, config.competition.tick_start, config.competition.tick
     );
 
-    let time_since_start = Utc::now().signed_duration_since(&config.start);
+    let time_since_start = Utc::now().signed_duration_since(&config.competition.start);
     if time_since_start > chrono::Duration::seconds(0) {
         info!(
             "the competition started {:} s ago",
@@ -123,8 +109,8 @@ async fn handle_scheduling(
     }
 
     // TODO: Perhaps add tick delay to ensure that we're not going "too fast" and to account for clock skews
-    let tick = Duration::from_secs(config.tick);
-    let instant = utils::get_instant_from_datetime(config.start).unwrap();
+    let tick = Duration::from_secs(config.competition.tick);
+    let instant = utils::get_instant_from_datetime(config.competition.start)?;
 
     let mut interval = interval_at(instant, tick);
     interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
@@ -141,7 +127,11 @@ async fn handle_scheduling(
                 return Ok(());
             }
         }
-        let tick = get_current_tick(config.start, Utc::now(), config.tick);
+        let tick = get_current_tick(
+            config.competition.start,
+            Utc::now(),
+            config.competition.tick,
+        );
 
         handle_tick(tick, &runtime, &exploits, &services, &teams).await;
     }

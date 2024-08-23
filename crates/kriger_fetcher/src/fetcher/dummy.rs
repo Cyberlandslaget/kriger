@@ -2,7 +2,7 @@ use crate::fetcher::{Fetcher, FetcherError};
 use async_trait::async_trait;
 use dashmap::DashMap;
 use kriger_common::models;
-use kriger_common::runtime::AppRuntime;
+use kriger_common::server::runtime::AppRuntime;
 
 pub(crate) struct DummyFetcher;
 

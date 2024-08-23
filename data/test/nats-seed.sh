@@ -1,20 +1,5 @@
 #!/usr/bin/env sh
 
-nats kv put config competition '{
-  "start": "2024-01-01T08:00:00Z",
-  "tick": 5,
-  "tickStart": 0,
-  "flagValidity": 5,
-  "flagFormat": "[A-Z0-9]{31}=",
-  "submitter": {
-    "type": "dummy",
-    "interval": 1
-  },
-  "fetcher": {
-    "type": "dummy"
-  }
-}'
-
 # TODO: Remove once the fetcher is functional
 nats kv put services U2VydmljZSAxIENoZWNrZXIgMQ '{"name": "Service 1 Checker 1", "hasHint": false}'
 

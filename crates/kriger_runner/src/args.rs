@@ -3,7 +3,7 @@ use clap_derive::Parser;
 #[derive(Parser, Debug)]
 #[command(version, about)]
 #[group(skip)]
-pub struct Config {
+pub struct Args {
     /// The URL to the NATS/JetStream server
     #[arg(env, long, default_value = "nats://127.0.0.1:4222")]
     pub nats_url: String,
@@ -15,6 +15,10 @@ pub struct Config {
     /// The name of the exploit that the runner will be responsible for
     #[arg(env, long)]
     pub exploit: String,
+
+    /// The flag format
+    #[arg(env, long)]
+    pub flag_format: String,
 
     /// The maximum amount of workers/executions to handle at any given time. If omitted, the default worker count will be 2*cpu.
     #[arg(env, long)]

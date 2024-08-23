@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useAtomValue } from "jotai";
-import { competitionConfigAtom, statusAtom } from "../utils/atoms";
+import { serverConfigAtom, statusAtom } from "../utils/atoms";
 import { useInterval } from "usehooks-ts";
 import { useMemo, useState } from "react";
 import clsx from "clsx";
@@ -15,21 +15,21 @@ const ROUTES = [
 
 function NavigationBar() {
   const status = useAtomValue(statusAtom);
-  const competitionConfig = useAtomValue(competitionConfigAtom);
+  const serverConfig = useAtomValue(serverConfigAtom);
 
   const startTime = useMemo(
     () =>
-      competitionConfig
-        ? new Date(competitionConfig.start).getTime()
+      serverConfig
+        ? new Date(serverConfig.competition.start).getTime()
         : undefined,
-    [competitionConfig],
+    [serverConfig],
   );
   const tickStart = useMemo(
     () =>
-      startTime && competitionConfig
-        ? startTime + status.currentTick * competitionConfig.tick * 1000
+      startTime && serverConfig
+        ? startTime + status.currentTick * serverConfig.competition.tick * 1000
         : undefined,
-    [startTime, status.currentTick, competitionConfig],
+    [startTime, status.currentTick, serverConfig],
   );
   const [currentTime, setCurrentTime] = useState<number | undefined>(tickStart);
 
@@ -37,17 +37,20 @@ function NavigationBar() {
   // Values greater than or equal to 1 represents ticks that are waiting for the server.
   const tickProgress = useMemo(
     () =>
-      currentTime && tickStart && competitionConfig
-        ? Math.max((currentTime - tickStart) / competitionConfig.tick / 1000, 0)
+      currentTime && tickStart && serverConfig
+        ? Math.max(
+            (currentTime - tickStart) / serverConfig.competition.tick / 1000,
+            0,
+          )
         : 0,
-    [currentTime, tickStart, competitionConfig],
+    [currentTime, tickStart, serverConfig],
   );
 
   const timeUntilNextTick = useMemo(() => {
-    return tickProgress && competitionConfig
-      ? (1 - tickProgress) * competitionConfig.tick
+    return tickProgress && serverConfig
+      ? (1 - tickProgress) * serverConfig.competition.tick
       : undefined;
-  }, [tickProgress, competitionConfig]);
+  }, [tickProgress, serverConfig]);
 
   // JavaScript timers are inaccurate by nature
   useInterval(() => {

@@ -1,6 +1,7 @@
 pub mod client;
-pub mod config;
+#[cfg(feature = "server")]
 pub mod messaging;
 pub mod models;
-pub mod runtime;
+#[cfg(feature = "server")]
+pub mod server;
 mod utils;

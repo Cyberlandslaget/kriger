@@ -1,0 +1,13 @@
+[competition]
+start = "2024-01-01T08:00:00Z"
+tick = 5
+tick_start = 0
+flag_validity = 5
+flag_format = "[A-Z0-9]{31}="
+
+[submitter]
+type = "dummy"
+interval = 1
+
+[fetcher]
+type = "dummy"

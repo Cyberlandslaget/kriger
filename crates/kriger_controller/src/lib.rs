@@ -12,7 +12,7 @@ use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta};
 use kriger_common::messaging::{AckPolicy, Bucket, DeliverPolicy, Message, Messaging};
 use kriger_common::models;
-use kriger_common::runtime::AppRuntime;
+use kriger_common::server::runtime::AppRuntime;
 use kube::api::{Patch, PatchParams};
 use kube::{Api, Client};
 use std::collections::BTreeMap;
@@ -62,7 +62,7 @@ pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
             res = exploits_stream.next() => {
                 match res {
                     Some(Ok(message)) => {
-                        if let Err(error) = handle_message(&deployments, message, &config).await {
+                        if let Err(error) = handle_message(&deployments, message, &runtime, &config).await {
                             warn! {
                                 ?error,
                                 "unable to handle message"
@@ -87,12 +87,13 @@ pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
 async fn handle_message(
     deployments: &Api<Deployment>,
     message: impl Message<Payload = models::Exploit>,
+    runtime: &AppRuntime,
     config: &Config,
 ) -> Result<()> {
     let exploit = message.payload();
     info!("reconciling exploit: {}", exploit.manifest.name);
     message.progress().await?;
-    match reconcile(&deployments, exploit, config).await {
+    match reconcile(&deployments, exploit, runtime, config).await {
         Ok(..) => {
             message.ack().await?;
         }
@@ -110,6 +111,7 @@ async fn handle_message(
 async fn reconcile(
     deployments: &Api<Deployment>,
     exploit: &models::Exploit,
+    runtime: &AppRuntime,
     config: &Config,
 ) -> Result<()> {
     let mut labels = BTreeMap::<String, String>::new();
@@ -124,6 +126,11 @@ async fn reconcile(
         EnvVar {
             name: "SERVICE".to_string(),
             value: Some(exploit.manifest.service.clone()),
+            ..Default::default()
+        },
+        EnvVar {
+            name: "FLAG_FORMAT".to_string(),
+            value: Some(runtime.config.competition.flag_format.clone()),
             ..Default::default()
         },
         EnvVar {

@@ -6,26 +6,6 @@ use std::collections::HashMap;
 pub mod requests;
 pub mod responses;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct CompetitionConfig {
-    /// The start time of the competition in UTC
-    pub start: chrono::DateTime<chrono::Utc>,
-    /// Tick/round length in seconds
-    pub tick: u64,
-    /// The start tick in ticks. This is usually 0.
-    pub tick_start: i32,
-    /// The validity of flags in rounds
-    pub flag_validity: u32,
-    /// The regular expression for the flag format
-    pub flag_format: String,
-    /// The submitter configuration. This will be dynamically checked by the submitter at runtime
-    /// to avoid having to model it in this crate.
-    pub submitter: serde_json::Value,
-    /// The fetcher configuration.
-    pub fetcher: serde_json::Value,
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Exploit {

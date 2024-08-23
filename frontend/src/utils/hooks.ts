@@ -3,28 +3,28 @@ import { WebSocketService } from "../services/webSocket";
 import type { WebSocketMessage } from "../services/models";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import {
-  competitionConfigAtom,
   currentTickAtom,
+  serverConfigAtom,
   servicesAtom,
   teamFlagPurgeDispatch,
   teamFlagSubmissionDispatch,
   teamsAtom,
 } from "./atoms";
 import {
-  useCompetitionConfig,
   useCompetitionServices,
   useCompetitionTeams,
+  useServerConfig,
 } from "../services/rest";
 
 export const useWebSocketProvider = (url: string) => {
   const [currentTick, setCurrentTick] = useAtom(currentTickAtom);
   const flagSubmissionDispatch = useSetAtom(teamFlagSubmissionDispatch);
   const flagPurgeDispatch = useSetAtom(teamFlagPurgeDispatch);
-  const competitionConfig = useAtomValue(competitionConfigAtom);
+  const serverConfig = useAtomValue(serverConfigAtom);
 
   const handleMessage = useCallback(
     (event: WebSocketMessage) => {
-      if (!competitionConfig) return;
+      if (!serverConfig) return;
 
       switch (event.type) {
         case "scheduling_start":
@@ -38,9 +38,9 @@ export const useWebSocketProvider = (url: string) => {
           // If the currentTick has not been updated yet, we'll consume the event
           // and hope that old data gets purged once the currentTick state is updated
           const oldest =
-            new Date(competitionConfig.start).getTime() +
-            (currentTick - competitionConfig.flagValidity + 1) *
-              competitionConfig.tick *
+            new Date(serverConfig.competition.start).getTime() +
+            (currentTick - serverConfig.competition.flagValidity + 1) *
+              serverConfig.competition.tick *
               1000;
           if (event.published < oldest) {
             break;
@@ -51,7 +51,7 @@ export const useWebSocketProvider = (url: string) => {
         }
       }
     },
-    [currentTick, competitionConfig, setCurrentTick, flagSubmissionDispatch],
+    [serverConfig, currentTick, setCurrentTick, flagSubmissionDispatch],
   );
 
   const handleMessageRef = useRef<typeof handleMessage>();
@@ -59,15 +59,15 @@ export const useWebSocketProvider = (url: string) => {
   // Peerform pruning reactively upon state changes instead of directly in the message handler
   // to avoid state inconsistency issues.
   useEffect(() => {
-    if (!competitionConfig || currentTick < 0) return;
+    if (!serverConfig || currentTick < 0) return;
 
     const oldest =
-      new Date(competitionConfig.start).getTime() +
-      (currentTick - competitionConfig.flagValidity + 1) *
-        competitionConfig.tick *
+      new Date(serverConfig.competition.start).getTime() +
+      (currentTick - serverConfig.competition.flagValidity + 1) *
+        serverConfig.competition.tick *
         1000;
     flagPurgeDispatch(oldest);
-  }, [currentTick, competitionConfig, flagPurgeDispatch]);
+  }, [currentTick, serverConfig, flagPurgeDispatch]);
 
   useEffect(() => {
     handleMessageRef.current = handleMessage;
@@ -76,31 +76,33 @@ export const useWebSocketProvider = (url: string) => {
   // We create a new WS connection when the competition config has been updated or first received.
   // Consumers are expected to handle websocket events idempotently.
   useEffect(() => {
-    if (!competitionConfig) return;
+    if (!serverConfig) return;
 
     // We add 1 to the flag validity here to account for the moving time window
     const service = new WebSocketService(
       url,
       () =>
         Date.now() -
-        competitionConfig.tick * (competitionConfig.flagValidity + 1) * 1000,
+        serverConfig.competition.tick *
+          (serverConfig.competition.flagValidity + 1) *
+          1000,
       (message) => {
         handleMessageRef.current?.(message);
       },
     );
     return () => service.close();
-  }, [url, competitionConfig]);
+  }, [url, serverConfig]);
 };
 
 export const useConfigProvider = () => {
-  const setCompetitionConfig = useSetAtom(competitionConfigAtom);
-  const { data } = useCompetitionConfig();
+  const setServerConfig = useSetAtom(serverConfigAtom);
+  const { data } = useServerConfig();
   useEffect(() => {
     if (!data) return;
 
     const { data: config } = data;
-    setCompetitionConfig(config);
-  }, [data, setCompetitionConfig]);
+    setServerConfig(config);
+  }, [data, setServerConfig]);
 };
 
 export const useCompetition = () => {

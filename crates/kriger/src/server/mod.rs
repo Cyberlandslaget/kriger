@@ -1,14 +1,23 @@
-use color_eyre::eyre::Result;
+use color_eyre::eyre;
 use kriger_common::messaging::nats::NatsMessaging;
-use kriger_common::runtime::{create_shutdown_cancellation_token, AppRuntime};
+use kriger_common::server::runtime::{create_shutdown_cancellation_token, AppConfig, AppRuntime};
+use std::path::Path;
 use std::sync::Arc;
 use tokio::task::JoinSet;
 use tracing::{info, instrument, warn};
 
 pub(crate) mod args;
 
+async fn read_app_config<P: AsRef<Path>>(path: P) -> eyre::Result<AppConfig> {
+    let content = tokio::fs::read_to_string(path).await?;
+    let config = toml::from_str(&content)?;
+    Ok(config)
+}
+
 #[instrument(skip_all)]
-pub(crate) async fn main(args: args::Args) -> Result<()> {
+pub(crate) async fn main(args: args::Args) -> eyre::Result<()> {
+    let app_config = read_app_config(args.config_file).await?;
+
     info!("initializing messaging");
     let messaging = NatsMessaging::new(&args.common.nats_url).await?;
 
@@ -18,7 +27,7 @@ pub(crate) async fn main(args: args::Args) -> Result<()> {
     let cancellation_token = create_shutdown_cancellation_token();
 
     let runtime = AppRuntime {
-        config: Arc::new(args.common),
+        config: Arc::new(app_config),
         messaging: Arc::new(messaging),
         cancellation_token,
     };

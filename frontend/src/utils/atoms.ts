@@ -1,17 +1,15 @@
 import { atom } from "jotai";
 import type {
-  CompetitionConfig,
   FlagSubmissionMessage,
   FlagSubmissionResultMessage,
+  ServerConfig,
   Service,
   Team,
 } from "../services/models";
 import type { ExploitType, TeamFlagMap } from "./types";
 import { FLAG_CODE } from "./enums";
 
-export const competitionConfigAtom = atom<CompetitionConfig | undefined>(
-  undefined,
-);
+export const serverConfigAtom = atom<ServerConfig | undefined>(undefined);
 
 export const statusAtom = atom({
   currentTick: -1,

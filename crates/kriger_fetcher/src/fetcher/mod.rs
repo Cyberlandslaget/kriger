@@ -6,7 +6,7 @@ pub mod statisk;
 
 use async_trait::async_trait;
 use dashmap::DashMap;
-use kriger_common::runtime::AppRuntime;
+use kriger_common::server::runtime::AppRuntime;
 use kriger_common::{messaging, models};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

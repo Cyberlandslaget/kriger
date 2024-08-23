@@ -6,13 +6,13 @@ use crate::utils::futures::PollPending;
 use base64::engine::general_purpose::STANDARD_NO_PAD;
 use base64::Engine;
 use color_eyre::eyre;
-use color_eyre::eyre::{Context, ContextCompat};
+use color_eyre::eyre::Context;
 use futures::future::join_all;
 use futures::StreamExt;
 use kriger_common::messaging::model::{FlagSubmission, FlagSubmissionResult};
 use kriger_common::messaging::{AckPolicy, Bucket, DeliverPolicy, Message, Messaging};
 use kriger_common::models;
-use kriger_common::runtime::AppRuntime;
+use kriger_common::server::runtime::AppRuntime;
 use std::time::Duration;
 use tokio::select;
 use tokio::time::{interval_at, Instant, MissedTickBehavior};
@@ -20,19 +20,6 @@ use tracing::{debug, error, info, instrument, warn};
 
 pub async fn main(runtime: AppRuntime) -> eyre::Result<()> {
     info!("starting submitter");
-
-    let config_bucket = runtime
-        .messaging
-        .config()
-        .await
-        .context("unable to retrieve the config bucket")?;
-
-    // TODO: Provide a more elegant way to retrieve this and add support for live reload
-    let competition_config = config_bucket
-        .get::<models::CompetitionConfig>("competition")
-        .await
-        .context("unable to retrieve the competition config")?
-        .context("the competition config does not exist")?;
 
     let flags_bucket = runtime
         .messaging
@@ -73,8 +60,12 @@ pub async fn main(runtime: AppRuntime) -> eyre::Result<()> {
         })
         .boxed(); // FIXME: Does actually have to be boxed?
 
-    let config: SubmitterConfig = serde_json::from_value(competition_config.submitter)
-        .context("unable to parse the flag submitter config")?;
+    let config: SubmitterConfig = runtime
+        .config
+        .submitter
+        .clone()
+        .try_into()
+        .context("unable to parse the submitter config")?;
 
     let submitter = config.inner.into_submitter();
 

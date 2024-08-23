@@ -1,7 +1,7 @@
-use crate::config::Config;
 use crate::messaging::nats::NatsMessaging;
 use futures::future::select_all;
 use futures::FutureExt;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::signal::unix::SignalKind;
 use tokio::{signal, spawn};
@@ -11,9 +11,35 @@ use tracing::{error, info};
 /// Common state for components
 #[derive(Clone)]
 pub struct AppRuntime {
-    pub config: Arc<Config>,
+    pub config: Arc<AppConfig>,
     pub messaging: Arc<NatsMessaging>,
     pub cancellation_token: CancellationToken,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct AppConfig {
+    pub competition: CompetitionConfig,
+    /// The submitter configuration. This will be dynamically checked by the submitter at runtime
+    /// to avoid having to model it in this crate.
+    pub submitter: toml::Value,
+    /// The fetcher configuration.
+    pub fetcher: toml::Value,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct CompetitionConfig {
+    /// The start time of the competition in UTC
+    pub start: chrono::DateTime<chrono::Utc>,
+    /// Tick/round length in seconds
+    pub tick: u64,
+    /// The start tick in ticks. This is usually 0.
+    pub tick_start: i32,
+    /// The validity of flags in rounds
+    pub flag_validity: u32,
+    /// The regular expression for the flag format
+    pub flag_format: String,
 }
 
 pub fn create_shutdown_cancellation_token() -> CancellationToken {
@@ -45,5 +71,5 @@ pub fn create_shutdown_cancellation_token() -> CancellationToken {
         signal_cancellation_token.cancel();
         info!("shutdown signal received");
     });
-    return cancellation_token;
+    cancellation_token
 }

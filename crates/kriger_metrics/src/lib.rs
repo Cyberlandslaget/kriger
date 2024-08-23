@@ -5,7 +5,7 @@ use color_eyre::eyre::{Context, Result};
 use futures::StreamExt;
 use kriger_common::messaging::model::ExecutionRequest;
 use kriger_common::messaging::{AckPolicy, DeliverPolicy, Message, Messaging, Stream};
-use kriger_common::runtime::AppRuntime;
+use kriger_common::server::runtime::AppRuntime;
 use opentelemetry::metrics::MeterProvider;
 use opentelemetry::KeyValue;
 use opentelemetry_sdk::metrics::SdkMeterProvider;

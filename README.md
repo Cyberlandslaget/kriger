@@ -54,7 +54,7 @@ Run the server components:
 cargo r server # This will run the NATS migration for the first time
 docker compose start nats-init # This will seed the K/V store with test data
 
-cargo r server --single
+cargo r server --single data/config/dev.toml 
 ```
 
 Run the competition mock:
@@ -68,7 +68,7 @@ The mock will be available at port `:8080` by default.
 Run the runner component:
 
 ```bash
-RUST_LOG=debug cargo r runner --exploit test -- bash -c 'head -c 19 /dev/random | base32'
+RUST_LOG=debug cargo run runner --exploit test --service "Service 1 Checker 1" --flag-format "[A-Z0-9]{31}=" -- bash -c 'head -c 19 /dev/random | base32'
 ```
 
 > **Note:** This is not required if the example exploit is deployed.

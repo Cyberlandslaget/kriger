@@ -68,8 +68,6 @@ pub enum MessagingError {
 }
 
 pub trait Messaging: Clone {
-    fn config(&self) -> impl Future<Output = Result<impl Bucket, MessagingError>>;
-
     fn exploits(&self) -> impl Future<Output = Result<impl Bucket, MessagingError>>;
 
     fn flags(&self) -> impl Future<Output = Result<impl Bucket + 'static, MessagingError>>;

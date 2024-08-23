@@ -4,10 +4,10 @@
 mod fetcher;
 
 use crate::fetcher::FetcherConfig;
-use color_eyre::eyre::{Context, ContextCompat, Result};
+use color_eyre::eyre::{Context, Result};
 use kriger_common::messaging::{Bucket, Messaging};
 use kriger_common::models;
-use kriger_common::runtime::AppRuntime;
+use kriger_common::server::runtime::AppRuntime;
 use tokio::time::MissedTickBehavior;
 use tokio::{select, time};
 use tracing::{info, warn};
@@ -15,20 +15,11 @@ use tracing::{info, warn};
 pub async fn main(runtime: AppRuntime) -> Result<()> {
     info!("starting data fetcher");
 
-    let config_bucket = runtime
-        .messaging
-        .config()
-        .await
-        .context("unable to retrieve the config bucket")?;
-
-    // TODO: Provide a more elegant way to retrieve this and add support for live reload
-    let competition_config = config_bucket
-        .get::<models::CompetitionConfig>("competition")
-        .await
-        .context("unable to retrieve the competition config")?
-        .context("the competition config does not exist")?;
-
-    let config: FetcherConfig = serde_json::from_value(competition_config.fetcher)
+    let config: FetcherConfig = runtime
+        .config
+        .fetcher
+        .clone()
+        .try_into()
         .context("unable to parse the fetcher config")?;
 
     let services_bucket = runtime

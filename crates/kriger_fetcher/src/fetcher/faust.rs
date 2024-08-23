@@ -7,7 +7,7 @@ use futures::future::join_all;
 use kriger_common::messaging::model::FlagHint;
 use kriger_common::messaging::{Bucket, Messaging, MessagingError};
 use kriger_common::models;
-use kriger_common::runtime::AppRuntime;
+use kriger_common::server::runtime::AppRuntime;
 use serde::{self, Deserialize};
 use std::collections::HashMap;
 use tracing::{debug, error, instrument};

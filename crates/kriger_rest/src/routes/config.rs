@@ -1,21 +1,12 @@
-use crate::support::{AppError, AppResponse};
+use crate::support::AppResponse;
 use crate::AppState;
 use axum::extract::State;
 use axum::response::IntoResponse;
 use axum::Json;
-use kriger_common::messaging::{Bucket, Messaging};
-use kriger_common::models;
+use std::ops::Deref;
 use std::sync::Arc;
 
-pub(crate) async fn get_competition_config(
-    state: State<Arc<AppState>>,
-) -> Result<impl IntoResponse, AppError> {
-    let config_bucket = state.runtime.messaging.config().await?;
-    match config_bucket
-        .get::<models::CompetitionConfig>("competition")
-        .await?
-    {
-        Some(config) => Ok(Json(AppResponse::Ok(config))),
-        None => Err(AppError::NotFound),
-    }
+pub(crate) async fn get_server_config(state: State<Arc<AppState>>) -> impl IntoResponse {
+    let config = state.runtime.config.deref().clone();
+    Json(AppResponse::Ok(config))
 }
