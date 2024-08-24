@@ -15,13 +15,34 @@ impl KrigerClient {
         }
     }
 
+    pub async fn get_competition_services(
+        &self,
+    ) -> reqwest::Result<models::responses::AppResponse<Vec<models::Service>>> {
+        let url = format!("{}/competition/services", &self.url);
+        self.request(reqwest::Method::GET, url).await
+    }
+
     pub async fn update_exploit(
         &self,
         exploit: &models::Exploit,
     ) -> reqwest::Result<models::responses::AppResponse<()>> {
-        let url = format!("{}/exploits/{}", self.url, &exploit.manifest.name);
+        let url = format!("{}/exploits/{}", &self.url, &exploit.manifest.name);
         self.request_with_body(reqwest::Method::PUT, url, exploit)
             .await
+    }
+
+    async fn request<U, R>(
+        &self,
+        method: reqwest::Method,
+        url: U,
+    ) -> reqwest::Result<models::responses::AppResponse<R>>
+    where
+        U: reqwest::IntoUrl,
+        R: DeserializeOwned + Serialize + ?Sized,
+    {
+        let response = self.client.request(method, url).send().await?;
+        let response: models::responses::AppResponse<R> = response.json().await?;
+        Ok(response)
     }
 
     async fn request_with_body<U, B, R>(

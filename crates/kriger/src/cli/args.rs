@@ -35,6 +35,10 @@ pub(crate) struct Create {
     #[arg(env, long, default_value = DEFAULT_REST_URL)]
     pub(crate) rest_url: String,
 
-    /// The name to give the exploit
+    #[arg(long)]
+    /// The service name that the exploit should target
+    pub(crate) service: Option<String>,
+
+    /// The exploit's name
     pub(crate) name: Option<String>,
 }
