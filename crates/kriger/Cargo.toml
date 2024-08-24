@@ -7,7 +7,17 @@ default-run = "kriger"
 [features]
 default = ["server-all", "otel", "cli"]
 server = []
-server-all = ["server", "controller", "fetcher", "metrics", "rest", "runner", "scheduler", "submitter", "ws"]
+server-all = [
+  "server",
+  "controller",
+  "fetcher",
+  "metrics",
+  "rest",
+  "runner",
+  "scheduler",
+  "submitter",
+  "ws",
+]
 controller = ["dep:kriger_controller", "server"]
 fetcher = ["dep:kriger_fetcher", "server"]
 metrics = ["dep:kriger_metrics", "server"]
@@ -18,19 +28,17 @@ submitter = ["dep:kriger_submitter", "server"]
 ws = ["dep:kriger_ws", "server"]
 otel = ["dep:tracing-opentelemetry"]
 cli = [
-    "dep:indicatif",
-    "dep:bollard",
-    "dep:tar",
-    "dep:console",
-    "dep:humantime",
-    "dep:tokio-stream",
-    "dep:chrono",
-    "dep:inquire",
-    "dep:oci-distribution"
+  "dep:indicatif",
+  "dep:tar",
+  "dep:console",
+  "dep:humantime",
+  "dep:tokio-stream",
+  "dep:chrono",
+  "dep:inquire",
+  "dep:oci-distribution",
 ]
 
 [dependencies]
-bollard = { version = "0.16.1", features = ["buildkit"], optional = true }
 chrono = { workspace = true, optional = true }
 clap.workspace = true
 clap_derive.workspace = true
@@ -44,7 +52,12 @@ opentelemetry.workspace = true
 opentelemetry-semantic-conventions.workspace = true
 opentelemetry_sdk.workspace = true
 opentelemetry-otlp = { workspace = true, features = ["trace"] }
-tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "process"] }
+tokio = { workspace = true, features = [
+  "rt",
+  "rt-multi-thread",
+  "macros",
+  "process",
+] }
 tokio-stream = { workspace = true, optional = true }
 tokio-util.workspace = true
 tracing.workspace = true

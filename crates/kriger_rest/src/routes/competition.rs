@@ -1,4 +1,4 @@
-use crate::support::{AppError, AppResponse};
+use crate::support::AppError;
 use crate::AppState;
 use axum::response::IntoResponse;
 use axum::{extract::State, Json};
@@ -12,7 +12,7 @@ pub(crate) async fn get_services(
     let services_bucket = state.runtime.messaging.services().await?;
     let services: Vec<models::Service> = services_bucket.list(None).await?.into_values().collect();
 
-    Ok(Json(AppResponse::Ok(services)))
+    Ok(Json(models::responses::AppResponse::Ok(services)))
 }
 
 pub(crate) async fn get_teams(state: State<Arc<AppState>>) -> Result<impl IntoResponse, AppError> {
@@ -21,5 +21,5 @@ pub(crate) async fn get_teams(state: State<Arc<AppState>>) -> Result<impl IntoRe
     // We return a map of team network id to the team data
     let teams = teams_bucket.list::<models::Team>(None).await?;
 
-    Ok(Json(AppResponse::Ok(teams)))
+    Ok(Json(models::responses::AppResponse::Ok(teams)))
 }

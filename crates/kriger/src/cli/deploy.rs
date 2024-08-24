@@ -1,13 +1,13 @@
 use crate::cli;
 use crate::cli::{args, emoji, format_duration_secs, log};
-use color_eyre::eyre::{bail, Context, ContextCompat};
+use color_eyre::eyre::{Context, ContextCompat};
 use color_eyre::Result;
 use console::style;
 use futures::stream::select_all;
 use futures::StreamExt;
 use indicatif::ProgressBar;
+use kriger_common::client::KrigerClient;
 use kriger_common::models;
-use reqwest::{Method, StatusCode};
 use std::process::Stdio;
 use std::time::Duration;
 use tokio::fs;
@@ -80,28 +80,6 @@ async fn build_image(progress: &ProgressBar, tag: &str) -> Result<bool> {
     println!("  {} Tag: {}", emoji::PACKAGE, style(tag).underlined());
 
     Ok(true)
-}
-
-async fn update_exploit(exploit: &models::Exploit, rest_url: &str) -> Result<()> {
-    let client = reqwest::Client::new();
-    let response = client
-        .request(
-            Method::PUT,
-            format!("{}/exploits/{}", rest_url, &exploit.manifest.name),
-        )
-        .json(&exploit)
-        .send()
-        .await
-        .context("unable to send a request to update the exploit")?;
-
-    // TODO: Use the common error response model
-    match response.status() {
-        StatusCode::OK => Ok(()),
-        StatusCode::INTERNAL_SERVER_ERROR => {
-            bail!("update error: {}", response.text().await?)
-        }
-        _ => bail!("unexpected response: {response:?}"),
-    }
 }
 
 pub(crate) async fn main(args: args::Deploy) -> Result<()> {
@@ -185,30 +163,40 @@ pub(crate) async fn main(args: args::Deploy) -> Result<()> {
     progress.enable_steady_tick(Duration::from_millis(130));
     progress.set_message(format!("{} Deploying exploit...", emoji::ROCKET));
 
-    let update_res = update_exploit(
-        &models::Exploit {
+    let client = KrigerClient::new(args.rest_url);
+    let update_res = client
+        .update_exploit(&models::Exploit {
             manifest,
             image: tag,
-        },
-        &args.rest_url,
-    )
-    .await;
+        })
+        .await;
 
     progress.finish_and_clear();
     match update_res {
         Err(err) => {
             println!(
-                "  {} {}: {:?}",
+                "  {} {}: {}",
                 emoji::CROSS_MARK,
-                style("Launch failed").red().bold(),
+                style("Deployment failed").red().bold(),
                 err
             );
+
+            // Propagate this error since it is unexpected
+            return Err(err.into());
         }
-        Ok(..) => {
+        Ok(models::responses::AppResponse::Error { message }) => {
+            println!(
+                "  {} {}: {}",
+                emoji::CROSS_MARK,
+                style("Deployment failed").red().bold(),
+                &message
+            );
+        }
+        Ok(models::responses::AppResponse::Ok(_)) => {
             println!(
                 "  {} {}",
                 emoji::CHECK_MARK,
-                style("Deployment succeeded").green().bold()
+                style("Deployment requested succcessfully").green().bold()
             );
         }
     }

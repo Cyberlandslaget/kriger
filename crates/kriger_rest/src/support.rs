@@ -4,7 +4,7 @@ use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
 use kriger_common::messaging::MessagingError;
-use serde::Serialize;
+use kriger_common::models;
 
 #[derive(thiserror::Error, Debug)]
 #[non_exhaustive]
@@ -35,20 +35,9 @@ impl AppError {
     }
 }
 
-/// The structure used to serialize consistent responses to the consumer.
-#[derive(Serialize, Debug)]
-#[serde(rename_all = "lowercase")]
-pub enum AppResponse<T: Serialize> {
-    #[serde(rename = "data")]
-    Ok(T),
-    Error {
-        message: String,
-    },
-}
-
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
-        let res: AppResponse<()> = AppResponse::Error {
+        let res: models::responses::AppResponse<()> = models::responses::AppResponse::Error {
             message: self.to_string(),
         };
         let mut res = Json(res).into_response();
