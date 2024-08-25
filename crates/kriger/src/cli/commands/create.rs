@@ -35,32 +35,9 @@ pub(crate) async fn main(args: args::Create) -> eyre::Result<()> {
         return Ok(());
     }
 
-    let service = match args.service {
+    let service = match inquire_service(args.service, &cli_config).await? {
         Some(service) => service,
-        None => {
-            let client = KrigerClient::new(cli_config.client.rest_url.clone());
-            let maybe_services = with_spinner("Fetching competition services", || {
-                client.get_competition_services()
-            })
-            .await
-            .context("unable to fetch competition services")?;
-            let services: Vec<String> = match maybe_services {
-                models::responses::AppResponse::Ok(services) => {
-                    services.into_iter().map(|svc| svc.name).collect()
-                }
-                models::responses::AppResponse::Error { message } => {
-                    println!(
-                        "  {} {}: {}",
-                        emoji::CROSS_MARK,
-                        style("Unable to fetch services").red().bold(),
-                        message
-                    );
-                    return Ok(());
-                }
-            };
-            let select = inquire::Select::new("Service:", services);
-            select.prompt()?
-        }
+        None => return Ok(()), // Should be handled by inquire_service
     };
 
     let client = create_oci_client(&cli_config);
@@ -99,6 +76,40 @@ fn inquire_text<S: AsRef<str>>(opt: Option<String>, message: S) -> eyre::Result<
     }
     let value = inquire::prompt_text(message)?;
     Ok(value)
+}
+
+async fn inquire_service(
+    service: Option<String>,
+    cli_config: &CliConfig,
+) -> eyre::Result<Option<String>> {
+    let service = match service {
+        Some(service) => service,
+        None => {
+            let client = KrigerClient::new(cli_config.client.rest_url.clone());
+            let maybe_services = with_spinner("Fetching competition services", || {
+                client.get_competition_services()
+            })
+            .await
+            .context("unable to fetch competition services")?;
+            let services: Vec<String> = match maybe_services {
+                models::responses::AppResponse::Ok(services) => {
+                    services.into_iter().map(|svc| svc.name).collect()
+                }
+                models::responses::AppResponse::Error { message } => {
+                    println!(
+                        "  {} {}: {}",
+                        emoji::CROSS_MARK,
+                        style("Unable to fetch services").red().bold(),
+                        message
+                    );
+                    return Ok(None);
+                }
+            };
+            let select = inquire::Select::new("Service:", services);
+            select.prompt()?
+        }
+    };
+    Ok(Some(service))
 }
 
 fn create_manifest(name: &str, service: String) -> cli::models::ExploitManifest {
