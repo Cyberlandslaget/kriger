@@ -1,7 +1,7 @@
 permissions: read-all
 on:
   push:
-    branches: [ main ]
+    branches: [main]
     paths:
       - ".github/workflows/templates.yml"
       - "data/templates/**"
@@ -34,7 +34,7 @@ jobs:
 
       - name: Archive the template
         run: |
-          tar -czf template.tar.gz -C "data/templates/${{ matrix.name }}" .
+          tar -czfh template.tar.gz -C "data/templates/${{ matrix.name }}" .
 
       - name: Push the template
         run: |
