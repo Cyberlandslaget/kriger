@@ -7,7 +7,7 @@ FROM $REGISTRY/kriger/kriger AS runner
 
 # Note that we SHOULD NOT use the slim variant due to some Python packages relying on native compilation (eg. gcc)
 FROM python:3.12-bookworm
-COPY --from=uv /usr/bin/uv /usr/bin/uv
+COPY --from=uv /uv /usr/bin/uv
 COPY --from=runner /usr/bin/kriger /usr/bin/kriger
 
 WORKDIR /exploit
