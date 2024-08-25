@@ -1,10 +1,11 @@
+use color_eyre::eyre::{self, Context, ContextCompat};
 use futures::Future;
 use indicatif::ProgressBar;
-use std::time::Duration;
+use models::CliConfig;
+use std::{path::PathBuf, time::Duration};
 
 pub(crate) mod args;
-pub(crate) mod create;
-pub(crate) mod deploy;
+pub(crate) mod commands;
 mod emoji;
 mod models;
 
@@ -34,4 +35,22 @@ where
     pb.finish_and_clear();
 
     res
+}
+
+fn get_config_dir() -> Option<PathBuf> {
+    dirs::config_dir().map(|path| path.join("kriger"))
+}
+
+fn get_config_file() -> Option<PathBuf> {
+    get_config_dir().map(|path| path.join("cli.toml"))
+}
+
+async fn read_cli_config() -> eyre::Result<CliConfig> {
+    let path = get_config_file().context("unable to locate the config directory")?;
+    let content = tokio::fs::read_to_string(path)
+        .await
+        .context("unable to read the config file")?;
+    let config: CliConfig = toml::from_str(&content).context("unable to parse the config file")?;
+
+    Ok(config)
 }

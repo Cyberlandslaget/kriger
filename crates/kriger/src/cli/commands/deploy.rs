@@ -1,4 +1,4 @@
-use crate::cli;
+use crate::cli::{self, read_cli_config};
 use crate::cli::{args, emoji, format_duration_secs, log};
 use color_eyre::eyre::{Context, ContextCompat};
 use color_eyre::Result;
@@ -83,6 +83,8 @@ async fn build_image(progress: &ProgressBar, tag: &str) -> Result<bool> {
 }
 
 pub(crate) async fn main(args: args::Deploy) -> Result<()> {
+    let cli_config = read_cli_config().await?;
+
     // TODO: Honor the existing image in the CLI manifest
     let cli_manifest = match read_exploit_manifest().await {
         Ok(manifest) => manifest,
@@ -112,7 +114,7 @@ pub(crate) async fn main(args: args::Deploy) -> Result<()> {
     let tag_version = format!("{}", date.timestamp());
     let tag = format!(
         "{}/kriger-exploits/{}:{}",
-        &args.registry, &manifest.name, tag_version
+        &cli_config.registry.registry, &manifest.name, tag_version
     );
 
     let progress = ProgressBar::new_spinner();
@@ -163,7 +165,7 @@ pub(crate) async fn main(args: args::Deploy) -> Result<()> {
     progress.enable_steady_tick(Duration::from_millis(130));
     progress.set_message(format!("{} Deploying exploit...", emoji::ROCKET));
 
-    let client = KrigerClient::new(args.rest_url);
+    let client = KrigerClient::new(cli_config.client.rest_url);
     let update_res = client
         .update_exploit(&models::Exploit {
             manifest,

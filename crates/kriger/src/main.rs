@@ -40,12 +40,12 @@ async fn main() -> eyre::Result<()> {
         #[cfg(feature = "cli")]
         args::Commands::Deploy(args) => {
             init_tracing(false)?;
-            cli::deploy::main(args).await
+            cli::commands::deploy::main(args).await
         }
         #[cfg(feature = "cli")]
         args::Commands::Create(args) => {
             init_tracing(false)?;
-            cli::create::main(args).await
+            cli::commands::create::main(args).await
         }
     }
 }

@@ -1,6 +1,25 @@
 use kriger_common::models;
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Deserialize)]
+pub(crate) struct CliConfig {
+    pub client: CliClientConfig,
+    pub registry: CliRegistryConfig,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct CliClientConfig {
+    pub rest_url: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct CliRegistryConfig {
+    pub secure: bool,
+    pub registry: String,
+    pub username: String,
+    pub password: String,
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct ExploitManifest {
     /// If specified, the CLI will skip the building step
