@@ -1,4 +1,5 @@
-__pycache__/
+__pycache__
+.venv/
 .dockerignore
 exploit.toml
 exploitlib.py
