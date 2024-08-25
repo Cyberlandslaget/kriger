@@ -34,7 +34,7 @@ jobs:
 
       - name: Archive the template
         run: |
-          tar -czfh template.tar.gz -C "data/templates/${{ matrix.name }}" .
+          tar czfh template.tar.gz -C "data/templates/${{ matrix.name }}" .
 
       - name: Push the template
         run: |
