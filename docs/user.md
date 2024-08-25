@@ -1,12 +1,21 @@
 # User Guide
 
+- [Prerequisites](#prerequisites)
+- [Installing the CLI](#installing-the-cli)
+- [Configuring the CLI](#configuring-the-cli)
+- [Setting up Docker CLI](#setting-up-docker-cli)
+
+## Prerequisites
+
+### Required
+
+- Rust toolchain - see [Install Rust](https://www.rust-lang.org/tools/install).
+
+### Optional, but recommended
+
 ## Installing the CLI
 
-### Installing the Rust toolchain
-
-See [Install Rust](https://www.rust-lang.org/tools/install).
-
-### Building and installing the CLI
+### Alternative 1: Building and installing the CLI
 
 Run the following command in the project's root directory:
 
@@ -14,15 +23,22 @@ Run the following command in the project's root directory:
 cargo install --path crates/kriger --bin kriger
 ```
 
-Alternatively, a prebuilt binary or the container image can be used.
+### Alternative 2: Using a prebuilt binary
+
+Simply copy the prebuilt binary to a directory that is included in your shell's path. On Linux
+distributions, `~/.local/bin` can be used.
+
+### Alternative 3. Using the container image
+
+TODO
 
 ## Configuring the CLI
 
-### Alternative 1. Automatic Setup
+### Alternative 1: Automatic Setup
 
 TBD
 
-### Alternative 2. Manual Setup
+### Alternative 2: Manual Setup
 
 The config files are located at:
 
@@ -44,13 +60,14 @@ rest_url = "https://kriger.o99.no/api"
 ws_url = "wss://kriger.o99.no/ws"
 ```
 
-Ensure that the permissions of the file is not globally-readable.
-
-Changing the permissions on a **Unix-like system**:
-
-```bash
-chmod 400 "$XDG_CONFIG_HOME/kriger/cli.toml"
-```
+> [!IMPORTANT]
+> Ensure that the file is not globally-readable as it contains the registry credentials.
+> 
+> Changing the file permissions on a **Linux distribution**:
+>
+> ```bash
+> chmod 400 "$XDG_CONFIG_HOME/kriger/cli.toml"
+> ```
 
 ## Setting up Docker CLI
 
@@ -59,9 +76,18 @@ chmod 400 "$XDG_CONFIG_HOME/kriger/cli.toml"
 See [Docker's documentation](https://docs.docker.com/get-docker/) for how you can install Docker on your system. Mac
 users may be interested in using [Colima](https://github.com/abiosoft/colima) instead.
 
+> [!IMPORTANT]
+> Ensure that your current user has access to the Docker daemon.
+> On most **Linux distributions**, adding the user to the `docker`
+> group will be sufficient:
+>
+> ```bash
+> sudo useradd -aG docker `whoami`
+> ```
+
 After setting up Docker, log in to the container registry using the following commands:
 
-```
+```bash
 docker login https://r.o99.no
 ```
 
