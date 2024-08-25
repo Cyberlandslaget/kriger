@@ -13,6 +13,10 @@
 
 ### Optional, but recommended
 
+- [**uv**](https://docs.astral.sh/uv/getting-started/installation/) - an extremely fast Python package
+  manager ([10-100x faster than pip](https://github.com/astral-sh/uv/blob/main/BENCHMARKS.md)). The performance
+  improvement will be taken advantage of when developing exploits.
+
 ## Installing the CLI
 
 ### Alternative 1: Building and installing the CLI
@@ -62,7 +66,7 @@ ws_url = "wss://kriger.o99.no/ws"
 
 > [!IMPORTANT]
 > Ensure that the file is not globally-readable as it contains the registry credentials.
-> 
+>
 > Changing the file permissions on a **Linux distribution**:
 >
 > ```bash
