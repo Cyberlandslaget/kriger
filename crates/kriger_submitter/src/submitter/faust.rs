@@ -23,7 +23,7 @@ impl Submitter for FaustSubmitter {
         let mut stream_ref = self.stream.write().await;
 
         // TODO: Improve this mess?
-        let mut stream = match stream_ref.deref_mut() {
+        let stream = match stream_ref.deref_mut() {
             Some(stream) => stream,
             opt => {
                 let stream = self.create_connection().await?;
@@ -31,7 +31,7 @@ impl Submitter for FaustSubmitter {
             }
         };
 
-        match submit_internal(&mut stream, flags).await {
+        match submit_internal(stream, flags).await {
             Ok(map) => Ok(map),
             Err(error) => {
                 // Drop the connection and propagate the error. This should trigger a retry and a

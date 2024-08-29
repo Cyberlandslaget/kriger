@@ -14,7 +14,7 @@ impl Submitter for DummySubmitter {
         flags: &[&str],
     ) -> Result<HashMap<String, models::FlagSubmissionStatus>, SubmitError> {
         Ok(flags
-            .into_iter()
+            .iter()
             .map(|&flag| (flag.to_owned(), gen_submission_status()))
             .collect())
     }

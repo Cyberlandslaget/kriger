@@ -1,58 +1,21 @@
 mod cini;
 pub mod dummy;
-pub mod enowars;
 pub mod faust;
-pub mod statisk;
 
 use async_trait::async_trait;
 use dashmap::DashMap;
-use kriger_common::server::runtime::AppRuntime;
 use kriger_common::{messaging, models};
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use serde::Deserialize;
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
-pub struct ServiceOld(pub HashMap<String, TicksOld>);
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
-pub struct TicksOld(pub HashMap<i32, serde_json::Value>);
-
-/// All services
-// /// {service_name: {"10.0.0.1": ["a", "b"], "10.0.0.2"}}
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
-pub struct ServiceMap(pub HashMap<String, Service>);
-
-impl ServiceMap {
-    /// renames services
-    pub fn apply_name_mapping(self, mapping: &HashMap<String, String>) -> ServiceMap {
-        ServiceMap(
-            self.0
-                .into_iter()
-                .map(|(old_name, service)| {
-                    (
-                        mapping.get(&old_name).unwrap_or(&old_name).to_owned(),
-                        service,
-                    )
-                })
-                .collect(),
-        )
-    }
+pub(crate) struct CompetitionData {
+    pub flag_hints: Option<Vec<FlagHint>>,
 }
 
-/// A service' teams
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
-pub struct Service {
-    pub teams: HashMap<String, TeamService>,
-}
-
-/// A teams' instance of a service
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
-pub struct TeamService {
-    // in most cases there is just one flagid per tick (we always just read the
-    // raw json value), but in the case of faust-like ctfs we may have multiple
-    // flagids and we dont know which they belong to, so we have to put
-    // multiple for the current tick
-    pub ticks: HashMap<i32, Vec<serde_json::Value>>,
+pub(crate) struct FlagHint {
+    pub round: Option<i64>,
+    pub team_id: String,
+    pub service: String,
+    pub hint: serde_json::Value,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -68,14 +31,6 @@ pub enum FetcherError {
     Reqwest(#[from] reqwest::Error),
     #[error("messaging error")]
     Messaging(#[from] messaging::MessagingError),
-}
-
-/// Implements fetching flagids and hosts
-pub trait OldFetcher {
-    /// services (with flagids)
-    async fn services(&self) -> Result<ServiceMap, FetcherError>;
-    /// "backup" raw get all ips
-    async fn ips(&self) -> Result<Vec<String>, FetcherError>;
 }
 
 #[derive(Deserialize, Debug)]
@@ -108,11 +63,21 @@ impl FetcherConfig {
     }
 }
 
+/// Instructs what the fetcher needs to fetch.
+///
+/// Providing options instead of strictly requesting specific data allows fetchers
+/// to efficiently return data in a manner that is the most efficient. For example, some
+/// competitions may return flag hints (flag ids) and the list of teams in a single response,
+/// while others may return them separately.
+pub(crate) struct FetchOptions {
+    pub require_hints: bool,
+}
+
 #[async_trait]
 pub(crate) trait Fetcher: Send {
-    async fn run(
+    async fn fetch(
         &self,
-        runtime: &AppRuntime,
+        options: &FetchOptions,
         services: &DashMap<String, models::Service>,
-    ) -> Result<(), FetcherError>;
+    ) -> Result<CompetitionData, FetcherError>;
 }

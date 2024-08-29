@@ -1,18 +1,19 @@
-use crate::fetcher::{Fetcher, FetcherError};
+use crate::fetcher::{CompetitionData, FetchOptions, Fetcher, FetcherError};
 use async_trait::async_trait;
 use dashmap::DashMap;
 use kriger_common::models;
-use kriger_common::server::runtime::AppRuntime;
 
 pub(crate) struct DummyFetcher;
 
 #[async_trait]
 impl Fetcher for DummyFetcher {
-    async fn run(
+    async fn fetch(
         &self,
-        _runtime: &AppRuntime,
+        _options: &FetchOptions,
         _services: &DashMap<String, models::Service>,
-    ) -> Result<(), FetcherError> {
-        Ok(())
+    ) -> Result<CompetitionData, FetcherError> {
+        Ok(CompetitionData {
+            flag_hints: Some(vec![]),
+        })
     }
 }

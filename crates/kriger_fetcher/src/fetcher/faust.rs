@@ -1,16 +1,10 @@
-use super::{Fetcher, FetcherError};
+use super::{CompetitionData, FetchOptions, Fetcher, FetcherError, FlagHint};
 use async_trait::async_trait;
-use base64::engine::general_purpose::STANDARD_NO_PAD;
-use base64::Engine;
 use dashmap::DashMap;
-use futures::future::join_all;
-use kriger_common::messaging::model::FlagHint;
-use kriger_common::messaging::{Bucket, Messaging, MessagingError};
 use kriger_common::models;
-use kriger_common::server::runtime::AppRuntime;
 use serde::{self, Deserialize};
 use std::collections::HashMap;
-use tracing::{debug, error, instrument};
+use tracing::debug;
 
 #[derive(Deserialize, Debug)]
 pub struct AttackInfo {
@@ -48,60 +42,15 @@ impl FaustFetcher {
         let info: AttackInfo = self.client.get(&self.url).send().await?.json().await?;
         Ok(info)
     }
-
-    #[instrument(level = "DEBUG", skip_all, fields(team_id, service, hint))]
-    async fn handle_flag_insertion(
-        &self,
-        bucket: &impl Bucket,
-        team_id: String,
-        service: String,
-        hint: serde_json::Value,
-    ) {
-        match serde_json::to_vec(&hint) {
-            Ok(serialized) => {
-                let key = format!(
-                    "{}.{}.{}",
-                    STANDARD_NO_PAD.encode(&service),
-                    team_id,
-                    STANDARD_NO_PAD.encode(&serialized)
-                );
-                let data = FlagHint {
-                    team_id,
-                    service,
-                    hint,
-                };
-                match bucket.create(&key, &data).await {
-                    Err(MessagingError::KeyValueConflictError) => {
-                        // Ignore
-                    }
-                    Err(error) => {
-                        error! {
-                            ?error,
-                            "unable to insert the flag hint to the k/v store"
-                        }
-                    }
-                    _ => {}
-                }
-            }
-            Err(error) => {
-                error! {
-                    ?error,
-                    "unable to serialize the hint"
-                }
-            }
-        }
-    }
 }
 
 #[async_trait]
 impl Fetcher for FaustFetcher {
-    #[instrument(skip_all)]
-    async fn run(
+    async fn fetch(
         &self,
-        runtime: &AppRuntime,
+        _options: &FetchOptions,
         _services: &DashMap<String, models::Service>,
-    ) -> Result<(), FetcherError> {
-        let hints_bucket = runtime.messaging.data_hints().await?;
+    ) -> Result<CompetitionData, FetcherError> {
         let info = self.get_attack_into().await?;
 
         debug! {
@@ -110,25 +59,23 @@ impl Fetcher for FaustFetcher {
             "fetched attack info"
         }
 
-        let mut tasks = Vec::new();
-
+        let mut flag_hints = Vec::new();
         for (service, map) in info.flag_ids {
             for (team_id, hints) in map.0 {
                 for hint in hints {
-                    // FIXME: Functional programming?
-                    tasks.push(self.handle_flag_insertion(
-                        &hints_bucket,
-                        team_id.clone(),
-                        service.clone(),
+                    flag_hints.push(FlagHint {
+                        round: None,
+                        team_id: team_id.clone(),
+                        service: service.clone(),
                         hint,
-                    ));
+                    });
                 }
             }
         }
 
-        join_all(tasks).await;
-
-        Ok(())
+        Ok(CompetitionData {
+            flag_hints: Some(flag_hints),
+        })
     }
 }
 

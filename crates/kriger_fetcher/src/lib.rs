@@ -3,14 +3,17 @@
 
 mod fetcher;
 
-use crate::fetcher::FetcherConfig;
+use crate::fetcher::{FetchOptions, FetcherConfig, FlagHint};
+use base64::engine::general_purpose::STANDARD_NO_PAD;
+use base64::Engine;
 use color_eyre::eyre::{Context, Result};
-use kriger_common::messaging::{Bucket, Messaging};
-use kriger_common::models;
+use kriger_common::messaging::{Bucket, Messaging, MessagingError};
 use kriger_common::server::runtime::AppRuntime;
+use kriger_common::{messaging, models};
+use tokio::task::JoinSet;
 use tokio::time::MissedTickBehavior;
 use tokio::{select, time};
-use tracing::{info, warn};
+use tracing::{error, info, instrument, warn};
 
 pub async fn main(runtime: AppRuntime) -> Result<()> {
     info!("starting data fetcher");
@@ -33,6 +36,13 @@ pub async fn main(runtime: AppRuntime) -> Result<()> {
         .await
         .context("unable to subscribe to services")?;
 
+    let hints_bucket = runtime
+        .messaging
+        .data_hints()
+        .await
+        .context("unable to retrieve the hints bucket")?;
+    let hints_bucket = Box::leak(Box::new(hints_bucket)); // TODO: fix?
+
     let fetcher = config.into_fetcher();
 
     // TODO: Un-hardcode this
@@ -42,6 +52,9 @@ pub async fn main(runtime: AppRuntime) -> Result<()> {
 
     interval.tick().await; // The first tick will immediately complete
 
+    let options = FetchOptions {
+        require_hints: true,
+    };
     loop {
         select! {
             _ = interval.tick() => {}
@@ -49,12 +62,70 @@ pub async fn main(runtime: AppRuntime) -> Result<()> {
                 return Ok(())
             }
         }
+        let data = match fetcher.fetch(&options, &services).await {
+            Ok(data) => data,
+            Err(error) => {
+                warn! {
+                    ?error,
+                    "fetcher error"
+                }
+                continue;
+            }
+        };
 
-        if let Err(error) = fetcher.run(&runtime, &services).await {
-            warn! {
-                ?error,
-                "fetcher error"
+        if let Some(flag_hints) = data.flag_hints {
+            let mut set = JoinSet::new();
+            for hint in flag_hints {
+                set.spawn(handle_hint_insertion(hints_bucket, hint));
+            }
+
+            while let Some(res) = set.join_next().await {
+                if let Err(error) = res {
+                    error! {
+                        ?error,
+                        "unable to join task"
+                    }
+                }
             }
         }
+    }
+}
+
+#[instrument(level = "DEBUG", skip_all, fields(team_id, service, hint))]
+async fn handle_hint_insertion(bucket: &impl Bucket, hint: FlagHint) {
+    let serialized = match serde_json::to_vec(&hint.hint) {
+        Ok(serialized) => serialized,
+
+        Err(error) => {
+            error! {
+                ?error,
+                "unable to serialize the hint"
+            }
+            return;
+        }
+    };
+
+    let key = format!(
+        "{}.{}.{}",
+        STANDARD_NO_PAD.encode(&hint.service),
+        hint.team_id,
+        STANDARD_NO_PAD.encode(&serialized)
+    );
+    let data = messaging::model::FlagHint {
+        team_id: hint.team_id,
+        service: hint.service,
+        hint: hint.hint,
+    };
+    match bucket.create(&key, &data).await {
+        Err(MessagingError::KeyValueConflictError) => {
+            // Ignore
+        }
+        Err(error) => {
+            error! {
+                ?error,
+                "unable to insert the flag hint to the k/v store"
+            }
+        }
+        _ => {}
     }
 }

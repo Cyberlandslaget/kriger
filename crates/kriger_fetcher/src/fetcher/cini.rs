@@ -1,14 +1,34 @@
-use crate::fetcher::{Fetcher, FetcherError};
+use crate::fetcher::{CompetitionData, FetchOptions, Fetcher, FetcherError, FlagHint};
 use async_trait::async_trait;
 use color_eyre::eyre;
 use dashmap::DashMap;
 use futures::future::join_all;
 use kriger_common::models;
-use kriger_common::server::runtime::AppRuntime;
 use serde::Deserialize;
 use serde_json::Value;
 use std::collections::HashMap;
 use tracing::{instrument, warn};
+
+#[derive(Deserialize, PartialEq)]
+struct MetaResponse {
+    teams: Vec<Team>,
+    services: Vec<Service>,
+}
+
+#[derive(Deserialize, PartialEq)]
+struct Team {
+    id: u32,
+    shortname: String,
+}
+
+#[derive(Deserialize, PartialEq)]
+struct Service {
+    id: String,
+    shortname: String,
+}
+
+/// Flag IDs are indexed by service name, team id, and round number.
+type FlagIdsResponse = HashMap<String, HashMap<String, HashMap<String, Value>>>;
 
 pub(crate) struct CiniFetcher {
     client: reqwest::Client,
@@ -48,72 +68,65 @@ impl CiniFetcher {
     }
 
     #[instrument(skip_all, fields(service))]
-    async fn handle_service<S: AsRef<str>>(&self, runtime: AppRuntime, service: S) {
-        match self.get_flag_ids_by_service(service.as_ref()).await {
-            Ok(res) => match res.get(service.as_ref()) {
-                Some(map) => {}
-                None => {
-                    warn! {
-                        "unable to find the service in the flag ids response"
-                    }
-                }
-            },
+    async fn handle_service(&self, service: String) -> Vec<FlagHint> {
+        let mut res = match self.get_flag_ids_by_service(&service).await {
+            Ok(res) => res,
             Err(error) => {
                 warn! {
                     ?error,
                     "unable to fetch flag ids"
                 }
+                return vec![];
+            }
+        };
+        let teams = match res.remove(&service) {
+            Some(teams) => teams,
+            None => {
+                warn! {
+                    "unable to find the service in the flag ids response"
+                }
+                return vec![];
+            }
+        };
+
+        // TODO: Preallocate the vec?
+        let mut hints = Vec::new();
+        for (team_id, rounds) in teams {
+            for (round_id, hint) in rounds {
+                hints.push(FlagHint {
+                    round: round_id.parse().ok(),
+                    team_id: team_id.clone(),
+                    service: service.clone(),
+                    hint,
+                })
             }
         }
+
+        vec![]
     }
 }
 
 #[async_trait]
 impl Fetcher for CiniFetcher {
-    async fn run(
+    async fn fetch(
         &self,
-        runtime: &AppRuntime,
+        options: &FetchOptions,
         services: &DashMap<String, models::Service>,
-    ) -> Result<(), FetcherError> {
-        let mut tasks = Vec::new();
+    ) -> Result<CompetitionData, FetcherError> {
+        let mut flag_hints: Option<Vec<FlagHint>> = None;
 
-        for service in services.iter() {
-            if !service.has_hint {
-                continue;
-            }
+        if options.require_hints {
+            let futures = services
+                .iter()
+                .filter(|service| service.has_hint)
+                .map(|service| self.handle_service(service.name.clone()));
 
-            tasks.push(self.handle_service(runtime.clone(), service.name.clone()));
+            flag_hints = Some(join_all(futures).await.into_iter().flatten().collect());
         }
 
-        join_all(tasks).await;
-
-        Ok(())
+        Ok(CompetitionData { flag_hints })
     }
 }
-
-#[derive(Deserialize, PartialEq)]
-struct MetaResponse {
-    teams: Vec<Team>,
-    services: Vec<Service>,
-}
-
-#[derive(Deserialize, PartialEq)]
-struct Team {
-    id: u32,
-    shortname: String,
-}
-
-#[derive(Deserialize, PartialEq)]
-struct Service {
-    id: String,
-    shortname: String,
-}
-
-/// A map consisting of flag ID maps associated with service names
-type FlagIdsResponse = HashMap<String, TeamFlagIdMap>;
-
-/// A map consisting of flag IDs associated with team IDs.
-type TeamFlagIdMap = HashMap<String, Vec<Value>>;
 
 #[cfg(test)]
 mod tests {
@@ -143,20 +156,21 @@ mod tests {
 
     #[test]
     fn should_deserialize_flag_ids_response_filtered_by_service() {
-        const FLAGIDS_JSON: &str = r#"{"MineCClicker":{"0":[{"boardname":"dTaU0T7TGkoufV"}],"1":[{"boardname":"QRDk8Q4ajUHdLb"}],"2":[{"boardname":"KkmyAUTIRhViuP8tTi5b"}],"3":[{"boardname":"AWxS5tCVAg6Ts0Oy2HFpmxo9kHhoAR"}],"4":[{"boardname":"NivajZsi4iaZVZQRMqj7aTRSQDUK3W"}],"5":[{"boardname":"IFXj86iCGh5ia"}],"6":[{"boardname":"zgOYyAXtmAnmT3aiBG8VEic"}],"7":[{"boardname":"SL6VtqTegCB9btlseZ6"}],"8":[{"boardname":"ZVui0Zgs2QfBsGHb"}],"9":[{"boardname":"OIPWYSCSg6"}],"10":[{"boardname":"aysvU8LU8Wd1J80rXZGwgFbmz"}],"11":[{"boardname":"aBB9jBga2Vglq40xKHTqpBiW8io7ix"}],"12":[{"boardname":"avPsojxjk171O91R8A4d"}],"13":[{"boardname":"vZ671lhc"}],"14":[{"boardname":"5pMX84DxCE"}],"15":[{"boardname":"XLdoR67bQpl0Sq52jJJOmv0"}],"16":[{"boardname":"2CnJFyVS"}],"17":[{"boardname":"ovppp82mLmHou1lVWteTxtbubiHuHzk"}],"18":[{"boardname":"pMdBnn2mg5F6JrCFFXOxuU7le"}],"19":[{"boardname":"poPWsFHTq0ULfV1IX0vEzsC3jO8hYT"}],"20":[{"boardname":"m0eu8hMC8K"}],"21":[{"boardname":"ap8kgW4juu3jtA"}],"22":[{"boardname":"ALj8kpBO26jaHLIIBVXAcpNNqTUeu66"}],"23":[{"boardname":"O7ld92p8Z21ZtTdfKJ"}],"24":[{"boardname":"rakVgQaQlqa8oJ2VsUvQLSLj9JeWDKu"}],"25":[{"boardname":"QzLPiGkObkypfZAfJuBTA"}],"26":[{"boardname":"OvcHppEjKj31iBLcfkzrhVbCH8eW"}],"27":[{"boardname":"ubGN4jRE8"}],"28":[{"boardname":"sa0Q1I3wEk"}],"29":[{"boardname":"pDrxv2cb9Dbu9TCRlODuCXSg"}],"30":[{"boardname":"a2iYJesTlzn"}],"31":[{"boardname":"VbmHpEDis2re7CA1KIiJXQKu0"}],"32":[{"boardname":"Vrxi2E1gIfIt"}],"33":[{"boardname":"6Q5tUiB1cR6ba1MH0IydtIgw7H"}],"34":[{"boardname":"ORaRlEyljQ6t0uxMMWA"}],"35":[{"boardname":"vp5xf28coeDD"}],"36":[{"boardname":"ey0kQZ7eXnZsQp6ga0wJ8hg"}],"37":[{"boardname":"zVM4Y0JICTX"}],"38":[{"boardname":"qZdcRZ8AHwKWiuM"}],"39":[{"boardname":"knnoFW8jKgRXKccuS5shN0"}]}}"#;
+        const FLAGIDS_JSON: &str = r#"{"foobar":{"1":{"5":{"flag_id_description":"flag_id_service_foobar_team_1_round_5"}}}}"#;
 
         let maybe_res = serde_json::from_str(FLAGIDS_JSON);
         assert!(maybe_res.is_ok());
 
         let res: FlagIdsResponse = maybe_res.unwrap();
         assert_eq!(res.len(), 1);
-        assert!(res.contains_key("MineCClicker"));
+        assert!(res.contains_key("foobar"));
 
-        let team_map = &res["MineCClicker"];
-        assert_eq!(team_map.len(), 40);
-        assert!(team_map.contains_key("29"));
+        let team_map = &res["foobar"];
+        assert_eq!(team_map.len(), 1);
+        assert!(team_map.contains_key("1"));
 
-        let nor_flag_ids = &team_map["29"];
-        assert_eq!(nor_flag_ids.len(), 1);
+        let round_map = &team_map["1"];
+        assert_eq!(round_map.len(), 1);
+        assert!(round_map.contains_key("5"));
     }
 }
