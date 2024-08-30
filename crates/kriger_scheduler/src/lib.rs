@@ -251,7 +251,6 @@ async fn handle_tick(
     }
 }
 
-#[instrument(skip_all)]
 async fn handle_hint_scheduling(
     runtime: AppRuntime,
     data_hints_bucket: impl Bucket,
