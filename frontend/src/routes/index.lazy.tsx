@@ -8,12 +8,14 @@ function DashboardPage() {
   const flagStatusAggregate = useAtomValue(flagStatusAggregateAtom);
 
   const statCards = [
-    { title: "Executions in queue", value: "26" },
-    { title: "Exploits", value: "3" },
+    { title: "Executions in queue", value: "?" },
+    { title: "Exploits", value: "?" },
     { title: "Flags received", value: flagStatusAggregate.count },
     {
       title: "Accepted flags",
-      value: flagStatusAggregate.statusMap.get(FLAG_CODE.Ok) ?? 0,
+      value:
+        (flagStatusAggregate.statusMap.get(FLAG_CODE.Ok) ?? 0) +
+        (flagStatusAggregate.statusMap.get(FLAG_CODE.Duplicate) ?? 0),
     },
     {
       title: "Rejected flags",
@@ -26,8 +28,8 @@ function DashboardPage() {
   ];
 
   return (
-    <main className="flex flex-col gap-3">
-      <div className="grid grid-cols-6 gap-3">
+    <main className="flex flex-col gap-3 min-h-0">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
         {statCards.map((box) => (
           <div
             key={box.title}

@@ -10,7 +10,7 @@ const ROUTES = [
   { href: "/executions", text: "Executions" },
   { href: "/exploits", text: "Exploits" },
   { href: "/submit", text: "Manual submit" },
-  { href: "/config", text: "Configuration" },
+  // { href: "/config", text: "Configuration" },
 ];
 
 function NavigationBar() {
@@ -69,7 +69,7 @@ function NavigationBar() {
       </div>
 
       <div className="p-6 flex flex-row items-center justify-between gap-6">
-        <div className="flex items-center gap-6 ">
+        <div className="flex items-center gap-6">
           <Link to={"/"}>
             <div className="text-xl font-bold">Kriger</div>
           </Link>
@@ -80,7 +80,7 @@ function NavigationBar() {
               activeProps={{
                 className: "font-bold !opacity-100",
               }}
-              className="opacity-60"
+              className="opacity-60 hidden md:block"
             >
               {link.text}
             </Link>

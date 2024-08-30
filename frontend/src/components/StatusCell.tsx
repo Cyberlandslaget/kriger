@@ -27,11 +27,7 @@ export const StatusCell = ({ flags }: StatusCellProps) => {
     ) {
       return "border-red-500/50";
     }
-    if (
-      aggregate.get(FLAG_CODE.Duplicate) ||
-      aggregate.get(FLAG_CODE.Resubmit) ||
-      aggregate.get(FLAG_CODE.Old)
-    ) {
+    if (aggregate.get(FLAG_CODE.Resubmit) || aggregate.get(FLAG_CODE.Old)) {
       return "border-amber-200/40";
     }
 
@@ -53,7 +49,12 @@ export const StatusCell = ({ flags }: StatusCellProps) => {
       title={aggregateSummary}
     >
       <div className="flex flex-row items-center p-1.5 gap-1">
-        {[...Array(aggregate.get(FLAG_CODE.Ok) ?? 0)].map((_, i) => (
+        {[
+          ...Array(
+            (aggregate.get(FLAG_CODE.Ok) ?? 0) +
+              (aggregate.get(FLAG_CODE.Duplicate) ?? 0),
+          ),
+        ].map((_, i) => (
           <FlagIcon
             className="stroke-green-500 fill-green-500 w-5 h-5"
             key={i}
