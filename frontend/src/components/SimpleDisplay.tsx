@@ -31,7 +31,6 @@ function SimpleDisplay() {
             {Object.entries(teams).map(([teamId, team]) => (
               <tr key={teamId}>
                 <td
-                  key={teamId}
                   className="bg-slate-950 bg-opacity-30 border-slate-950 border-opacity-20 border-2"
                   title={`[${teamId}] ${team.name ?? ""}`}
                 >
@@ -43,7 +42,7 @@ function SimpleDisplay() {
                 {services.map((service) => (
                   <StatusCell
                     flags={teamFlagMap[teamId]?.[service.name] ?? {}}
-                    key={teamId}
+                    key={service.name}
                   />
                 ))}
               </tr>
