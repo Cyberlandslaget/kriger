@@ -14,7 +14,6 @@ async fn read_app_config<P: AsRef<Path>>(path: P) -> eyre::Result<AppConfig> {
     Ok(config)
 }
 
-#[instrument(skip_all)]
 pub(crate) async fn main(args: args::Args) -> eyre::Result<()> {
     let app_config = read_app_config(args.config_file).await?;
 
