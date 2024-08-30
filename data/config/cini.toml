@@ -1,0 +1,17 @@
+[competition]
+start = "2024-08-31T07:30:00.000Z"
+tick = 120
+tick_start = 0
+flag_validity = 5
+flag_format = "[A-Z0-9]{31}="
+
+[submitter]
+type = "cini"
+interval = 6 # 10 req/min
+batch = 2000 # body size limit: 200 kB
+url = "http://10.10.0.1:8080/flags"
+token = ""
+
+[fetcher]
+type = "cini"
+url = "http://10.10.0.1:8081"

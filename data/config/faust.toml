@@ -1,0 +1,16 @@
+[competition]
+start = "2024-08-11T20:34:47Z"
+tick = 60
+tick_start = 0
+flag_validity = 5
+flag_format = "CYBL_[A-Za-z0-9/+]{32}"
+
+[submitter]
+type = "faust"
+interval = 1
+host = "10.10.0.1:31337"
+
+[fetcher]
+type = "faust"
+url = "http://10.10.0.1:5000/competition/teams.json"
+ip_format = "10.60.{}.1"
