@@ -102,7 +102,7 @@ impl CiniFetcher {
             }
         }
 
-        vec![]
+        hints
     }
 }
 
