@@ -1,6 +1,9 @@
+import AutoSizer from "react-virtualized-auto-sizer";
+import { forwardRef } from "react";
 import { useAtomValue } from "jotai";
 import { servicesAtom, teamFlagStatusAtom, teamsAtom } from "../utils/atoms";
 import { StatusCell } from "./StatusCell";
+import { FixedSizeList as List } from 'react-window';
 
 function SimpleDisplay() {
   const services = useAtomValue(servicesAtom);
@@ -9,45 +12,69 @@ function SimpleDisplay() {
 
   return (
     <div
-      className="flex flex-col h-full relative rounded-md overflow-auto"
+      className="flex flex-col h-full relative rounded-md"
     >
-      <div className="min-w-full text-sm bg-primary-bg z-10 absolute overflow-x-hidden overflow-y-scroll">
-        <div className="flex mb-2 pr-2">
-          <div className="min-w-48 items-center font-bold p-2 shadow-inner bg-slate-950/30 border-slate-950 border-opacity-20 border-2 rounded-sm text-left">
-            Team
-          </div>
-          {services.map((service) => (
-            <div
-              className="w-full min-w-36 ml-2 font-bold p-2 shadow-inner bg-slate-950/30 border-slate-950 border-opacity-20 border-2 rounded-sm text-nowrap sticky"
-              key={service.name}
-            >
-              {service.name}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex flex-col min-w-full h-full overflow-x-hidden overflow-y-scroll absolute pt-12">
-        {Object.entries(teams).map(([teamId, team]) => (
-          <div key={teamId} className="flex mb-2 pr-2">
-            <div
-              className="min-w-48 bg-slate-950 bg-opacity-30 border-slate-950 border-opacity-20 border-2"
-              title={`[${teamId}] ${team.name ?? ""}`}
-            >
-              <div className="w-full flex items-center text-sm p-1.5 h-full shadow-inner  rounded-sm transition-all duration-150 truncate">
-                [{teamId}] {team.name}
-              </div>
-            </div>
-
-            {services.map((service) => (
-              <StatusCell
-                flags={teamFlagMap[teamId]?.[service.name] ?? {}}
-                key={service.name}
-              />
+      <AutoSizer>
+        {({ height, width }) => (
+          <List
+            height={height}
+            itemCount={Object.keys(teams).length}
+            itemSize={48}
+            width={width}
+            innerElementType={forwardRef(({ children, ...rest }, ref) => (
+              <table ref={ref} {...rest}>
+                <thead
+                  className="sticky top-0 bg-primary-bg h-10 z-10"
+                >
+                  <tr className="flex mb-2">
+                    <th className="min-w-48 max-w-72 h-10 items-center font-bold p-2 shadow-inner bg-slate-950/30 border-slate-950 border-opacity-20 border-2 rounded-sm text-left">
+                      Team
+                    </th>
+                    {services.map((service) => (
+                      <th
+                        className="w-full min-w-36 max-w-72 ml-2 h-10 font-bold p-2 shadow-inner bg-slate-950/30 border-slate-950 border-opacity-20 border-2 rounded-sm text-nowrap"
+                        key={service.name}
+                      >
+                        {service.name}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {children}
+                </tbody>
+              </table>
             ))}
-          </div>
-        ))}
-      </div>
+          >
+            {({ index, style }) => {
+              const [teamId, team] = Object.entries(teams)[index];
+              return (
+                <tr
+                  key={`key-${index}`}
+                  style={{ ...style }}
+                  className="flex min-w-full mt-12"
+                >
+                  <td
+                    className="min-w-48 max-w-72 h-10 bg-slate-950 bg-opacity-30 border-slate-950 border-opacity-20 border-2"
+                    title={`[${teamId}] ${team.name ?? ""}`}
+                  >
+                    <div className="w-full flex items-center text-sm p-1.5 h-full shadow-inner  rounded-sm transition-all duration-150 truncate">
+                      [{teamId}] {team.name}
+                    </div>
+                  </td>
+
+                  {services.map((service) => (
+                    <StatusCell
+                      flags={teamFlagMap[teamId]?.[service.name] ?? {}}
+                      key={service.name}
+                    />
+                  ))}
+                </tr>
+              )
+            }}
+          </List>
+        )}
+      </AutoSizer>
     </div>
   );
 }

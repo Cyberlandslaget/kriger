@@ -41,9 +41,9 @@ export const StatusCell = ({ flags }: StatusCellProps) => {
   }, [aggregate]);
 
   return (
-    <div
+    <td
       className={clsx(
-        "w-full min-w-36 ml-2 bg-slate-950 bg-opacity-20 border-2 rounded-sm",
+        "w-full min-w-36 max-w-72 ml-2 h-10 bg-slate-950 bg-opacity-20 border-2 rounded-sm",
         borderColor,
       )}
       title={aggregateSummary}
@@ -52,7 +52,7 @@ export const StatusCell = ({ flags }: StatusCellProps) => {
         {[
           ...Array(
             (aggregate.get(FLAG_CODE.Ok) ?? 0) +
-              (aggregate.get(FLAG_CODE.Duplicate) ?? 0),
+            (aggregate.get(FLAG_CODE.Duplicate) ?? 0),
           ),
         ].map((_, i) => (
           <FlagIcon
@@ -70,6 +70,6 @@ export const StatusCell = ({ flags }: StatusCellProps) => {
           />
         ))}
       </div>
-    </div>
+    </td>
   );
 };
