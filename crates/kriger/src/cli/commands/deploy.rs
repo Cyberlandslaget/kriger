@@ -46,7 +46,7 @@ async fn build_image(
 
     for (key, value) in build_args {
         args.push("--build-arg".into());
-        args.push(Cow::Owned(format!("{}={}", key, value)));
+        args.push(format!("{}={}", key, value).into());
     }
 
     args.push(".".into());
