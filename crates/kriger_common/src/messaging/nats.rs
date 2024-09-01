@@ -515,8 +515,8 @@ impl<T: DeserializeOwned + Send + Sync + 'static> Message for NatsMessage<T> {
         Ok(())
     }
 
-    async fn nak(&self) -> Result<(), MessagingError> {
-        self.message.ack_with(AckKind::Nak(None)).await?;
+    async fn nak(&self, retry_in: Option<Duration>) -> Result<(), MessagingError> {
+        self.message.ack_with(AckKind::Nak(retry_in)).await?;
         Ok(())
     }
 

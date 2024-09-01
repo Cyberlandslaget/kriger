@@ -195,7 +195,7 @@ pub trait Message: Send + Sync + 'static {
     async fn ack(&self) -> Result<(), MessagingError>;
 
     /// Signals that the message will not be processed now and processing can move onto the next message, NAK’d message will be retried.
-    async fn nak(&self) -> Result<(), MessagingError>;
+    async fn nak(&self, retry_in: Option<Duration>) -> Result<(), MessagingError>;
 
     /// When sent before the AckWait period indicates that work is ongoing and the period should be extended by another equal to AckWait.
     async fn progress(&self) -> Result<(), MessagingError>;

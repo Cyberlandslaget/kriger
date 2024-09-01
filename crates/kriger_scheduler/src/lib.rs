@@ -268,6 +268,7 @@ async fn handle_hint_scheduling(
         .context("unable to watch flag hints")?;
     pin!(data_hints);
 
+    // TODO: Add Nak delays
     loop {
         select! {
             _ = runtime.cancellation_token.cancelled() => {
@@ -282,7 +283,7 @@ async fn handle_hint_scheduling(
                                 ?error,
                                 "scheduling error"
                             }
-                            if let Err(error) = message.nak().await {
+                            if let Err(error) = message.nak(None).await {
                                 error! {
                                     ?error,
                                     "unable to ack message"

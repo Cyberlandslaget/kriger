@@ -93,7 +93,7 @@ impl Runner {
                     ?error,
                     "execution failed"
                 }
-                job.request.nak().await.context("unable to nak")?;
+                job.request.nak(None).await.context("unable to nak")?;
             }
             Ok(..) => {
                 debug!("execution succeeded");

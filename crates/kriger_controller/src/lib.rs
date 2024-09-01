@@ -104,7 +104,7 @@ async fn handle_message(
                 "reconciliation error for exploit: {}: {:?}",
                 exploit.manifest.name, err
             );
-            message.nak().await?;
+            message.nak(None).await?;
         }
     };
     Ok(())

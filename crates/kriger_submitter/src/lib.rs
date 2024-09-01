@@ -38,16 +38,17 @@ pub async fn main(runtime: AppRuntime) -> eyre::Result<()> {
             Duration::from_secs(60),
             DeliverPolicy::New,
             // TODO: Un-hardcode
-            vec![
-                Duration::from_secs(1),
-                Duration::from_secs(3),
-                Duration::from_secs(5),
-                Duration::from_secs(10),
-                Duration::from_secs(30),
-                Duration::from_secs(60),
-                Duration::from_secs(90),
-                Duration::from_secs(120),
-            ],
+            vec![], // TODO: Do something with this. AckWait is not supported when using consumer backoffs
+                    // vec![
+                    //     Duration::from_secs(1),
+                    //     Duration::from_secs(3),
+                    //     Duration::from_secs(5),
+                    //     Duration::from_secs(10),
+                    //     Duration::from_secs(30),
+                    //     Duration::from_secs(60),
+                    //     Duration::from_secs(90),
+                    //     Duration::from_secs(120),
+                    // ],
         )
         .await
         .context("unable to watch flag submissions")?
@@ -135,7 +136,8 @@ async fn handle_submit(
                 ?error,
                 "unable to submit flags"
             }
-            let futures = requests.iter().map(|message| message.nak());
+            let backoff = Some(Duration::from_secs(2));
+            let futures = requests.iter().map(|message| message.nak(backoff));
             join_all(futures).await;
         }
     }
@@ -150,6 +152,8 @@ async fn handle_result(
     maybe_status: Option<models::FlagSubmissionStatus>,
     message: impl Message<Payload = FlagSubmission>,
 ) {
+    let nak_backoff = Some(Duration::from_secs(2));
+
     let payload = message.payload();
     let status = match maybe_status {
         Some(status) => status,
@@ -159,7 +163,7 @@ async fn handle_result(
                 flag = %payload.flag,
                 "submitted flag did not receive a response",
             }
-            let _ = message.nak().await;
+            let _ = message.nak(nak_backoff).await;
             return;
         }
     };
@@ -186,12 +190,12 @@ async fn handle_result(
             ?error,
             "unable to publish flag submission result"
         }
-        let _ = message.nak().await;
+        let _ = message.nak(nak_backoff).await;
         return;
     }
 
     if should_retry {
-        let _ = message.nak().await;
+        let _ = message.nak(nak_backoff).await;
     } else {
         let _ = message.ack().await;
     }
