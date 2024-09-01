@@ -16,6 +16,7 @@ use tokio::process::Command;
 use tokio::time::Instant;
 use tokio_stream::wrappers::LinesStream;
 use tracing::debug;
+use std::collections::HashMap;
 
 async fn read_exploit_manifest() -> Result<cli::models::ExploitManifest> {
     let raw = fs::read("exploit.toml").await?;
@@ -25,22 +26,29 @@ async fn read_exploit_manifest() -> Result<cli::models::ExploitManifest> {
 }
 
 // TODO: Eventually move to bollard if things work?
-async fn build_image(progress: &ProgressBar, tag: &str) -> Result<bool> {
+async fn build_image(progress: &ProgressBar, tag: &str, build_args: &HashMap<String, String>) -> Result<bool> {
     let start = Instant::now();
 
-    // TODO: Verify if this works on all relevant OSes?
-    debug!("Running: docker buildx build --push --pull --tag {tag} .");
+    let mut args = vec![
+        "buildx",
+        "build",
+        "--network=host",
+        "--push",
+        "--pull",
+        "--tag",
+        tag,
+    ].into_iter().map(String::from).collect::<Vec<_>>();
+    
+    for (key, value) in build_args {
+        args.push("--build-arg".to_owned());
+        args.push(format!("{}={}", key, value));
+    }
+    
+    args.push(".".to_owned());
+
+    debug!("Running: docker {}", args.join(" "));
     let mut child = Command::new("docker")
-        .args(&[
-            "buildx",
-            "build",
-            "--network=host",
-            "--push",
-            "--pull",
-            "--tag",
-            tag,
-            ".",
-        ])
+        .args(&args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -125,8 +133,12 @@ pub(crate) async fn main(args: args::Deploy) -> Result<()> {
         style(&manifest.name).green().bold()
     ));
 
+     // Prepare build arguments
+    let mut build_args = HashMap::new();
+    build_args.insert("REGISTRY".to_string(), cli_config.registry.registry.clone());
+
     // TODO: Set up a buildx instance first
-    match build_image(&progress, &tag).await {
+    match build_image(&progress, &tag, &build_args).await {
         Err(err) => {
             progress.finish_and_clear();
             println!(
