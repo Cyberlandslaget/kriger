@@ -58,7 +58,7 @@ function NavigationBar() {
   }, 50);
 
   return (
-    <nav>
+    <nav className="h-20">
       {/* Progress bar for a tick */}
       <div className="bg-slate-400/20 h-2">
         {/* FIXME: This progress bar is NOT accurate due to how the animation easing works. */}

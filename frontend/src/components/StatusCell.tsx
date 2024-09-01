@@ -41,9 +41,9 @@ export const StatusCell = ({ flags }: StatusCellProps) => {
   }, [aggregate]);
 
   return (
-    <td
+    <div
       className={clsx(
-        "bg-slate-950 bg-opacity-20 border-2 rounded-sm",
+        "w-full min-w-32 ml-2 bg-slate-950 bg-opacity-20 border-2 rounded-sm",
         borderColor,
       )}
       title={aggregateSummary}
@@ -57,6 +57,7 @@ export const StatusCell = ({ flags }: StatusCellProps) => {
         ].map((_, i) => (
           <FlagIcon
             className="stroke-green-500 fill-green-500 w-5 h-5"
+            // biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
             key={i}
           />
         ))}
@@ -64,10 +65,11 @@ export const StatusCell = ({ flags }: StatusCellProps) => {
         {[...Array(aggregate.get(FLAG_CODE.Pending) ?? 0)].map((_, i) => (
           <FlagIcon
             className="stroke-slate-700 fill-slate-700 w-5 h-5"
+            // biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
             key={i}
           />
         ))}
       </div>
-    </td>
+    </div>
   );
 };
