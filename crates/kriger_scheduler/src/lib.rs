@@ -104,7 +104,7 @@ async fn handle_scheduling(
     } else {
         info!(
             "the competition starts in {:} s",
-            time_since_start.num_seconds()
+            -time_since_start.num_seconds()
         );
     }
 
@@ -115,10 +115,10 @@ async fn handle_scheduling(
     let mut interval = interval_at(instant, tick);
     interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
-    // The first tick completes immediately.
-    interval.tick().await;
-
-    // TODO: Add scheduling for services with hints
+    if time_since_start > chrono::Duration::seconds(0) {
+        // The first tick completes immediately if the interval has started.
+        interval.tick().await;
+    }
 
     loop {
         select! {

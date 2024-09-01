@@ -13,7 +13,7 @@ use kriger_common::{messaging, models};
 use tokio::task::JoinSet;
 use tokio::time::MissedTickBehavior;
 use tokio::{select, time};
-use tracing::{error, info, instrument, warn};
+use tracing::{debug, error, info, instrument, warn};
 
 pub async fn main(runtime: AppRuntime) -> Result<()> {
     info!("starting data fetcher");
@@ -45,12 +45,10 @@ pub async fn main(runtime: AppRuntime) -> Result<()> {
 
     let fetcher = config.into_fetcher();
 
-    // TODO: Un-hardcode this
+    // TODO: Un-hardcode this and align the start to the start of a tick
     let tick_duration = time::Duration::from_secs(20);
-    let mut interval = time::interval_at(time::Instant::now(), tick_duration);
+    let mut interval = time::interval(tick_duration);
     interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
-
-    interval.tick().await; // The first tick will immediately complete
 
     let options = FetchOptions {
         require_hints: true,
@@ -62,6 +60,8 @@ pub async fn main(runtime: AppRuntime) -> Result<()> {
                 return Ok(())
             }
         }
+
+        debug!("fetcher tick");
         let data = match fetcher.fetch(&options, &services).await {
             Ok(data) => data,
             Err(error) => {

@@ -15,7 +15,7 @@ use kriger_common::models;
 use kriger_common::server::runtime::AppRuntime;
 use std::time::Duration;
 use tokio::select;
-use tokio::time::{interval_at, Instant, MissedTickBehavior};
+use tokio::time::MissedTickBehavior;
 use tracing::{debug, error, info, instrument, warn};
 
 pub async fn main(runtime: AppRuntime) -> eyre::Result<()> {
@@ -72,21 +72,18 @@ pub async fn main(runtime: AppRuntime) -> eyre::Result<()> {
 
     let submitter = config.inner.into_submitter();
 
-    let mut interval = interval_at(Instant::now(), Duration::from_secs(config.interval));
+    let mut interval = tokio::time::interval(Duration::from_secs(config.interval));
     interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
-    // The first tick completes immediately
-    interval.tick().await;
-
     loop {
-        debug!("submitter tick");
         select! {
+            _ = interval.tick() => {}
             _ = runtime.cancellation_token.cancelled() => {
                 return Ok(());
             }
-            _ = interval.tick() => {}
         }
 
+        debug!("submitter tick");
         // TODO: Is `PollPending` the best solution here, or should we just use the consumer's pending count?
         // TODO: Handle backpressure somehow
         let requests = PollPending::new(&mut flag_submissions, config.batch).await;
