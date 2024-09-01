@@ -16,6 +16,7 @@ use kriger_common::server::runtime::AppRuntime;
 use kube::api::{Patch, PatchParams};
 use kube::{Api, Client};
 use std::collections::BTreeMap;
+use std::time::Duration;
 use tokio::{pin, select};
 use tracing::{info, warn};
 
@@ -47,6 +48,7 @@ pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
             "*",
             None,
             AckPolicy::Explicit,
+            Duration::from_secs(60), // TODO: Adjust
             DeliverPolicy::LastPerSubject,
             vec![],
         )

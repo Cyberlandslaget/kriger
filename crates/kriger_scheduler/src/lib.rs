@@ -261,6 +261,7 @@ async fn handle_hint_scheduling(
         .watch_all::<FlagHint>(
             Some("scheduler".to_string()),
             AckPolicy::Explicit,
+            Duration::from_secs(60), // TODO: Adjust
             DeliverPolicy::New,
         )
         .await

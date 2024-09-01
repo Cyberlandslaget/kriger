@@ -34,6 +34,8 @@ pub async fn main(runtime: AppRuntime) -> eyre::Result<()> {
             "*.submit",
             Some("submitter".to_string()),
             AckPolicy::Explicit,
+            // TODO: Use approximately the same duration as flag submission timeout
+            Duration::from_secs(60),
             DeliverPolicy::New,
             // TODO: Un-hardcode
             vec![

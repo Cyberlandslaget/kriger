@@ -192,7 +192,14 @@ async fn subscribe_all(
 
     // TODO: Deliver messages from the last N ticks
     let flag_submissions_stream = flags
-        .watch_key::<FlagSubmission>("*.submit", None, AckPolicy::None, deliver_policy, vec![])
+        .watch_key::<FlagSubmission>(
+            "*.submit",
+            None,
+            AckPolicy::None,
+            Default::default(),
+            deliver_policy,
+            vec![],
+        )
         .await
         .context("unable to watch flags")?
         .filter_map(|res| async {
@@ -206,6 +213,7 @@ async fn subscribe_all(
             "*.result",
             None,
             AckPolicy::None,
+            Default::default(),
             deliver_policy,
             vec![],
         )

@@ -4,7 +4,7 @@ use kriger_common::server::runtime::{create_shutdown_cancellation_token, AppConf
 use std::path::Path;
 use std::sync::Arc;
 use tokio::task::JoinSet;
-use tracing::{info, instrument, warn};
+use tracing::{info, warn};
 
 pub(crate) mod args;
 

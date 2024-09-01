@@ -141,6 +141,7 @@ impl NatsBucket {
         key: Option<&str>,
         durable_name: Option<String>,
         ack_policy: AckPolicy,
+        ack_wait: Duration,
         deliver_policy: DeliverPolicy,
         backoff: Vec<Duration>,
     ) -> Result<impl Stream<Item = Result<NatsMessage<T>, MessagingError>>, MessagingError>
@@ -156,6 +157,7 @@ impl NatsBucket {
                 }),
                 durable_name,
                 ack_policy,
+                ack_wait,
                 deliver_policy,
                 backoff,
                 ..Default::default()
@@ -222,6 +224,7 @@ impl Bucket for NatsBucket {
         key: &str,
         durable_name: Option<String>,
         ack_policy: messaging::AckPolicy,
+        ack_wait: Duration,
         deliver_policy: messaging::DeliverPolicy,
         backoff: Vec<Duration>,
     ) -> Result<impl Stream<Item = Result<impl Message<Payload = T>, MessagingError>>, MessagingError>
@@ -232,6 +235,7 @@ impl Bucket for NatsBucket {
             Some(key),
             durable_name,
             ack_policy.into(),
+            ack_wait,
             deliver_policy.into(),
             backoff,
         )
@@ -242,6 +246,7 @@ impl Bucket for NatsBucket {
         &self,
         durable_name: Option<String>,
         ack_policy: messaging::AckPolicy,
+        ack_wait: Duration,
         deliver_policy: messaging::DeliverPolicy,
     ) -> Result<impl Stream<Item = Result<impl Message<Payload = T>, MessagingError>>, MessagingError>
     where
@@ -251,6 +256,7 @@ impl Bucket for NatsBucket {
             None,
             durable_name,
             ack_policy.into(),
+            ack_wait,
             deliver_policy.into(),
             vec![],
         )

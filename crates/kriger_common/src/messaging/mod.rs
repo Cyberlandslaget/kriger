@@ -109,6 +109,7 @@ pub trait Bucket: Clone + 'static {
         key: &str,
         durable_name: Option<String>,
         ack_policy: AckPolicy,
+        ack_wait: Duration,
         deliver_policy: DeliverPolicy,
         backoff: Vec<Duration>,
     ) -> impl Future<
@@ -124,6 +125,7 @@ pub trait Bucket: Clone + 'static {
         &self,
         durable_name: Option<String>,
         ack_policy: AckPolicy,
+        ack_wait: Duration,
         deliver_policy: DeliverPolicy,
     ) -> impl Future<
         Output = Result<
