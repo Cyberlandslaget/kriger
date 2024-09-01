@@ -29,7 +29,7 @@ async fn read_exploit_manifest() -> Result<cli::models::ExploitManifest> {
 async fn build_image(
     progress: &ProgressBar,
     tag: &str,
-    build_args: &HashMap<String, String>,
+    build_args: &HashMap<&str, &str>,
 ) -> Result<bool> {
     let start = Instant::now();
 
@@ -137,9 +137,9 @@ pub(crate) async fn main(args: args::Deploy) -> Result<()> {
         style(&manifest.name).green().bold()
     ));
 
-    // Prepare build arguments
-    let mut build_args = HashMap::new();
-    build_args.insert("REGISTRY".to_string(), cli_config.registry.registry.clone());
+     // Prepare build arguments
+    let mut build_args: HashMap<&str, &str> = HashMap::new();
+    build_args.insert("REGISTRY", &cli_config.registry.registry);
 
     // TODO: Set up a buildx instance first
     match build_image(&progress, &tag, &build_args).await {
