@@ -8,6 +8,7 @@ use futures::StreamExt;
 use indicatif::ProgressBar;
 use kriger_common::client::KrigerClient;
 use kriger_common::models;
+use std::collections::HashMap;
 use std::process::Stdio;
 use std::time::Duration;
 use tokio::fs;
@@ -16,7 +17,6 @@ use tokio::process::Command;
 use tokio::time::Instant;
 use tokio_stream::wrappers::LinesStream;
 use tracing::debug;
-use std::collections::HashMap;
 
 async fn read_exploit_manifest() -> Result<cli::models::ExploitManifest> {
     let raw = fs::read("exploit.toml").await?;
@@ -26,25 +26,29 @@ async fn read_exploit_manifest() -> Result<cli::models::ExploitManifest> {
 }
 
 // TODO: Eventually move to bollard if things work?
-async fn build_image(progress: &ProgressBar, tag: &str, build_args: &HashMap<String, String>) -> Result<bool> {
+async fn build_image(
+    progress: &ProgressBar,
+    tag: &str,
+    build_args: &HashMap<String, String>,
+) -> Result<bool> {
     let start = Instant::now();
 
     let mut args = vec![
-        "buildx",
-        "build",
-        "--network=host",
-        "--push",
-        "--pull",
-        "--tag",
-        tag,
-    ].into_iter().map(String::from).collect::<Vec<_>>();
+        "buildx".to_string(),
+        "build".to_string(),
+        "--network=host".to_string(),
+        "--push".to_string(),
+        "--pull".to_string(),
+        "--tag".to_string(),
+        tag.to_string(),
+    ];
     
     for (key, value) in build_args {
-        args.push("--build-arg".to_owned());
+        args.push("--build-arg".to_string());
         args.push(format!("{}={}", key, value));
     }
     
-    args.push(".".to_owned());
+    args.push(".".to_string());
 
     debug!("Running: docker {}", args.join(" "));
     let mut child = Command::new("docker")
@@ -133,7 +137,7 @@ pub(crate) async fn main(args: args::Deploy) -> Result<()> {
         style(&manifest.name).green().bold()
     ));
 
-     // Prepare build arguments
+    // Prepare build arguments
     let mut build_args = HashMap::new();
     build_args.insert("REGISTRY".to_string(), cli_config.registry.registry.clone());
 
