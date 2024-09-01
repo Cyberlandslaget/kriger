@@ -28,7 +28,7 @@ function DashboardPage() {
   ];
 
   return (
-    <main className="relative grid [grid-template-rows:auto_1fr] gap-3 min-h-0 h-[calc(100vh-6rem)]">
+    <main className="relative grid grid-rows-[auto_1fr] gap-3 min-h-0 h-[calc(100vh-6rem)]">
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
         {statCards.map((box) => (
           <div
