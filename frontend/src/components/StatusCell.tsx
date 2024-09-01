@@ -43,7 +43,7 @@ export const StatusCell = ({ flags }: StatusCellProps) => {
   return (
     <div
       className={clsx(
-        "w-full min-w-32 ml-2 bg-slate-950 bg-opacity-20 border-2 rounded-sm",
+        "w-full min-w-36 ml-2 bg-slate-950 bg-opacity-20 border-2 rounded-sm",
         borderColor,
       )}
       title={aggregateSummary}
