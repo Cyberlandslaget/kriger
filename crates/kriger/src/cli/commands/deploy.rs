@@ -8,6 +8,7 @@ use futures::StreamExt;
 use indicatif::ProgressBar;
 use kriger_common::client::KrigerClient;
 use kriger_common::models;
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::process::Stdio;
 use std::time::Duration;
@@ -33,22 +34,24 @@ async fn build_image(
 ) -> Result<bool> {
     let start = Instant::now();
 
-    let mut args = vec![
-        "buildx".to_string(),
-        "build".to_string(),
-        "--network=host".to_string(),
-        "--push".to_string(),
-        "--pull".to_string(),
-        "--tag".to_string(),
-        tag.to_string(),
+    let mut args: Vec<Cow<str>> = vec![
+        "buildx".into(),
+        "build".into(),
+        "--network=host".into(),
+        "--push".into(),
+        "--pull".into(),
+        "--tag".into(),
+        tag.into(),
     ];
-    
+
     for (key, value) in build_args {
-        args.push("--build-arg".to_string());
-        args.push(format!("{}={}", key, value));
+        args.push("--build-arg".into());
+        args.push(Cow::Owned(format!("{}={}", key, value)));
     }
-    
-    args.push(".".to_string());
+
+    args.push(".".into());
+
+    let args: Vec<&str> = args.iter().map(|arg| arg.as_ref()).collect();
 
     debug!("Running: docker {}", args.join(" "));
     let mut child = Command::new("docker")
@@ -137,7 +140,7 @@ pub(crate) async fn main(args: args::Deploy) -> Result<()> {
         style(&manifest.name).green().bold()
     ));
 
-     // Prepare build arguments
+    // Prepare build arguments
     let mut build_args: HashMap<&str, &str> = HashMap::new();
     build_args.insert("REGISTRY", &cli_config.registry.registry);
 
