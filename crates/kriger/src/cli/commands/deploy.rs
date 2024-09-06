@@ -8,6 +8,8 @@ use futures::StreamExt;
 use indicatif::ProgressBar;
 use kriger_common::client::KrigerClient;
 use kriger_common::models;
+use std::borrow::Cow;
+use std::collections::HashMap;
 use std::process::Stdio;
 use std::time::Duration;
 use tokio::fs;
@@ -25,22 +27,35 @@ async fn read_exploit_manifest() -> Result<cli::models::ExploitManifest> {
 }
 
 // TODO: Eventually move to bollard if things work?
-async fn build_image(progress: &ProgressBar, tag: &str) -> Result<bool> {
+async fn build_image(
+    progress: &ProgressBar,
+    tag: &str,
+    build_args: &HashMap<&str, &str>,
+) -> Result<bool> {
     let start = Instant::now();
 
-    // TODO: Verify if this works on all relevant OSes?
-    debug!("Running: docker buildx build --push --pull --tag {tag} .");
+    let mut args: Vec<Cow<str>> = vec![
+        "buildx".into(),
+        "build".into(),
+        "--network=host".into(),
+        "--push".into(),
+        "--pull".into(),
+        "--tag".into(),
+        tag.into(),
+    ];
+
+    for (key, value) in build_args {
+        args.push("--build-arg".into());
+        args.push(format!("{}={}", key, value).into());
+    }
+
+    args.push(".".into());
+
+    let args: Vec<&str> = args.iter().map(|arg| arg.as_ref()).collect();
+
+    debug!("Running: docker {}", args.join(" "));
     let mut child = Command::new("docker")
-        .args(&[
-            "buildx",
-            "build",
-            "--network=host",
-            "--push",
-            "--pull",
-            "--tag",
-            tag,
-            ".",
-        ])
+        .args(&args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -125,8 +140,12 @@ pub(crate) async fn main(args: args::Deploy) -> Result<()> {
         style(&manifest.name).green().bold()
     ));
 
+    // Prepare build arguments
+    let mut build_args: HashMap<&str, &str> = HashMap::new();
+    build_args.insert("REGISTRY", &cli_config.registry.registry);
+
     // TODO: Set up a buildx instance first
-    match build_image(&progress, &tag).await {
+    match build_image(&progress, &tag, &build_args).await {
         Err(err) => {
             progress.finish_and_clear();
             println!(
