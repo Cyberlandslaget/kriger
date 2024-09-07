@@ -1,9 +1,11 @@
-# kriger
+<div align="center">
+<h1>kriger</h1>
+</div>
+
+![](.github/assets/banner.png)
 
 An exploit farm for attack/defense (A/D) CTFs. This is the next-generation exploit farm based on the work done
 in [angrepa](https://github.com/Cyberlandslaget/angrepa).
-
-![](.github/assets/logo.png)
 
 ## Documentation
 
