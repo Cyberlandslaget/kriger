@@ -1,6 +1,6 @@
 mod utils;
 
-use crate::utils::get_current_tick;
+use crate::utils::{get_current_tick, is_team_excluded};
 use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine};
 use chrono::Utc;
 use color_eyre::eyre;
@@ -185,66 +185,76 @@ async fn handle_tick(
 
         // Used as the key in our K/V store since the service name can be unpredictable
         let service_name_b64 = STANDARD_NO_PAD.encode(&exploit.manifest.service);
-        match services.get(&service_name_b64) {
-            Some(service) => {
-                // If the service has hints / flag ids, then we don't schedule the executions now.
-                // We will schedule the execution once the hint is made available.
-                if service.has_hint {
-                    debug! {
-                        service.name,
-                        "the service requires hint, skipping"
-                    }
-                    continue;
-                }
-
-                for team in teams.iter() {
-                    let ip_address = team
-                        .services
-                        .get(&service.name)
-                        .or(team.ip_address.as_ref());
-
-                    if let Some(ip_address) = ip_address {
-                        let request = ExecutionRequest {
-                            ip_address: ip_address.clone(),
-                            flag_hint: None,
-                            team_id: Some(team.key().clone()),
-                        };
-
-                        debug! {
-                            ?request,
-                            "sending execution request"
-                        }
-
-                        // TODO: Parallelize this
-                        let res = runtime
-                            .messaging
-                            .publish(
-                                format!("executions.{}.request", &exploit.manifest.name),
-                                &request,
-                                false, // TODO: Do we need double ack?
-                            )
-                            .await;
-
-                        if let Err(error) = res {
-                            warn! {
-                                ?error,
-                                "unable to send execution request"
-                            }
-                        }
-                    } else {
-                        warn! {
-                            team.name = team.key(),
-                            service.name,
-                            "the team does not have an ip address for the service",
-                        }
-                    }
-                }
-            }
+        let service = match services.get(&service_name_b64) {
+            Some(service) => service,
             None => {
                 warn! {
                     exploit.name = exploit.manifest.name,
                     service.name = exploit.manifest.service,
                     "unable to find the service referenced by the exploit"
+                }
+                continue;
+            }
+        };
+
+        // If the service has hints / flag ids, then we don't schedule the executions now.
+        // We will schedule the execution once the hint is made available.
+        if service.has_hint {
+            debug! {
+                service.name,
+                "the service requires hint, skipping"
+            }
+            continue;
+        }
+
+        for team in teams.iter() {
+            if is_team_excluded(&runtime.config.competition, &team.key()) {
+                debug! {
+                    service.name,
+                    team.id = team.key(),
+                    "the team is excluded, skipping"
+                }
+                continue;
+            }
+
+            let ip_address = team
+                .services
+                .get(&service.name)
+                .or(team.ip_address.as_ref());
+
+            if let Some(ip_address) = ip_address {
+                let request = ExecutionRequest {
+                    ip_address: ip_address.clone(),
+                    flag_hint: None,
+                    team_id: Some(team.key().clone()),
+                };
+
+                debug! {
+                    ?request,
+                    "sending execution request"
+                }
+
+                // TODO: Parallelize this
+                let res = runtime
+                    .messaging
+                    .publish(
+                        format!("executions.{}.request", &exploit.manifest.name),
+                        &request,
+                        false, // TODO: Do we need double ack?
+                    )
+                    .await;
+
+                if let Err(error) = res {
+                    warn! {
+                        ?error,
+                        "unable to send execution request"
+                    }
+                }
+            } else {
+                warn! {
+                    team.name = team.key(),
+                    service.name,
+                    "the team does not have an ip address for the service",
                 }
             }
         }
@@ -270,44 +280,40 @@ async fn handle_hint_scheduling(
 
     // TODO: Add Nak delays
     loop {
-        select! {
-            _ = runtime.cancellation_token.cancelled() => {
-                return Ok(())
-            }
-            maybe_message = data_hints.next() => {
-                match maybe_message {
-                    Some(Ok(message)) => {
-                        // TODO: Make this more efficient.
-                        if let Err(error) = handle_hint_schedule(&runtime, &teams, &exploits, &message).await {
-                            error! {
-                                ?error,
-                                "scheduling error"
-                            }
-                            if let Err(error) = message.nak(None).await {
-                                error! {
-                                    ?error,
-                                    "unable to ack message"
-                                }
-                            }
-                        } else {
-                            if let Err(error) = message.ack().await {
-                                error! {
-                                    ?error,
-                                    "unable to ack message"
-                                }
-                            }
-                        }
-                    }
-                    Some(Err(error)) => {
-                        error! {
-                            ?error,
-                            "unexpected messaging error"
-                        }
-                    }
-                    None => {
-                        return Ok(())
-                    }
+        let maybe_message = select! {
+            _ = runtime.cancellation_token.cancelled() => return Ok(()),
+            maybe_message = data_hints.next() => maybe_message
+        };
+        let message = match maybe_message {
+            Some(Ok(message)) => message,
+            Some(Err(error)) => {
+                error! {
+                    ?error,
+                    "unexpected messaging error"
                 }
+                continue;
+            }
+            // End of stream
+            None => return Ok(()),
+        };
+        // TODO: Make this more efficient.
+        if let Err(error) = handle_hint_schedule(&runtime, &teams, &exploits, &message).await {
+            error! {
+                ?error,
+                "scheduling error"
+            }
+            if let Err(error) = message.nak(None).await {
+                error! {
+                    ?error,
+                    "unable to ack message"
+                }
+            }
+            continue;
+        }
+        if let Err(error) = message.ack().await {
+            error! {
+                ?error,
+                "unable to ack message"
             }
         }
     }
@@ -331,6 +337,15 @@ async fn handle_hint_schedule(
     let payload = message.payload();
 
     let team = teams.get(&payload.team_id).context("unknown team id")?;
+    if is_team_excluded(&runtime.config.competition, &team.key()) {
+        debug! {
+            service.name = payload.service,
+            team.id = team.key(),
+            "the team is excluded, skipping"
+        }
+        return Ok(());
+    }
+
     let ip_address = team
         .services
         .get(&payload.service)

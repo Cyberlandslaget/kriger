@@ -40,6 +40,10 @@ pub struct CompetitionConfig {
     pub flag_validity: u32,
     /// The regular expression for the flag format
     pub flag_format: String,
+    /// The team id of the NOP team
+    pub nop_team: Option<String>,
+    /// The team id of the self team
+    pub self_team: Option<String>,
 }
 
 pub fn create_shutdown_cancellation_token() -> CancellationToken {

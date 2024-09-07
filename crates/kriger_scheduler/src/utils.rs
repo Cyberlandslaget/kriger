@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use color_eyre::Result;
+use kriger_common::server::runtime::CompetitionConfig;
 
 // Ported from angrepa
 pub(crate) fn get_instant_from_datetime(target: DateTime<Utc>) -> Result<tokio::time::Instant> {
@@ -30,10 +31,28 @@ pub(crate) fn get_current_tick(
     ticks_after_start.floor() as i64
 }
 
+pub(crate) fn is_team_excluded(config: &CompetitionConfig, team_id: &str) -> bool {
+    if let Some(nop_team) = &config.nop_team {
+        if nop_team == team_id {
+            return true;
+        }
+    }
+    if let Some(self_team) = &config.self_team {
+        if self_team == team_id {
+            return true;
+        }
+    }
+    false
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::utils::get_current_tick;
+    use crate::utils::{get_current_tick, is_team_excluded};
     use chrono::{DateTime, Duration, NaiveDate, NaiveDateTime, NaiveTime, TimeDelta, Utc};
+    use kriger_common::server::runtime::CompetitionConfig;
+
+    const NOP_TEAM_ID: &str = "1";
+    const SELF_TEAM_ID: &str = "4";
 
     fn expect_tick(offset: TimeDelta, expected_tick: i64) {
         // CTF starts at Jan 1st 2024, 08:00 AM UTC
@@ -46,6 +65,19 @@ mod tests {
         );
         let tick = get_current_tick(start_time, start_time + offset, 120);
         assert_eq!(tick, expected_tick);
+    }
+
+    fn create_competition_config() -> CompetitionConfig {
+        // We do not care about other fields here except nop_team and self_team
+        CompetitionConfig {
+            start: Default::default(),
+            tick: 0,
+            tick_start: 0,
+            flag_validity: 0,
+            flag_format: "".to_string(),
+            nop_team: Some(NOP_TEAM_ID.to_string()),
+            self_team: Some(SELF_TEAM_ID.to_string()),
+        }
     }
 
     #[test]
@@ -75,5 +107,23 @@ mod tests {
     #[test]
     fn should_have_correct_tick_one_hour_before_start() {
         expect_tick(Duration::hours(-1), -30);
+    }
+
+    #[test]
+    fn should_exclude_nop_team() {
+        let config = create_competition_config();
+        assert!(is_team_excluded(&config, NOP_TEAM_ID));
+    }
+
+    #[test]
+    fn should_exclude_self_team() {
+        let config = create_competition_config();
+        assert!(is_team_excluded(&config, SELF_TEAM_ID));
+    }
+
+    #[test]
+    fn should_not_exclude_other_team() {
+        let config = create_competition_config();
+        assert!(!is_team_excluded(&config, "1337"));
     }
 }
