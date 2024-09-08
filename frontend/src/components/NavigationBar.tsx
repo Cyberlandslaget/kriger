@@ -31,19 +31,26 @@ function NavigationBar() {
         : undefined,
     [startTime, status.currentTick, serverConfig],
   );
+  const tickOffset = useMemo(
+    () =>
+      serverConfig
+        ? serverConfig.competition.tickStart * serverConfig.competition.tick * 1000
+        : undefined,
+    [serverConfig],
+  );
   const [currentTime, setCurrentTime] = useState<number | undefined>(tickStart);
 
   // Values in the range [0, inf). Values below 1 represents tick progress.
   // Values greater than or equal to 1 represents ticks that are waiting for the server.
   const tickProgress = useMemo(
     () =>
-      currentTime && tickStart && serverConfig
+      currentTime && tickStart && tickOffset && serverConfig
         ? Math.max(
-          (currentTime - tickStart) / serverConfig.competition.tick / 1000,
+          (currentTime - tickStart - tickOffset) / serverConfig.competition.tick / 1000,
           0,
         )
         : 0,
-    [currentTime, tickStart, serverConfig],
+    [currentTime, tickStart, tickOffset, serverConfig],
   );
 
   const timeUntilNextTick = useMemo(() => {
