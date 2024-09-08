@@ -1,6 +1,6 @@
 mod utils;
 
-use crate::utils::{get_current_tick, is_team_excluded};
+use crate::utils::{get_current_non_offsetting_tick, is_team_excluded};
 use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine};
 use chrono::Utc;
 use color_eyre::eyre;
@@ -127,11 +127,11 @@ async fn handle_scheduling(
                 return Ok(());
             }
         }
-        let tick = get_current_tick(
+        let tick = get_current_non_offsetting_tick(
             config.competition.start,
             Utc::now(),
             config.competition.tick,
-        );
+        ) + config.competition.tick_start;
 
         handle_tick(tick, &runtime, &exploits, &services, &teams).await;
     }

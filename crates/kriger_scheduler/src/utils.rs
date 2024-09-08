@@ -16,7 +16,7 @@ pub(crate) fn get_instant_from_datetime(target: DateTime<Utc>) -> Result<tokio::
 }
 
 // Taken from angrepa
-pub(crate) fn get_current_tick(
+pub(crate) fn get_current_non_offsetting_tick(
     start_time: DateTime<Utc>,
     current_time: DateTime<Utc>,
     tick_duration_secs: u64,
@@ -47,7 +47,7 @@ pub(crate) fn is_team_excluded(config: &CompetitionConfig, team_id: &str) -> boo
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::{get_current_tick, is_team_excluded};
+    use crate::utils::{get_current_non_offsetting_tick, is_team_excluded};
     use chrono::{DateTime, Duration, NaiveDate, NaiveDateTime, NaiveTime, TimeDelta, Utc};
     use kriger_common::server::runtime::CompetitionConfig;
 
@@ -63,7 +63,7 @@ mod tests {
             ),
             Utc,
         );
-        let tick = get_current_tick(start_time, start_time + offset, 120);
+        let tick = get_current_non_offsetting_tick(start_time, start_time + offset, 120);
         assert_eq!(tick, expected_tick);
     }
 
