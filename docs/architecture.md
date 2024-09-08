@@ -95,41 +95,32 @@ The *metrics* component is not explicitly listed as a consumer, but it'll consum
 
 ### Diagrams
 
-**Fetcher, exploit execution, and submission**:
+**Logical messaging & components**:
 
 ```mermaid
-sequenceDiagram
-    participant c as Controller
-    participant nats as NATS
-    participant r as Runner
-    participant s as Submitter
-    participant f as Fetcher
-    participant cs as Competition system
-    loop Every tick
-        f ->> cs: Request attack data (eg. teams.json)
-        cs -->> f: Attack data (network IDs, flag IDs, etc)
-    end
-    f ->> nats: Push attack data
-    nats ->> c: Watch registered exploits
-    loop Scheduling routine
-        nats -->> c: Attack data
-        c ->> nats: Schedule executions
-    end
-    loop Poll routine based on capacity
-        r ->> nats: Poll schedule
-        nats -->> + r: Receive schedule
-        r -->> nats: Acknowledgement: In progress
-        r ->> r: Execute the exploit
-        r ->> nats: Publish execution result and flag(s)
-        r -->>  - nats: Acknowledgement: Ack/Nak
-    end
-    loop Poll routine based on capacity
-        s ->> nats: Poll flag
-        nats -->> + s: Receive flag
-        s -->> nats: Acknowledgement: In progress
-        s ->> cs: Submit flag
-        cs -->> s: Submission result
-        s ->> nats: Publish submission result
-        s -->>  - nats: Acknowledgement: Ack/Nak/Term
-    end
+graph TB
+    kv_exploits[(KV_exploits)]
+    kv_services[(KV_services)]
+    kv_teams[(KV_teams)]
+    fetcher[kriger-fetcher]
+    scheduler[kriger-scheduler]
+    controller[kriger-controller]
+    submitter[kriger-submitter]
+    ws[kriger-ws]
+    exploits[exploits]
+    k8s([Kubernetes])
+    comp([Competition system])
+    kv_exploits --> scheduler
+    kv_services --> scheduler
+    kv_teams --> scheduler
+    kv_exploits --> controller
+    controller -- " Create deployments " --> k8s
+    fetcher <-- " Fetch data " --> comp
+    submitter -- " Submit flags " --> comp
+    fetcher -- " data.flag_hints.> " --> scheduler
+    scheduler -- " executions.*.request " --> exploits
+    exploits -- " flags.submit " --> submitter
+    exploits -- " flags.submit " --> ws
+    submitter -- " flags.result " --> ws
+    scheduler -- " scheduling.tick " --> ws
 ```
