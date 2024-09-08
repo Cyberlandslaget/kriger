@@ -34,8 +34,8 @@ pub struct CompetitionConfig {
     pub start: chrono::DateTime<chrono::Utc>,
     /// Tick/round length in seconds
     pub tick: u64,
-    /// The start tick in ticks. This is usually 0.
-    pub tick_start: i32,
+    /// The start tick in ticks. This indicates the first ticking round between T+0 and T+tick.
+    pub tick_start: i64,
     /// The validity of flags in rounds
     pub flag_validity: u32,
     /// The regular expression for the flag format
