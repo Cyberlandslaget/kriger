@@ -56,6 +56,8 @@ jobs:
         include:
           - tag: kriger/exploit-base:python
             path: data/base/python
+          - tag: kriger/exploit-base:python-slim
+            path: data/base/python-slim
     name: Build exploit base ${{ matrix.tag }}
     runs-on: self-hosted
     needs: [ build ]

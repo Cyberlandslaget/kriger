@@ -1,1 +1,1 @@
-# Add exploit-specific dependencies below:
+../../base/python-slim/requirements.txt
