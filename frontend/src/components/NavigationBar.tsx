@@ -46,7 +46,7 @@ function NavigationBar() {
     () =>
       currentTime && tickStart && tickOffset && serverConfig
         ? Math.max(
-          (currentTime - tickStart - tickOffset) / serverConfig.competition.tick / 1000,
+          (currentTime - tickStart + tickOffset) / serverConfig.competition.tick / 1000,
           0,
         )
         : 0,
