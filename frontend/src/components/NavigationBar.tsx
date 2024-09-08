@@ -39,9 +39,9 @@ function NavigationBar() {
     () =>
       currentTime && tickStart && serverConfig
         ? Math.max(
-            (currentTime - tickStart) / serverConfig.competition.tick / 1000,
-            0,
-          )
+          (currentTime - tickStart) / serverConfig.competition.tick / 1000,
+          0,
+        )
         : 0,
     [currentTime, tickStart, serverConfig],
   );
@@ -51,6 +51,19 @@ function NavigationBar() {
       ? (1 - tickProgress) * serverConfig.competition.tick
       : undefined;
   }, [tickProgress, serverConfig]);
+
+  const [hasTickStarted, stringTimeUntilFirstTick] = useMemo(() => {
+    // Calculate days, hours, minutes, and seconds
+    const remainingTime = ((startTime ?? 0) - (currentTime ?? 0));
+    const days = Math.floor(remainingTime / 86400000).toString().padStart(2, "0");
+    const hours = Math.floor((remainingTime % 86400000) / 3600000).toString().padStart(2, "0");
+    const minutes = Math.floor((remainingTime % 3600000) / 60000).toString().padStart(2, "0");
+    const seconds = Math.floor((remainingTime % 60000) / 1000).toString().padStart(2, "0");
+    return [
+      currentTime && startTime && currentTime >= startTime,
+      `${days}:${hours}:${minutes}:${seconds}`
+    ]
+  }, [startTime, currentTime])
 
   // JavaScript timers are inaccurate by nature
   useInterval(() => {
@@ -88,17 +101,24 @@ function NavigationBar() {
         </div>
 
         {/* Current tick + remaining tick time */}
-        <div className="font-bold">
-          {/* Highlight the tick as red if the tickProgress is > 1. This means that the server is not delivering on time. */}
-          <span className={clsx(tickProgress > 1 && "text-red-500")}>
-            Tick {status.currentTick}
-          </span>{" "}
-          {/* We don't support end round yet */}
-          {/* / {status.rounds}{" "} */}
-          <span className="font-normal text-slate-300">
-            ({timeUntilNextTick?.toFixed(0) ?? "∞"}s)
-          </span>
-        </div>
+        {hasTickStarted ?
+          <div className="font-bold">
+            {/* Highlight the tick as red if the tickProgress is > 1. This means that the server is not delivering on time. */}
+            <span className={clsx(tickProgress > 1 && "text-red-500")}>
+              Tick {status.currentTick}
+            </span>{" "}
+            {/* We don't support end round yet */}
+            {/* / {status.rounds}{" "} */}
+            <span className="font-normal text-slate-300">
+              ({timeUntilNextTick?.toFixed(0) ?? "∞"}s)
+            </span>
+          </div> :
+          <div className="font-bold">
+            <span>
+              Starting in {stringTimeUntilFirstTick}
+            </span>
+          </div>
+        }
       </div>
     </nav>
   );
