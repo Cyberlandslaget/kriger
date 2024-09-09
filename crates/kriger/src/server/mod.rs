@@ -21,7 +21,7 @@ pub(crate) async fn main(args: args::Args) -> eyre::Result<()> {
     let messaging = NatsMessaging::new(&args.common.nats_url).await?;
 
     // TODO: Move this somewhere else
-    messaging.do_migration().await?;
+    messaging.do_migration(&app_config).await?;
 
     let cancellation_token = create_shutdown_cancellation_token();
 

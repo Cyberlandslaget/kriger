@@ -4,7 +4,7 @@ use dashmap::DashMap;
 use kriger_common::models;
 use serde::{self, Deserialize};
 use std::collections::HashMap;
-use tracing::debug;
+use tracing::{debug, instrument};
 
 #[derive(Deserialize, Debug)]
 pub struct AttackInfo {
@@ -46,6 +46,7 @@ impl FaustFetcher {
 
 #[async_trait]
 impl Fetcher for FaustFetcher {
+    #[instrument(skip_all)]
     async fn fetch(
         &self,
         _options: &FetchOptions,

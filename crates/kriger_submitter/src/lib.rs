@@ -2,17 +2,15 @@ mod submitter;
 mod utils;
 
 use crate::submitter::{Submitter, SubmitterConfig};
-use crate::utils::futures::PollPending;
-use base64::engine::general_purpose::STANDARD_NO_PAD;
-use base64::Engine;
+use async_nats::jetstream::AckKind;
 use color_eyre::eyre;
 use color_eyre::eyre::Context;
 use futures::future::join_all;
 use futures::StreamExt;
-use kriger_common::messaging::model::{FlagSubmission, FlagSubmissionResult};
-use kriger_common::messaging::{AckPolicy, Bucket, DeliverPolicy, Message, Messaging};
-use kriger_common::models;
+use kriger_common::messaging::nats::{Fetcher, MessageWrapper, MessagingServiceError};
+use kriger_common::messaging::services::flags::FlagsService;
 use kriger_common::server::runtime::AppRuntime;
+use kriger_common::{messaging, models};
 use std::time::Duration;
 use tokio::select;
 use tokio::time::MissedTickBehavior;
@@ -21,47 +19,9 @@ use tracing::{debug, error, info, instrument, warn};
 pub async fn main(runtime: AppRuntime) -> eyre::Result<()> {
     info!("starting submitter");
 
-    let flags_bucket = runtime
-        .messaging
-        .flags()
-        .await
-        .context("unable to retrieve the flags bucket")?;
-    let flags_bucket = Box::leak(Box::new(flags_bucket));
+    let flags_bucket = runtime.messaging.flags();
+    let flags_svc = Box::leak(Box::new(flags_bucket));
     // TODO FIXME Using Box::leak is ugly, avoid doing that
-
-    let mut flag_submissions = flags_bucket
-        .watch_key::<FlagSubmission>(
-            "*.submit",
-            Some("submitter".to_string()),
-            AckPolicy::Explicit,
-            // TODO: Use approximately the same duration as flag submission timeout
-            Duration::from_secs(60),
-            DeliverPolicy::New,
-            // TODO: Un-hardcode
-            vec![], // TODO: Do something with this. AckWait is not supported when using consumer backoffs
-                    // vec![
-                    //     Duration::from_secs(1),
-                    //     Duration::from_secs(3),
-                    //     Duration::from_secs(5),
-                    //     Duration::from_secs(10),
-                    //     Duration::from_secs(30),
-                    //     Duration::from_secs(60),
-                    //     Duration::from_secs(90),
-                    //     Duration::from_secs(120),
-                    // ],
-        )
-        .await
-        .context("unable to watch flag submissions")?
-        .filter_map(|item| async move {
-            match item {
-                Ok(msg) => Some(msg),
-                Err(err) => {
-                    warn!("unable to parse flag submission: {err:?}");
-                    None
-                }
-            }
-        })
-        .boxed(); // FIXME: Does actually have to be boxed?
 
     let config: SubmitterConfig = runtime
         .config
@@ -69,6 +29,12 @@ pub async fn main(runtime: AppRuntime) -> eyre::Result<()> {
         .clone()
         .try_into()
         .context("unable to parse the submitter config")?;
+
+    let batch = config.batch.unwrap_or(10_000);
+    let mut fetcher = flags_svc
+        .submissions_fetcher(Some("submitter".to_string()), batch)
+        .await
+        .context("unable to create a fetcher for flag submissions")?;
 
     let submitter = config.inner.into_submitter();
 
@@ -78,23 +44,48 @@ pub async fn main(runtime: AppRuntime) -> eyre::Result<()> {
     loop {
         select! {
             _ = interval.tick() => {}
-            _ = runtime.cancellation_token.cancelled() => {
-                return Ok(());
-            }
+            _ = runtime.cancellation_token.cancelled() => return Ok(())
         }
 
         debug!("submitter tick");
-        // TODO: Is `PollPending` the best solution here, or should we just use the consumer's pending count?
-        // TODO: Handle backpressure somehow
-        let requests = PollPending::new(&mut flag_submissions, config.batch).await;
-        handle_submit(submitter.as_ref(), requests, flags_bucket).await;
+        let submissions = match fetcher.next().await {
+            Ok(submissions) => submissions.filter_map(|maybe_submission| async {
+                match maybe_submission {
+                    Ok(submission) => Some(submission),
+                    Err(MessagingServiceError::ProcessingError { message, error }) => {
+                        error! {
+                            ?error,
+                            "messaging processing error"
+                        }
+                        _ = message.ack_with(AckKind::Term).await;
+                        None
+                    }
+                    Err(error) => {
+                        error! {
+                            ?error,
+                            "unexpected messaging error"
+                        }
+                        None
+                    }
+                }
+            }),
+            Err(error) => {
+                error! {
+                    ?error,
+                    "unable to fetch flag submissions"
+                }
+                continue;
+            }
+        };
+        let submissions = submissions.collect().await;
+        handle_submit(submitter.as_ref(), submissions, flags_svc).await;
     }
 }
 #[instrument(skip_all, fields(flag_count = %requests.len()))]
 async fn handle_submit(
     submitter: &(dyn Submitter + Send + Sync),
-    requests: Vec<impl Message<Payload = FlagSubmission>>,
-    flags_bucket: &impl Bucket,
+    requests: Vec<MessageWrapper<messaging::model::FlagSubmission>>,
+    flags_svc: &FlagsService,
 ) {
     if requests.len() == 0 {
         debug!("there are no flags to submit, skipping");
@@ -106,10 +97,9 @@ async fn handle_submit(
         "preparing to submit flags"
     }
 
-    // TODO: Investigate why duplicate flags were received?
     let flags: Vec<&str> = requests
         .iter()
-        .map(|msg| msg.payload().flag.as_ref())
+        .map(|msg| msg.payload.flag.as_ref())
         .collect();
 
     // Indicate the work is in progress. We do this concurrently.
@@ -121,8 +111,8 @@ async fn handle_submit(
         Ok(mut results) => {
             let futures = requests.into_iter().map(|message| {
                 handle_result(
-                    flags_bucket,
-                    results.remove(message.payload().flag.as_str()),
+                    flags_svc,
+                    results.remove(message.payload.flag.as_str()),
                     message,
                 )
             });
@@ -140,18 +130,22 @@ async fn handle_submit(
     }
 }
 
-#[instrument(skip_all, fields(
-    flag = %message.payload().flag,
-    flag.status = ?maybe_status
-))]
+#[instrument(
+    level = "DEBUG",
+    skip_all,
+    fields(
+        flag = %message.payload.flag,
+        flag.status = ?maybe_status
+    )
+)]
 async fn handle_result(
-    flags_bucket: &impl Bucket,
+    flags_svc: &FlagsService,
     maybe_status: Option<models::FlagSubmissionStatus>,
-    message: impl Message<Payload = FlagSubmission>,
+    message: MessageWrapper<messaging::model::FlagSubmission>,
 ) {
     let nak_backoff = Some(Duration::from_secs(2));
 
-    let payload = message.payload();
+    let payload = &message.payload;
     let status = match maybe_status {
         Some(status) => status,
         None => {
@@ -166,9 +160,8 @@ async fn handle_result(
     };
 
     debug!("received flag submission response");
-    // FIXME: Can't we move??
     let should_retry = status.should_retry();
-    let result = FlagSubmissionResult {
+    let result = messaging::model::FlagSubmissionResult {
         flag: payload.flag.clone(),
         team_id: payload.team_id.clone(),
         service: payload.service.clone(),
@@ -179,10 +172,7 @@ async fn handle_result(
 
     debug!("flag submission result: {result:?}");
 
-    let flag_b64 = STANDARD_NO_PAD.encode(&payload.flag);
-    let key = format!("{}.result", &flag_b64);
-
-    if let Err(error) = flags_bucket.put(&key, &result).await {
+    if let Err(error) = flags_svc.submit_flag_result(&result).await {
         warn! {
             ?error,
             "unable to publish flag submission result"

@@ -1,16 +1,13 @@
-// TODO: Remove once things are implemented
-#![allow(dead_code)]
-
 mod fetcher;
 
-use crate::fetcher::{FetchOptions, FetcherConfig, FlagHint};
-use base64::engine::general_purpose::STANDARD_NO_PAD;
-use base64::Engine;
+use crate::fetcher::{FetchOptions, Fetcher, FetcherConfig};
 use color_eyre::eyre::{Context, Result};
-use kriger_common::messaging::{Bucket, Messaging, MessagingError};
+use dashmap::DashMap;
+use kriger_common::messaging;
+use kriger_common::messaging::services::data::DataService;
+use kriger_common::messaging::Bucket;
+use kriger_common::models::Service;
 use kriger_common::server::runtime::AppRuntime;
-use kriger_common::{messaging, models};
-use tokio::task::JoinSet;
 use tokio::time::MissedTickBehavior;
 use tokio::{select, time};
 use tracing::{debug, error, info, instrument, warn};
@@ -25,23 +22,14 @@ pub async fn main(runtime: AppRuntime) -> Result<()> {
         .try_into()
         .context("unable to parse the fetcher config")?;
 
-    let services_bucket = runtime
-        .messaging
-        .services()
-        .await
-        .context("unable to retrieve the services bucket")?;
+    let services_bucket = runtime.messaging.services();
 
     let services = services_bucket
-        .subscribe_all::<models::Service>()
+        .subscribe_all()
         .await
         .context("unable to subscribe to services")?;
 
-    let hints_bucket = runtime
-        .messaging
-        .data_hints()
-        .await
-        .context("unable to retrieve the hints bucket")?;
-    let hints_bucket = Box::leak(Box::new(hints_bucket)); // TODO: fix?
+    let data_svc = runtime.messaging.data();
 
     let fetcher = config.into_fetcher();
 
@@ -61,71 +49,45 @@ pub async fn main(runtime: AppRuntime) -> Result<()> {
             }
         }
 
-        debug!("fetcher tick");
-        let data = match fetcher.fetch(&options, &services).await {
-            Ok(data) => data,
-            Err(error) => {
-                warn! {
-                    ?error,
-                    "fetcher error"
-                }
-                continue;
-            }
-        };
-
-        if let Some(flag_hints) = data.flag_hints {
-            let mut set = JoinSet::new();
-            for hint in flag_hints {
-                set.spawn(handle_hint_insertion(hints_bucket, hint));
-            }
-
-            while let Some(res) = set.join_next().await {
-                if let Err(error) = res {
-                    error! {
-                        ?error,
-                        "unable to join task"
-                    }
-                }
-            }
-        }
+        handle_fetcher_tick(&services, &data_svc, fetcher.as_ref(), &options).await;
     }
 }
 
-#[instrument(level = "DEBUG", skip_all, fields(team_id, service, hint))]
-async fn handle_hint_insertion(bucket: &impl Bucket, hint: FlagHint) {
-    let serialized = match serde_json::to_vec(&hint.hint) {
-        Ok(serialized) => serialized,
-
+#[instrument(level = "DEBUG", skip_all)]
+async fn handle_fetcher_tick(
+    services: &DashMap<String, Service>,
+    data_svc: &DataService,
+    fetcher: &dyn Fetcher,
+    options: &FetchOptions,
+) {
+    debug!("fetcher tick");
+    let data = match fetcher.fetch(&options, &services).await {
+        Ok(data) => data,
         Err(error) => {
-            error! {
+            warn! {
                 ?error,
-                "unable to serialize the hint"
+                "fetcher error"
             }
             return;
         }
     };
+    debug!("received fetcher data");
 
-    let key = format!(
-        "{}.{}.{}",
-        STANDARD_NO_PAD.encode(&hint.service),
-        hint.team_id,
-        STANDARD_NO_PAD.encode(&serialized)
-    );
-    let data = messaging::model::FlagHint {
-        team_id: hint.team_id,
-        service: hint.service,
-        hint: hint.hint,
-    };
-    match bucket.create(&key, &data).await {
-        Err(MessagingError::KeyValueConflictError) => {
-            // Ignore
-        }
-        Err(error) => {
-            error! {
-                ?error,
-                "unable to insert the flag hint to the k/v store"
+    if let Some(flag_hints) = data.flag_hints {
+        for hint in flag_hints {
+            let data = messaging::model::FlagHint {
+                team_id: hint.team_id,
+                service: hint.service,
+                hint: hint.hint,
+            };
+            if let Err(error) = data_svc.publish_flag_hint(&data).await {
+                error! {
+                    ?error,
+                    hint.team_id = data.team_id,
+                    hint.service = data.service,
+                    "unable to publish flag hint"
+                }
             }
         }
-        _ => {}
     }
 }
