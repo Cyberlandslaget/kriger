@@ -19,16 +19,15 @@ impl DataService {
         message: &model::FlagHint,
     ) -> Result<jetstream::context::PublishAckFuture, messaging::MessagingError> {
         let serialized_hint = serde_json::to_string(&message.hint)?;
-        let id = format!(
-            "{}.{}.{}",
-            &message.service,
-            &message.team_id,
-            base64::engine::general_purpose::STANDARD_NO_PAD.encode(serialized_hint)
-        );
+        let encoded_hint = base64::engine::general_purpose::STANDARD_NO_PAD.encode(serialized_hint);
+        let encoded_service =
+            base64::engine::general_purpose::STANDARD_NO_PAD.encode(&message.service);
+
+        let id = format!("{}.{}.{}", &encoded_service, &message.team_id, encoded_hint);
         publish_with_id(
             &self.context,
             format_subject(
-                Some(message.service.as_str()),
+                Some(encoded_service.as_str()),
                 Some(message.team_id.as_str()),
             ),
             id.as_str(),
@@ -61,11 +60,11 @@ impl DataService {
 }
 
 #[inline]
-fn format_subject(service: Option<&str>, team_id: Option<&str>) -> String {
+fn format_subject(encoded_service: Option<&str>, team_id: Option<&str>) -> String {
     format!(
         "{}{}.{}",
         DATA_FLAG_HINTS_SUBJECT_PREFIX,
-        service.unwrap_or("*"),
+        encoded_service.unwrap_or("*"),
         team_id.unwrap_or("*")
     )
 }
