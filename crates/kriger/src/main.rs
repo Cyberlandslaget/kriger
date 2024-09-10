@@ -64,19 +64,13 @@ fn init_tracing(use_otel: bool) -> eyre::Result<()> {
         if use_otel {
             use opentelemetry::global;
             use opentelemetry::trace::TracerProvider;
-            use opentelemetry::KeyValue;
             use opentelemetry_sdk::runtime;
             use opentelemetry_sdk::trace::BatchConfig;
-            use opentelemetry_sdk::Resource;
-            use opentelemetry_semantic_conventions::attribute::SERVICE_NAME;
 
+            // TODO: Sampling?
             let provider = opentelemetry_otlp::new_pipeline()
                 .tracing()
                 .with_exporter(opentelemetry_otlp::new_exporter().tonic())
-                // TODO: Sampling?
-                .with_trace_config(opentelemetry_sdk::trace::Config::default().with_resource(
-                    Resource::new(vec![KeyValue::new(SERVICE_NAME, env!("CARGO_PKG_NAME"))]),
-                ))
                 .with_batch_config(BatchConfig::default())
                 .install_batch(runtime::Tokio)
                 .context("unable to construct a tracing pipeline")?;
