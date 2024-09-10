@@ -9,6 +9,11 @@ pub(crate) mod commands;
 mod emoji;
 mod models;
 
+#[cfg(not(debug_assertions))]
+const CONFIG_FILE_NAME: &str = "cli.toml";
+#[cfg(debug_assertions)]
+const CONFIG_FILE_NAME: &str = "cli.dev.toml";
+
 fn log(p: &ProgressBar, message: String) {
     p.suspend(|| {
         println!("  {message}");
@@ -42,7 +47,7 @@ fn get_config_dir() -> Option<PathBuf> {
 }
 
 fn get_config_file() -> Option<PathBuf> {
-    get_config_dir().map(|path| path.join("cli.toml"))
+    get_config_dir().map(|path| path.join(CONFIG_FILE_NAME))
 }
 
 async fn read_cli_config() -> eyre::Result<CliConfig> {
