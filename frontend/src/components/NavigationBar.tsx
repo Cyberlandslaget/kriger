@@ -1,9 +1,9 @@
 import { Link } from "@tanstack/react-router";
-import { useAtomValue } from "jotai";
-import { serverConfigAtom, statusAtom } from "../utils/atoms";
-import { useInterval } from "usehooks-ts";
-import { useMemo, useState } from "react";
 import clsx from "clsx";
+import { useAtomValue } from "jotai";
+import { useMemo, useState } from "react";
+import { useInterval } from "usehooks-ts";
+import { serverConfigAtom, statusAtom } from "../utils/atoms";
 
 const ROUTES = [
   { href: "/", text: "Dashboard" },
@@ -34,7 +34,9 @@ function NavigationBar() {
   const tickOffset = useMemo(
     () =>
       serverConfig
-        ? serverConfig.competition.tickStart * serverConfig.competition.tick * 1000
+        ? serverConfig.competition.tickStart *
+          serverConfig.competition.tick *
+          1000
         : undefined,
     [serverConfig],
   );
@@ -44,33 +46,43 @@ function NavigationBar() {
   // Values greater than or equal to 1 represents ticks that are waiting for the server.
   const tickProgress = useMemo(
     () =>
-      currentTime && tickStart && tickOffset && serverConfig
+      currentTime && tickStart && tickOffset !== undefined && serverConfig
         ? Math.max(
-          (currentTime - tickStart + tickOffset) / serverConfig.competition.tick / 1000,
-          0,
-        )
+            (currentTime - tickStart + tickOffset) /
+              serverConfig.competition.tick /
+              1000,
+            0,
+          )
         : 0,
     [currentTime, tickStart, tickOffset, serverConfig],
   );
 
   const timeUntilNextTick = useMemo(() => {
-    return tickProgress && serverConfig
+    return tickProgress !== undefined && serverConfig
       ? (1 - tickProgress) * serverConfig.competition.tick
       : undefined;
   }, [tickProgress, serverConfig]);
 
   const [hasTickStarted, stringTimeUntilFirstTick] = useMemo(() => {
     // Calculate days, hours, minutes, and seconds
-    const remainingTime = ((startTime ?? 0) - (currentTime ?? 0));
-    const days = Math.floor(remainingTime / 86400000).toString().padStart(2, "0");
-    const hours = Math.floor((remainingTime % 86400000) / 3600000).toString().padStart(2, "0");
-    const minutes = Math.floor((remainingTime % 3600000) / 60000).toString().padStart(2, "0");
-    const seconds = Math.floor((remainingTime % 60000) / 1000).toString().padStart(2, "0");
+    const remainingTime = (startTime ?? 0) - (currentTime ?? 0);
+    const days = Math.floor(remainingTime / 86400000)
+      .toString()
+      .padStart(2, "0");
+    const hours = Math.floor((remainingTime % 86400000) / 3600000)
+      .toString()
+      .padStart(2, "0");
+    const minutes = Math.floor((remainingTime % 3600000) / 60000)
+      .toString()
+      .padStart(2, "0");
+    const seconds = Math.floor((remainingTime % 60000) / 1000)
+      .toString()
+      .padStart(2, "0");
     return [
       currentTime && startTime && currentTime >= startTime,
-      `${days}:${hours}:${minutes}:${seconds}`
-    ]
-  }, [startTime, currentTime])
+      `${days}:${hours}:${minutes}:${seconds}`,
+    ];
+  }, [startTime, currentTime]);
 
   // JavaScript timers are inaccurate by nature
   useInterval(() => {
@@ -108,7 +120,7 @@ function NavigationBar() {
         </div>
 
         {/* Current tick + remaining tick time */}
-        {hasTickStarted ?
+        {hasTickStarted ? (
           <div className="font-bold">
             {/* Highlight the tick as red if the tickProgress is > 1. This means that the server is not delivering on time. */}
             <span className={clsx(tickProgress > 1 && "text-red-500")}>
@@ -119,13 +131,12 @@ function NavigationBar() {
             <span className="font-normal text-slate-300">
               ({timeUntilNextTick?.toFixed(0) ?? "∞"}s)
             </span>
-          </div> :
-          <div className="font-bold">
-            <span>
-              Starting in {stringTimeUntilFirstTick}
-            </span>
           </div>
-        }
+        ) : (
+          <div className="font-bold">
+            <span>Starting in {stringTimeUntilFirstTick}</span>
+          </div>
+        )}
       </div>
     </nav>
   );
