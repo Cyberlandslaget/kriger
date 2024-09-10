@@ -29,7 +29,7 @@ pub struct SubmitterConfig {
     /// The interval that the submitter should submit flags at.
     pub(crate) interval: u64,
 
-    /// The maximum batch size for flag submissions.
+    /// The maximum batch size for flag submissions, the default being 10_000.
     pub(crate) batch: Option<usize>,
 
     #[serde(flatten)]

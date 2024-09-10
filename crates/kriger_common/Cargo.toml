@@ -11,6 +11,7 @@ client = ["dep:reqwest"]
 [dependencies]
 async-nats.workspace = true
 async-trait.workspace = true
+base64.workspace = true
 chrono = { workspace = true, features = ["serde"] }
 clap.workspace = true
 clap_derive.workspace = true

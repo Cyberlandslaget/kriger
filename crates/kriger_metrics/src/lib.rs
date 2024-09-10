@@ -3,8 +3,6 @@ pub mod args;
 use crate::args::Args;
 use color_eyre::eyre::{Context, Result};
 use futures::StreamExt;
-use kriger_common::messaging::model::ExecutionRequest;
-use kriger_common::messaging::{AckPolicy, DeliverPolicy, Message, Messaging, Stream};
 use kriger_common::server::runtime::AppRuntime;
 use opentelemetry::metrics::MeterProvider;
 use opentelemetry::KeyValue;
@@ -26,20 +24,11 @@ fn init_metrics() -> opentelemetry::metrics::Result<SdkMeterProvider> {
 pub async fn main(runtime: AppRuntime, _args: Args) -> Result<()> {
     info!("starting metrics exporter");
 
-    let executions_wq = runtime
+    let execution_requests = runtime
         .messaging
-        .executions_wq()
-        .await
-        .context("unable to retrieve the execution work queue")?;
-
-    // We're not using a durable name here. Make sure to only run a single instance of the metrics exporter.
-    let execution_requests = executions_wq
-        .subscribe::<ExecutionRequest>(
-            None,
-            Some("executions.*.request".to_string()),
-            AckPolicy::None,
-            DeliverPolicy::New,
-        )
+        .executions()
+        // We're not using a durable name here. Make sure to only run a single instance of the metrics exporter.
+        .subscribe_execution_requests(None, None)
         .await
         .context("unable to subscribe to execution requests")?;
     pin!(execution_requests);
@@ -67,9 +56,8 @@ pub async fn main(runtime: AppRuntime, _args: Args) -> Result<()> {
             res = execution_requests.next() => {
                 match res {
                     Some(Ok(message)) => {
-                        let payload = message.payload();
                         let mut labels = Vec::new();
-                        if let Some(team_id) = &payload.team_id {
+                        if let Some(team_id) = &message.payload.team_id {
                             labels.push(KeyValue::new("team_id", team_id.clone()));
                         }
                         execution_requests_counter.add(1, &labels);

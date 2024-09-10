@@ -3,14 +3,11 @@ mod runner;
 
 use crate::args::Args;
 use crate::runner::{Job, Runner, RunnerCallback};
-use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine};
 use color_eyre::eyre::{bail, Context, ContextCompat, Result};
 use futures::StreamExt;
 use kriger_common::messaging::model::{ExecutionRequest, FlagSubmission};
 use kriger_common::messaging::nats::NatsMessaging;
-use kriger_common::messaging::{
-    AckPolicy, Bucket, DeliverPolicy, Messaging, MessagingError, Stream,
-};
+use kriger_common::messaging::services::flags::FlagsService;
 use kriger_common::server::runtime::create_shutdown_cancellation_token;
 use regex::Regex;
 use std::str;
@@ -21,31 +18,21 @@ use tokio::{pin, select, spawn};
 use tracing::{debug, info, warn};
 
 #[derive(Clone)]
-struct RunnerCallbackImpl<T: Bucket> {
-    flags: Box<T>,
+struct RunnerCallbackImpl {
+    flags_svc: FlagsService,
     exploit: String,
     service: Option<String>,
 }
 
-impl<T: Bucket> RunnerCallback for RunnerCallbackImpl<T> {
+impl RunnerCallback for RunnerCallbackImpl {
     async fn on_flag(&self, request: &ExecutionRequest, flag: &str) -> Result<()> {
-        let key = format!("{}.submit", STANDARD_NO_PAD.encode(flag.as_bytes()));
-        let payload = FlagSubmission {
+        let submission = FlagSubmission {
             flag: flag.to_string(),
             team_id: request.team_id.clone(),
             service: self.service.clone(),
             exploit: Some(self.exploit.clone()),
         };
-        let res = self.flags.create(&key, &payload).await;
-        if let Err(MessagingError::KeyValueConflictError) = res {
-            // This means that the flag has already been submitted. We don't need to treat it as
-            // an error.
-            debug!("the flag `{flag}` already exists, ignoring");
-            return Ok(());
-        }
-
-        // Propagate other error
-        res?;
+        self.flags_svc.submit_flag(&submission).await?;
 
         Ok(())
     }
@@ -53,7 +40,7 @@ impl<T: Bucket> RunnerCallback for RunnerCallbackImpl<T> {
 
 pub async fn main(args: Args) -> Result<()> {
     info!("initializing messaging");
-    let messaging = NatsMessaging::new(&args.nats_url).await?;
+    let messaging = NatsMessaging::new(&args.nats_url, None).await?;
     let cancellation_token = create_shutdown_cancellation_token();
 
     let flag_format =
@@ -64,16 +51,11 @@ pub async fn main(args: Args) -> Result<()> {
         "subscribing to execution requests for exploit: {}",
         &args.exploit
     );
-    let executions_wq = messaging
-        .executions_wq()
-        .await
-        .context("unable to get the execution work queue")?;
-    let stream = executions_wq
-        .subscribe(
+    let stream = messaging
+        .executions()
+        .subscribe_execution_requests(
             Some(format!("exploit:{}", &args.exploit)),
-            Some(format!("executions.{}.request", args.exploit)),
-            AckPolicy::Explicit,
-            DeliverPolicy::New,
+            Some(args.exploit.as_str()),
         )
         .await
         .context("unable to subscribe to execution requests")?;
@@ -86,12 +68,7 @@ pub async fn main(args: Args) -> Result<()> {
     let (tx, rx) = async_channel::bounded::<Job>(worker_count);
 
     let callback = RunnerCallbackImpl {
-        flags: Box::new(
-            messaging
-                .flags()
-                .await
-                .context("unable to retrieve the flags bucket")?,
-        ),
+        flags_svc: messaging.flags(),
         exploit: args.exploit.clone(),
         service: args.service,
     };
@@ -129,7 +106,7 @@ pub async fn main(args: Args) -> Result<()> {
                         match maybe_message.context("end of stream")? {
                             Ok(message) => {
                                 let job = Job {
-                                    request: Box::new(message),
+                                    request: message,
                                     _permit: permit,
                                 };
                                 if let Err(err) = tx.send(job).await {

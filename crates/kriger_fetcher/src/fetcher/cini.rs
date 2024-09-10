@@ -108,6 +108,7 @@ impl CiniFetcher {
 
 #[async_trait]
 impl Fetcher for CiniFetcher {
+    #[instrument(skip_all)]
     async fn fetch(
         &self,
         options: &FetchOptions,

@@ -1552,6 +1552,7 @@ version = "0.0.1"
 dependencies = [
  "async-nats",
  "async-trait",
+ "base64 0.22.1",
  "chrono",
  "clap",
  "clap_derive",
@@ -1574,6 +1575,7 @@ dependencies = [
 name = "kriger_controller"
 version = "0.0.1"
 dependencies = [
+ "async-nats",
  "clap",
  "clap_derive",
  "color-eyre",
@@ -1691,6 +1693,7 @@ dependencies = [
 name = "kriger_submitter"
 version = "0.0.1"
 dependencies = [
+ "async-nats",
  "async-trait",
  "base64 0.22.1",
  "color-eyre",
@@ -1710,6 +1713,7 @@ dependencies = [
 name = "kriger_ws"
 version = "0.0.1"
 dependencies = [
+ "async-nats",
  "clap",
  "clap_derive",
  "color-eyre",

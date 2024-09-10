@@ -7,8 +7,8 @@ use color_eyre::eyre;
 use color_eyre::eyre::{Context, ContextCompat};
 use dashmap::DashMap;
 use futures::StreamExt;
-use kriger_common::messaging::model::{ExecutionRequest, FlagHint, SchedulingTick};
-use kriger_common::messaging::{AckPolicy, Bucket, DeliverPolicy, Message, Messaging};
+use kriger_common::messaging::nats::MessageWrapper;
+use kriger_common::messaging::Bucket;
 use kriger_common::server::runtime::AppRuntime;
 use kriger_common::{messaging, models};
 use std::sync::Arc;
@@ -22,35 +22,18 @@ pub async fn main(runtime: AppRuntime) -> eyre::Result<()> {
     info!("starting scheduler");
 
     debug!("retrieving buckets");
-    let exploits_bucket = runtime
-        .messaging
-        .exploits()
-        .await
-        .context("unable to retrieve the exploits bucket")?;
-    let services_bucket = runtime
-        .messaging
-        .services()
-        .await
-        .context("unable to retrieve the services bucket")?;
-    let teams_bucket = runtime
-        .messaging
-        .teams()
-        .await
-        .context("unable to retrieve the teams bucket")?;
-    let data_hints_bucket = runtime
-        .messaging
-        .data_hints()
-        .await
-        .context("unable to retrieve the data_hints bucket")?;
+    let exploits_bucket = runtime.messaging.exploits();
+    let services_bucket = runtime.messaging.services();
+    let teams_bucket = runtime.messaging.teams();
 
     debug!("subscribing to streams");
     let exploits = exploits_bucket
-        .subscribe_all::<models::Exploit>()
+        .subscribe_all()
         .await
         .context("unable to subscribe to exploits")?;
 
     let services = services_bucket
-        .subscribe_all::<models::Service>()
+        .subscribe_all()
         .await
         .context("unable to subscribe to exploits")?;
 
@@ -58,7 +41,7 @@ pub async fn main(runtime: AppRuntime) -> eyre::Result<()> {
     // There may be dozens or hundreds of teams, `subscribe_all` will continuously stream updates
     // and propagate the updates to a thread-safe map.
     let teams = teams_bucket
-        .subscribe_all::<models::Team>()
+        .subscribe_all()
         .await
         .context("unable to subscribe to teams")?;
 
@@ -69,12 +52,7 @@ pub async fn main(runtime: AppRuntime) -> eyre::Result<()> {
         services,
         teams.clone(),
     ));
-    set.spawn(handle_hint_scheduling(
-        runtime,
-        data_hints_bucket,
-        exploits,
-        teams,
-    ));
+    set.spawn(handle_hint_scheduling(runtime, exploits, teams));
 
     while let Some(res) = set.join_next().await {
         res??;
@@ -156,11 +134,8 @@ async fn handle_tick(
     info!("ticking");
     let res = runtime
         .messaging
-        .publish(
-            "scheduling.start".to_string(),
-            &SchedulingTick { tick },
-            false,
-        )
+        .scheduling()
+        .publish_tick(&messaging::model::SchedulingTick { tick })
         .await;
     if let Err(error) = res {
         warn! {
@@ -223,7 +198,7 @@ async fn handle_tick(
                 .or(team.ip_address.as_ref());
 
             if let Some(ip_address) = ip_address {
-                let request = ExecutionRequest {
+                let request = messaging::model::ExecutionRequest {
                     ip_address: ip_address.clone(),
                     flag_hint: None,
                     team_id: Some(team.key().clone()),
@@ -237,11 +212,8 @@ async fn handle_tick(
                 // TODO: Parallelize this
                 let res = runtime
                     .messaging
-                    .publish(
-                        format!("executions.{}.request", &exploit.manifest.name),
-                        &request,
-                        false, // TODO: Do we need double ack?
-                    )
+                    .executions()
+                    .publish_execution_request(&exploit.manifest.name, &request)
                     .await;
 
                 if let Err(error) = res {
@@ -263,17 +235,13 @@ async fn handle_tick(
 
 async fn handle_hint_scheduling(
     runtime: AppRuntime,
-    data_hints_bucket: impl Bucket,
     exploits: Arc<DashMap<String, models::Exploit>>,
     teams: Arc<DashMap<String, models::Team>>,
 ) -> eyre::Result<()> {
-    let data_hints = data_hints_bucket
-        .watch_all::<FlagHint>(
-            Some("scheduler".to_string()),
-            AckPolicy::Explicit,
-            Duration::from_secs(60), // TODO: Adjust
-            DeliverPolicy::New,
-        )
+    let data_hints = runtime
+        .messaging
+        .data()
+        .subscribe_flag_hint(Some("scheduler".to_string()))
         .await
         .context("unable to watch flag hints")?;
     pin!(data_hints);
@@ -322,19 +290,19 @@ async fn handle_hint_scheduling(
 #[instrument(
     skip_all,
     fields(
-        team.id = message.payload().team_id,
-        service.name = message.payload().service)
+        team.id = message.payload.team_id,
+        service.name = message.payload.service)
     )
 ]
 async fn handle_hint_schedule(
     runtime: &AppRuntime,
     teams: &DashMap<String, models::Team>,
     exploits: &DashMap<String, models::Exploit>,
-    message: &impl messaging::Message<Payload = FlagHint>,
+    message: &MessageWrapper<messaging::model::FlagHint>,
 ) -> eyre::Result<()> {
     message.progress().await?;
 
-    let payload = message.payload();
+    let payload = &message.payload;
 
     let team = teams.get(&payload.team_id).context("unknown team id")?;
     if is_team_excluded(&runtime.config.competition, &team.key()) {
@@ -352,7 +320,7 @@ async fn handle_hint_schedule(
         .or(team.ip_address.as_ref())
         .context("unknown target ip address")?;
 
-    let request = ExecutionRequest {
+    let request = messaging::model::ExecutionRequest {
         ip_address: ip_address.clone(),
         flag_hint: Some(payload.hint.clone()),
         team_id: Some(team.key().clone()),
@@ -363,18 +331,15 @@ async fn handle_hint_schedule(
         "sending execution request"
     }
 
+    let executions_svc = runtime.messaging.executions();
     for exploit in exploits.iter() {
         if !exploit.manifest.enabled || exploit.manifest.service != payload.service {
             continue;
         }
 
-        runtime
-            .messaging
-            .publish(
-                format!("executions.{}.request", &exploit.manifest.name),
-                &request,
-                false,
-            )
+        // FIXME: Should maybe not fail fast?
+        executions_svc
+            .publish_execution_request(&exploit.manifest.name, &request)
             .await?;
     }
 

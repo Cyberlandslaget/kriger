@@ -1,6 +1,7 @@
 pub mod config;
 
 use crate::config::Config;
+use async_nats::jetstream::consumer::DeliverPolicy;
 use color_eyre::eyre;
 use color_eyre::eyre::{bail, Context};
 use fastwebsockets::{upgrade, Frame, Payload, WebSocketError};
@@ -13,7 +14,6 @@ use hyper::{Request, Response};
 use hyper_util::rt::{TokioExecutor, TokioIo};
 use hyper_util::server::conn::auto::Builder;
 use kriger_common::messaging::model::{FlagSubmission, FlagSubmissionResult, SchedulingTick};
-use kriger_common::messaging::{AckPolicy, Bucket, DeliverPolicy, Message, Messaging, Stream};
 use kriger_common::server::runtime::AppRuntime;
 use serde::Serialize;
 use std::net::SocketAddr;
@@ -178,66 +178,38 @@ async fn subscribe_all(
         "consuming messages with deliver policy"
     }
 
-    let flags = runtime
-        .messaging
-        .flags()
-        .await
-        .context("unable to retrieve flags bucket")?;
+    let flags_svc = runtime.messaging.flags();
 
-    let scheduling = runtime
+    let flag_submissions_stream = flags_svc
+        .subscribe_submissions_ordered(deliver_policy)
+        .await
+        .context("unable to watch flag submissions")?
+        .filter_map(|res| async {
+            res.ok().map(|msg| WebSocketEvent {
+                published: msg.info.published_millis(),
+                payload: WebSocketPayload::FlagSubmission(msg.payload),
+            })
+        });
+    let flag_results_stream = flags_svc
+        .subscribe_submission_results_ordered(deliver_policy)
+        .await
+        .context("unable to watch flags")?
+        .filter_map(|res| async {
+            res.ok().map(|msg| WebSocketEvent {
+                published: msg.info.published_millis(),
+                payload: WebSocketPayload::FlagSubmissionResult(msg.payload),
+            })
+        });
+    let scheduling_start_stream = runtime
         .messaging
         .scheduling()
-        .await
-        .context("unable to retrieve the scheduling stream")?;
-
-    // TODO: Deliver messages from the last N ticks
-    let flag_submissions_stream = flags
-        .watch_key::<FlagSubmission>(
-            "*.submit",
-            None,
-            AckPolicy::None,
-            Default::default(),
-            deliver_policy,
-            vec![],
-        )
-        .await
-        .context("unable to watch flags")?
-        .filter_map(|res| async {
-            res.ok().map(|msg| WebSocketEvent {
-                published: msg.published(),
-                payload: WebSocketPayload::FlagSubmission(msg.into_payload()),
-            })
-        });
-    let flag_results_stream = flags
-        .watch_key::<FlagSubmissionResult>(
-            "*.result",
-            None,
-            AckPolicy::None,
-            Default::default(),
-            deliver_policy,
-            vec![],
-        )
-        .await
-        .context("unable to watch flags")?
-        .filter_map(|res| async {
-            res.ok().map(|msg| WebSocketEvent {
-                published: msg.published(),
-                payload: WebSocketPayload::FlagSubmissionResult(msg.into_payload()),
-            })
-        });
-    let scheduling_start_stream = scheduling
-        .subscribe::<SchedulingTick>(
-            None,
-            Some("scheduling.start".to_string()),
-            AckPolicy::None,
-            DeliverPolicy::Last,
-        )
+        .subscribe_ticks_ordered(deliver_policy)
         .await
         .context("unable to subscribe to scheduling start messages")?
         .filter_map(|res| async {
             res.ok().map(|msg| WebSocketEvent {
-                published: msg.published(),
-                payload: WebSocketPayload::SchedulingStart(msg.into_payload()),
+                published: msg.info.published_millis(),
+                payload: WebSocketPayload::SchedulingStart(msg.payload),
             })
         });
 

@@ -1,6 +1,7 @@
 pub mod config;
 
 use crate::config::Config;
+use async_nats::jetstream::consumer::{AckPolicy, DeliverPolicy};
 use color_eyre::eyre::{Context, Result};
 use futures::StreamExt;
 use k8s_openapi::api::apps::v1::{Deployment, DeploymentSpec};
@@ -10,7 +11,8 @@ use k8s_openapi::api::core::v1::{
 };
 use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta};
-use kriger_common::messaging::{AckPolicy, Bucket, DeliverPolicy, Message, Messaging};
+use kriger_common::messaging::nats::MessageWrapper;
+use kriger_common::messaging::Bucket;
 use kriger_common::models;
 use kriger_common::server::runtime::AppRuntime;
 use kube::api::{Patch, PatchParams};
@@ -33,67 +35,63 @@ pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
 
     // TODO: Handle deleted exploits?
 
-    let exploits = runtime
-        .messaging
-        .exploits()
-        .await
-        .context("unable to retrieve exploits bucket")?;
+    let exploits = runtime.messaging.exploits();
 
     // This watches for new exploits and exploit updates. Upon startup, the consumer will receive a
     // replay of all exploits, allowing the controller to reconcile exploits that may've been missed.
     // Technically, we can use a durable consumer here, but this approach allows us to quickly fix
     // provisioning issue with the underlying orchestration platform.
     let exploits_stream = exploits
-        .watch_key::<models::Exploit>(
+        .watch_key(
             "*",
             None,
             AckPolicy::Explicit,
             Duration::from_secs(60), // TODO: Adjust
             DeliverPolicy::LastPerSubject,
-            vec![],
         )
         .await
         .context("unable to watch exploits")?;
     pin!(exploits_stream);
 
     loop {
-        select! {
-            _ = runtime.cancellation_token.cancelled() => {
-                return Ok(());
-            }
-            res = exploits_stream.next() => {
-                match res {
-                    Some(Ok(message)) => {
-                        if let Err(error) = handle_message(&deployments, message, &runtime, &config).await {
-                            warn! {
-                                ?error,
-                                "unable to handle message"
-                            }
-                        }
-                    }
-                    Some(Err(error)) => {
-                        warn! {
-                            ?error,
-                            "unable to poll message"
-                        }
-                    }
-                    None => {
-                        // End of stream
+        let res = select! {
+            _ = runtime.cancellation_token.cancelled() => return Ok(()),
+            res = exploits_stream.next() => res
+        };
+        match res {
+            Some(Ok(message)) => {
+                if let Err(error) = handle_message(&deployments, message, &runtime, &config).await {
+                    warn! {
+                        ?error,
+                        "unable to handle message"
                     }
                 }
             }
-        }
+            Some(Err(error)) => {
+                warn! {
+                    ?error,
+                    "unable to poll message"
+                }
+            }
+            None => {
+                // End of stream
+            }
+        };
     }
 }
 
 async fn handle_message(
     deployments: &Api<Deployment>,
-    message: impl Message<Payload = models::Exploit>,
+    message: MessageWrapper<models::Exploit>,
     runtime: &AppRuntime,
     config: &Config,
 ) -> Result<()> {
-    let exploit = message.payload();
-    info!("reconciling exploit: {}", exploit.manifest.name);
+    let exploit = &message.payload;
+
+    info! {
+        exploit.name = exploit.manifest.name,
+        "reconciling exploit"
+    }
     message.progress().await?;
     match reconcile(&deployments, exploit, runtime, config).await {
         Ok(..) => {
