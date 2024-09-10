@@ -10,7 +10,6 @@ use async_nats::jetstream;
 use async_nats::jetstream::consumer::{AckPolicy, DeliverPolicy, ReplayPolicy};
 use async_nats::jetstream::kv::{CreateErrorKind, Operation, Store};
 use dashmap::DashMap;
-use futures::stream::FilterMap;
 use futures::StreamExt;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -19,6 +18,7 @@ use std::future::Future;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
+use time::UtcOffset;
 use tokio::spawn;
 use tracing::{debug, error, info, warn};
 
@@ -33,13 +33,22 @@ pub struct NatsMessaging {
     teams_store: Store,
     executions_wq_stream: jetstream::stream::Stream,
     data_stream: jetstream::stream::Stream,
-    flags_stream: jetstream::stream::Stream,
+    flags_submissions_stream: jetstream::stream::Stream,
+    flags_results_stream: jetstream::stream::Stream,
     scheduling_stream: jetstream::stream::Stream,
 }
 
 impl NatsMessaging {
-    pub async fn new<S: AsRef<str>>(nats_url: S) -> color_eyre::eyre::Result<Self> {
+    pub async fn new<S: AsRef<str>>(
+        nats_url: S,
+        app_config: Option<&AppConfig>,
+    ) -> color_eyre::eyre::Result<Self> {
         let context = create_jetstream_context(nats_url).await?;
+
+        // TODO: Move this somewhere else?
+        if let Some(app_config) = app_config {
+            do_migration(&context, app_config).await?;
+        }
 
         let exploits_store = context.get_key_value("exploits").await?;
         let services_store = context.get_key_value("services").await?;
@@ -47,7 +56,8 @@ impl NatsMessaging {
 
         let executions_wq_stream = context.get_stream("executions_wq").await?;
         let data_stream = context.get_stream("data").await?;
-        let flags_stream = context.get_stream("flags").await?;
+        let flags_submissions_stream = context.get_stream("flag_submissions").await?;
+        let flags_results_stream = context.get_stream("flag_results").await?;
         let scheduling_stream = context.get_stream("scheduling").await?;
 
         Ok(Self {
@@ -57,7 +67,8 @@ impl NatsMessaging {
             teams_store,
             executions_wq_stream,
             data_stream,
-            flags_stream,
+            flags_submissions_stream,
+            flags_results_stream,
             scheduling_stream,
         })
     }
@@ -90,7 +101,8 @@ impl NatsMessaging {
     pub fn flags(&self) -> FlagsService {
         FlagsService {
             context: self.context.clone(),
-            flags_stream: self.flags_stream.clone(),
+            flags_submissions_stream: self.flags_submissions_stream.clone(),
+            flags_results_stream: self.flags_results_stream.clone(),
         }
     }
 
@@ -106,87 +118,6 @@ impl NatsMessaging {
             context: self.context.clone(),
             scheduling_stream: self.scheduling_stream.clone(),
         }
-    }
-
-    pub async fn do_migration(&self, app_config: &AppConfig) -> color_eyre::eyre::Result<()> {
-        info!("creating jetstream streams");
-
-        let max_age =
-            app_config.competition.tick * (app_config.competition.flag_validity as u64 + 1);
-        debug! {
-            max_age,
-            "using max_age"
-        }
-
-        debug!("creating executions_wq stream");
-        self.context
-            .create_stream(jetstream::stream::Config {
-                name: "executions_wq".to_string(),
-                subjects: vec!["executions.*.request".to_string()],
-                discard: jetstream::stream::DiscardPolicy::Old,
-                // Important: this will provide idempotency for execution requests
-                duplicate_window: Duration::from_secs(max_age),
-                max_age: Duration::from_secs(max_age),
-                ..Default::default()
-            })
-            .await?;
-
-        debug!("creating scheduling stream");
-        self.context
-            .create_stream(jetstream::stream::Config {
-                name: "scheduling".to_string(),
-                subjects: vec!["scheduling.>".to_string()],
-                discard: jetstream::stream::DiscardPolicy::Old,
-                ..Default::default()
-            })
-            .await?;
-
-        debug!("creating data stream");
-        self.context
-            .create_stream(jetstream::stream::Config {
-                name: "data".to_string(),
-                subjects: vec!["data.>".to_string()],
-                discard: jetstream::stream::DiscardPolicy::Old,
-                duplicate_window: Duration::from_secs(max_age),
-                max_age: Duration::from_secs(max_age),
-                ..Default::default()
-            })
-            .await?;
-
-        debug!("creating flags stream");
-        self.context
-            .create_stream(jetstream::stream::Config {
-                name: "flags".to_string(),
-                subjects: vec!["flags.>".to_string()],
-                discard: jetstream::stream::DiscardPolicy::Old,
-                ..Default::default()
-            })
-            .await?;
-
-        info!("creating kev/value buckets");
-
-        debug!("creating exploits bucket");
-        self.context
-            .create_key_value(jetstream::kv::Config {
-                bucket: "exploits".to_string(),
-                ..Default::default()
-            })
-            .await?;
-        self.context
-            .create_key_value(jetstream::kv::Config {
-                bucket: "services".to_string(),
-                ..Default::default()
-            })
-            .await?;
-        self.context
-            .create_key_value(jetstream::kv::Config {
-                bucket: "teams".to_string(),
-                ..Default::default()
-            })
-            .await?;
-
-        info!("nats migration complete");
-        Ok(())
     }
 }
 
@@ -443,6 +374,104 @@ async fn create_jetstream_context<S: AsRef<str>>(
     Ok(ctx)
 }
 
+async fn do_migration(
+    context: &jetstream::Context,
+    app_config: &AppConfig,
+) -> color_eyre::eyre::Result<()> {
+    info!("creating jetstream streams");
+
+    let max_age = app_config.competition.tick * (app_config.competition.flag_validity as u64 + 1);
+    debug! {
+        max_age,
+        "using max_age"
+    }
+
+    debug!("creating executions_wq stream");
+    context
+        .create_stream(jetstream::stream::Config {
+            name: "executions_wq".to_string(),
+            subjects: vec!["executions.*.request".to_string()],
+            discard: jetstream::stream::DiscardPolicy::Old,
+            // Important: this will provide idempotency for execution requests
+            duplicate_window: Duration::from_secs(max_age),
+            max_age: Duration::from_secs(max_age),
+            ..Default::default()
+        })
+        .await?;
+
+    debug!("creating scheduling stream");
+    context
+        .create_stream(jetstream::stream::Config {
+            name: "scheduling".to_string(),
+            subjects: vec!["scheduling.>".to_string()],
+            discard: jetstream::stream::DiscardPolicy::Old,
+            ..Default::default()
+        })
+        .await?;
+
+    debug!("creating data stream");
+    context
+        .create_stream(jetstream::stream::Config {
+            name: "data".to_string(),
+            subjects: vec!["data.>".to_string()],
+            discard: jetstream::stream::DiscardPolicy::Old,
+            duplicate_window: Duration::from_secs(max_age),
+            max_age: Duration::from_secs(max_age),
+            ..Default::default()
+        })
+        .await?;
+
+    debug!("creating flag_submissions stream");
+    context
+        .create_stream(jetstream::stream::Config {
+            name: "flag_submissions".to_string(),
+            subjects: vec!["flags.submit.*".to_string()],
+            // Use subject-based deduplication since it is more suitable for large timeframes.
+            // See https://nats.io/blog/new-per-subject-discard-policy/
+            discard: jetstream::stream::DiscardPolicy::New,
+            discard_new_per_subject: true,
+            max_messages_per_subject: 1,
+            ..Default::default()
+        })
+        .await?;
+
+    debug!("creating flag_results stream");
+    // Submission results do not need to be indexed by the flag.
+    context
+        .create_stream(jetstream::stream::Config {
+            name: "flag_results".to_string(),
+            subjects: vec!["flags.result".to_string()],
+            discard: jetstream::stream::DiscardPolicy::Old,
+            ..Default::default()
+        })
+        .await?;
+
+    info!("creating kev/value buckets");
+
+    debug!("creating exploits bucket");
+    context
+        .create_key_value(jetstream::kv::Config {
+            bucket: "exploits".to_string(),
+            ..Default::default()
+        })
+        .await?;
+    context
+        .create_key_value(jetstream::kv::Config {
+            bucket: "services".to_string(),
+            ..Default::default()
+        })
+        .await?;
+    context
+        .create_key_value(jetstream::kv::Config {
+            bucket: "teams".to_string(),
+            ..Default::default()
+        })
+        .await?;
+
+    info!("nats migration complete");
+    Ok(())
+}
+
 fn kv_operation_from_message(message: &async_nats::Message) -> Option<Operation> {
     let headers = message.headers.as_ref()?;
     let val = headers.get(KV_OPERATION)?;
@@ -499,6 +528,16 @@ pub struct MessageInfo {
     pub pending: u64,
     /// the time that this message was received by the server from its publisher
     pub published: time::OffsetDateTime,
+}
+
+impl MessageInfo {
+    pub fn published_millis(&self) -> i64 {
+        (self
+            .published
+            .to_offset(UtcOffset::UTC)
+            .unix_timestamp_nanos()
+            / 1_000_000) as i64
+    }
 }
 
 impl From<jetstream::message::Info<'_>> for MessageInfo {
@@ -582,7 +621,7 @@ pub trait Fetcher<T> {
         &mut self,
     ) -> impl Future<
         Output = Result<
-            impl futures::Stream<Item = Result<MessageWrapper<T>, MessagingServiceError>>,
+            impl futures::Stream<Item = Result<MessageWrapper<T>, MessagingServiceError>> + Send + Sync,
             MessagingError,
         >,
     > + Send

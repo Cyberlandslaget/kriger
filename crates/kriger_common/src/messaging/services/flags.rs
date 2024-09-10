@@ -5,16 +5,18 @@ use crate::messaging::nats::{
     MessagingServiceError,
 };
 use async_nats::jetstream;
+use base64::Engine;
 use futures::Stream;
 use std::time::Duration;
 
-const SUBMISSIONS_SUBJECT: &str = "flags.submit";
+const SUBMISSIONS_SUBJECT_PREFIX: &str = "flags.submit.";
 const SUBMISSION_RESULTS_SUBJECT: &str = "flags.result";
 
 #[derive(Clone)]
 pub struct FlagsService {
     pub(crate) context: jetstream::Context,
-    pub(crate) flags_stream: jetstream::stream::Stream,
+    pub(crate) flags_submissions_stream: jetstream::stream::Stream,
+    pub(crate) flags_results_stream: jetstream::stream::Stream,
 }
 
 impl FlagsService {
@@ -22,9 +24,11 @@ impl FlagsService {
         &self,
         message: &model::FlagSubmission,
     ) -> Result<jetstream::context::PublishAckFuture, messaging::MessagingError> {
+        let encoded_flag =
+            base64::engine::general_purpose::STANDARD_NO_PAD.encode(message.flag.as_bytes());
         publish_with_id(
             &self.context,
-            SUBMISSIONS_SUBJECT,
+            format!("{}{}", SUBMISSIONS_SUBJECT_PREFIX, encoded_flag),
             message.flag.as_str(),
             message,
         )
@@ -52,12 +56,12 @@ impl FlagsService {
         messaging::MessagingError,
     > {
         subscribe(
-            &self.flags_stream,
+            &self.flags_submissions_stream,
             jetstream::consumer::pull::Config {
                 durable_name,
                 deliver_policy: jetstream::consumer::DeliverPolicy::New,
                 ack_policy: jetstream::consumer::AckPolicy::Explicit,
-                filter_subject: SUBMISSIONS_SUBJECT.to_string(),
+                filter_subject: format!("{}*", SUBMISSIONS_SUBJECT_PREFIX),
                 ..Default::default()
             },
         )
@@ -72,8 +76,8 @@ impl FlagsService {
         messaging::MessagingError,
     > {
         subscribe_ordered(
-            &self.flags_stream,
-            Some(SUBMISSIONS_SUBJECT.to_string()),
+            &self.flags_submissions_stream,
+            Some(format!("{}*", SUBMISSIONS_SUBJECT_PREFIX)),
             deliver_policy,
         )
         .await
@@ -89,7 +93,7 @@ impl FlagsService {
         messaging::MessagingError,
     > {
         subscribe_ordered(
-            &self.flags_stream,
+            &self.flags_results_stream,
             Some(SUBMISSION_RESULTS_SUBJECT.to_string()),
             deliver_policy,
         )
@@ -105,12 +109,12 @@ impl FlagsService {
             deliver_policy: jetstream::consumer::DeliverPolicy::New,
             ack_policy: jetstream::consumer::AckPolicy::Explicit,
             ack_wait: Duration::from_secs(60),
-            filter_subject: SUBMISSIONS_SUBJECT.to_string(),
+            filter_subject: format!("{}*", SUBMISSIONS_SUBJECT_PREFIX),
             replay_policy: Default::default(),
             metadata: Default::default(),
             durable_name,
             ..Default::default()
         };
-        fetch(&self.flags_stream, consumer_config, limit).await
+        fetch(&self.flags_submissions_stream, consumer_config, limit).await
     }
 }

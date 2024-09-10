@@ -2,8 +2,8 @@ use async_channel::Receiver;
 use color_eyre::eyre::{Context, ContextCompat, Result};
 use futures::stream::select_all;
 use futures::StreamExt;
-use kriger_common::messaging::model::ExecutionRequest;
-use kriger_common::messaging::Message;
+use kriger_common::messaging;
+use kriger_common::messaging::nats::MessageWrapper;
 use regex::Regex;
 use std::future::Future;
 use std::process::Stdio;
@@ -26,7 +26,7 @@ pub struct Runner {
 }
 
 pub struct Job {
-    pub request: Box<dyn Message<Payload = ExecutionRequest> + Send>,
+    pub request: MessageWrapper<messaging::model::ExecutionRequest>,
     pub _permit: OwnedSemaphorePermit,
 }
 
@@ -42,7 +42,11 @@ enum OutputLine {
 pub trait RunnerCallback {
     /// Called upon once the execution receives a flag. If this results in an error, the execution
     /// will be queued for retry.
-    fn on_flag(&self, request: &ExecutionRequest, flag: &str) -> impl Future<Output = Result<()>>;
+    fn on_flag(
+        &self,
+        request: &messaging::model::ExecutionRequest,
+        flag: &str,
+    ) -> impl Future<Output = Result<()>>;
 }
 
 impl Runner {
@@ -75,9 +79,9 @@ impl Runner {
 
     #[instrument(level = "debug", skip_all, fields(
         worker = worker_idx,
-        job.team_id = job.request.payload().team_id,
-        job.ip_address = job.request.payload().ip_address,
-        job.flag_hint = ?job.request.payload().flag_hint,
+        job.team_id = job.request.payload.team_id,
+        job.ip_address = job.request.payload.ip_address,
+        job.flag_hint = ?job.request.payload.flag_hint,
     ))]
     async fn handle_job(
         &self,
@@ -87,7 +91,7 @@ impl Runner {
         callback: &impl RunnerCallback,
     ) -> Result<()> {
         job.request.progress().await.context("unable to ack")?;
-        match self.execute(job.request.payload(), callback).await {
+        match self.execute(&job.request.payload, callback).await {
             Err(error) => {
                 warn! {
                     ?error,
@@ -106,7 +110,7 @@ impl Runner {
     #[instrument(level = "debug", skip_all)]
     async fn execute(
         &self,
-        request: &ExecutionRequest,
+        request: &messaging::model::ExecutionRequest,
         callback: &impl RunnerCallback,
     ) -> Result<()> {
         debug!("performing execution");

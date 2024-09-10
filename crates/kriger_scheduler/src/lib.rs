@@ -8,7 +8,6 @@ use color_eyre::eyre::{Context, ContextCompat};
 use dashmap::DashMap;
 use futures::StreamExt;
 use kriger_common::messaging::nats::MessageWrapper;
-use kriger_common::messaging::services::data::DataService;
 use kriger_common::messaging::Bucket;
 use kriger_common::server::runtime::AppRuntime;
 use kriger_common::{messaging, models};

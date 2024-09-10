@@ -40,7 +40,7 @@ impl RunnerCallback for RunnerCallbackImpl {
 
 pub async fn main(args: Args) -> Result<()> {
     info!("initializing messaging");
-    let messaging = NatsMessaging::new(&args.nats_url).await?;
+    let messaging = NatsMessaging::new(&args.nats_url, None).await?;
     let cancellation_token = create_shutdown_cancellation_token();
 
     let flag_format =
@@ -106,7 +106,7 @@ pub async fn main(args: Args) -> Result<()> {
                         match maybe_message.context("end of stream")? {
                             Ok(message) => {
                                 let job = Job {
-                                    request: Box::new(message),
+                                    request: message,
                                     _permit: permit,
                                 };
                                 if let Err(err) = tx.send(job).await {

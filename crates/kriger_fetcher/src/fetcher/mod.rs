@@ -74,7 +74,7 @@ pub(crate) struct FetchOptions {
 }
 
 #[async_trait]
-pub(crate) trait Fetcher: Send {
+pub(crate) trait Fetcher: Send + Sync {
     async fn fetch(
         &self,
         options: &FetchOptions,

@@ -30,7 +30,9 @@ impl ExecutionsService {
         durable_name: Option<String>,
         exploit_name: Option<&str>,
     ) -> Result<
-        impl futures::Stream<Item = Result<MessageWrapper<model::FlagHint>, MessagingServiceError>>,
+        impl futures::Stream<
+            Item = Result<MessageWrapper<model::ExecutionRequest>, MessagingServiceError>,
+        >,
         messaging::MessagingError,
     > {
         subscribe(

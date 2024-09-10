@@ -1713,6 +1713,7 @@ dependencies = [
 name = "kriger_ws"
 version = "0.0.1"
 dependencies = [
+ "async-nats",
  "clap",
  "clap_derive",
  "color-eyre",
