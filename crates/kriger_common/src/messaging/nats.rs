@@ -196,7 +196,8 @@ where
         let mut stream = consumer.messages().await?;
 
         let mut map = HashMap::new();
-        while let Some(Ok(msg)) = stream.next().await {
+        while let Some(maybe_msg) = stream.next().await {
+            let msg = maybe_msg?;
             // FIXME: mut is not really required here..
             handle_watch_message(&msg, &mut map, &self.store.prefix);
 
@@ -314,7 +315,8 @@ where
                 pending = num_pending,
                 "consuming the initial k/v pairs"
             }
-            while let Some(Ok(msg)) = stream.next().await {
+            while let Some(maybe_msg) = stream.next().await {
+                let msg = maybe_msg?;
                 // FIXME: mut is not really required here..
                 handle_watch_message(&msg, &mut arc, &self.store.prefix);
 
@@ -500,8 +502,11 @@ fn handle_watch_message<T>(
             Ok(payload) => {
                 map.insert(key, payload);
             }
-            Err(err) => {
-                warn!("malformed message: {err:?}");
+            Err(error) => {
+                warn! {
+                    ?error,
+                    "malformed message received"
+                }
             }
         },
         Operation::Delete | Operation::Purge => {
