@@ -3,7 +3,7 @@ members = ["crates/*"]
 resolver = "2"
 
 [workspace.dependencies]
-async-nats = "0.35.1"
+async-nats = "0.36.0"
 async-trait = "0.1.81"
 axum = "0.7.5"
 base64 = "0.22.1"
@@ -16,10 +16,10 @@ flume = { version = "0.11.0", features = ["async", "select"] }
 futures = "0.3.30"
 hyper = "1.4.1"
 hyper-util = "0.1.6"
-opentelemetry = "0.24.0"
-opentelemetry-semantic-conventions = "0.16.0"
-opentelemetry_sdk = { version = "0.24.1", features = ["rt-tokio"] }
-opentelemetry-otlp = "0.17.0"
+opentelemetry = "0.25.0"
+opentelemetry-semantic-conventions = "0.25.0"
+opentelemetry_sdk = { version = "0.25.0", features = ["rt-tokio"] }
+opentelemetry-otlp = "0.25.0"
 rand = "0.8.5"
 reqwest = { version = "0.12.5", features = ["rustls-tls", "charset", "http2", "json"], default-features = false }
 serde = { version = "1.0.203", features = ["derive"] }
