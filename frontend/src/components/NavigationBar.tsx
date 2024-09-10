@@ -63,7 +63,7 @@ function NavigationBar() {
       : undefined;
   }, [tickProgress, serverConfig]);
 
-  const [hasTickStarted, stringTimeUntilFirstTick] = useMemo(() => {
+  const [hasTickNotStarted, stringTimeUntilFirstTick] = useMemo(() => {
     // Calculate days, hours, minutes, and seconds
     const remainingTime = (startTime ?? 0) - (currentTime ?? 0);
     const days = Math.floor(remainingTime / 86400000)
@@ -79,7 +79,7 @@ function NavigationBar() {
       .toString()
       .padStart(2, "0");
     return [
-      currentTime && startTime && currentTime >= startTime,
+      currentTime && startTime && currentTime < startTime,
       `${days}:${hours}:${minutes}:${seconds}`,
     ];
   }, [startTime, currentTime]);
@@ -100,8 +100,8 @@ function NavigationBar() {
         />
       </div>
 
-      <div className="p-6 flex flex-row items-center justify-between gap-6">
-        <div className="flex items-center gap-6">
+      <div className="p-6 flex flex-row items-center gap-6">
+        <div className="flex flex-1 items-center gap-6">
           <Link to={"/"}>
             <div className="text-xl font-bold">Kriger</div>
           </Link>
@@ -120,7 +120,7 @@ function NavigationBar() {
         </div>
 
         {/* Current tick + remaining tick time */}
-        {hasTickStarted ? (
+        {!hasTickNotStarted ? (
           <div className="font-bold">
             {/* Highlight the tick as red if the tickProgress is > 1. This means that the server is not delivering on time. */}
             <span className={clsx(tickProgress > 1 && "text-red-500")}>
