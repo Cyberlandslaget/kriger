@@ -3,7 +3,7 @@ import { forwardRef } from "react";
 import { useAtomValue } from "jotai";
 import { servicesAtom, teamFlagStatusAtom, teamsAtom } from "../utils/atoms";
 import { StatusCell } from "./StatusCell";
-import { FixedSizeList as List } from 'react-window';
+import { FixedSizeList as List } from "react-window";
 
 function SimpleDisplay() {
   const services = useAtomValue(servicesAtom);
@@ -11,9 +11,7 @@ function SimpleDisplay() {
   const teamFlagMap = useAtomValue(teamFlagStatusAtom);
 
   return (
-    <div
-      className="flex flex-col h-full relative rounded-md"
-    >
+    <div className="flex flex-col h-full relative rounded-md">
       <AutoSizer>
         {({ height, width }) => (
           <List
@@ -23,9 +21,7 @@ function SimpleDisplay() {
             width={width}
             innerElementType={forwardRef(({ children, ...rest }, ref) => (
               <table ref={ref} {...rest}>
-                <thead
-                  className="sticky top-0 bg-primary-bg h-10 z-10"
-                >
+                <thead className="sticky top-0 bg-primary-bg h-10 z-10">
                   <tr className="flex mb-2">
                     <th className="min-w-48 max-w-72 h-10 items-center font-bold p-2 shadow-inner bg-slate-950/30 border-slate-950 border-opacity-20 border-2 rounded-sm text-left">
                       Team
@@ -40,9 +36,7 @@ function SimpleDisplay() {
                     ))}
                   </tr>
                 </thead>
-                <tbody>
-                  {children}
-                </tbody>
+                <tbody>{children}</tbody>
               </table>
             ))}
           >
@@ -70,7 +64,7 @@ function SimpleDisplay() {
                     />
                   ))}
                 </tr>
-              )
+              );
             }}
           </List>
         )}
