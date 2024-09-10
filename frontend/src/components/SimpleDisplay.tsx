@@ -20,7 +20,7 @@ function SimpleDisplay() {
             itemSize={48}
             width={width}
             innerElementType={forwardRef(({ children, ...rest }, ref) => (
-              <table ref={ref} {...rest}>
+              <table ref={ref} {...rest} className="relative">
                 <thead className="sticky top-0 bg-primary-bg h-10 z-10">
                   <tr className="flex mb-2">
                     <th className="min-w-48 max-w-72 h-10 items-center font-bold p-2 shadow-inner bg-slate-950/30 border-slate-950 border-opacity-20 border-2 rounded-sm text-left">
@@ -28,8 +28,9 @@ function SimpleDisplay() {
                     </th>
                     {services.map((service) => (
                       <th
-                        className="w-full min-w-36 max-w-72 ml-2 h-10 font-bold p-2 shadow-inner bg-slate-950/30 border-slate-950 border-opacity-20 border-2 rounded-sm text-nowrap"
+                        className="w-full min-w-36 max-w-72 ml-2 h-10 font-bold p-2 shadow-inner bg-slate-950/30 border-slate-950 border-opacity-20 border-2 rounded-sm text-nowrap truncate"
                         key={service.name}
+                        title={service.name}
                       >
                         {service.name}
                       </th>

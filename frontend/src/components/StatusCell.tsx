@@ -52,7 +52,7 @@ export const StatusCell = ({ flags }: StatusCellProps) => {
         {[
           ...Array(
             (aggregate.get(FLAG_CODE.Ok) ?? 0) +
-              (aggregate.get(FLAG_CODE.Duplicate) ?? 0),
+            (aggregate.get(FLAG_CODE.Duplicate) ?? 0),
           ),
         ].map((_, i) => (
           <FlagIcon
