@@ -55,7 +55,10 @@ fn init_tracing(use_otel: bool) -> eyre::Result<()> {
         tracing_subscriber::fmt::layer().with_filter(
             EnvFilter::builder()
                 .with_default_directive(LevelFilter::INFO.into())
-                .from_env_lossy(),
+                .from_env_lossy()
+                .add_directive("h2=info".parse()?)
+                .add_directive("async_nats=info".parse()?)
+                .add_directive("tower=info".parse()?),
         ),
     );
 
