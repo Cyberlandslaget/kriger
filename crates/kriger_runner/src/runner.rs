@@ -152,10 +152,12 @@ impl Runner {
                         debug!("stdout: {line}");
                         for m in self.flag_format.find_iter(&line) {
                             debug!("flag matched: {}", m.as_str());
-                            callback
-                                .on_flag(request, m.as_str())
-                                .await
-                                .context("flag callback failed")?;
+                            if let Err(error) = callback.on_flag(request, m.as_str()).await {
+                                warn! {
+                                    ?error,
+                                    "unexpected flag callback error"
+                                }
+                            }
                         }
                     }
                     OutputLine::Stderr(line) => {
