@@ -5,7 +5,7 @@ mod support;
 use crate::config::Config;
 use axum::http::header::InvalidHeaderValue;
 use axum::http::HeaderValue;
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::{routing::put, Router};
 use color_eyre::eyre;
 use color_eyre::eyre::Context;
@@ -45,6 +45,7 @@ pub async fn main(runtime: AppRuntime, config: Config) -> eyre::Result<()> {
     let app = Router::new()
         .route("/exploits", get(routes::exploits::get_exploits))
         .route("/exploits/:name", put(routes::exploits::update_exploit))
+        .route("/exploits/:name/execute", post(routes::exploits::execute_exploit))
         .route(
             "/competition/services",
             get(routes::competition::get_services),
