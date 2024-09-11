@@ -45,7 +45,10 @@ pub async fn main(runtime: AppRuntime, config: Config) -> eyre::Result<()> {
     let app = Router::new()
         .route("/exploits", get(routes::exploits::get_exploits))
         .route("/exploits/:name", put(routes::exploits::update_exploit))
-        .route("/exploits/:name/execute", post(routes::exploits::execute_exploit))
+        .route(
+            "/exploits/:name/execute",
+            post(routes::exploits::execute_exploit),
+        )
         .route(
             "/competition/services",
             get(routes::competition::get_services),
@@ -57,7 +60,11 @@ pub async fn main(runtime: AppRuntime, config: Config) -> eyre::Result<()> {
         )
         .route("/config/server", get(routes::config::get_server_config))
         .layer(TraceLayer::new_for_http())
-        .layer(cors::CorsLayer::new().allow_origin(origins))
+        .layer(
+            cors::CorsLayer::new()
+                .allow_origin(origins)
+                .allow_methods(cors::Any),
+        )
         .with_state(Arc::new(state));
 
     axum::serve(listener, app)
