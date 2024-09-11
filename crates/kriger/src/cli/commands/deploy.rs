@@ -1,4 +1,4 @@
-use crate::cli::{self, read_cli_config};
+use crate::cli::{self, read_cli_config, with_spinner};
 use crate::cli::{args, emoji, format_duration_secs, log};
 use color_eyre::eyre::{Context, ContextCompat};
 use color_eyre::Result;
@@ -185,12 +185,11 @@ pub(crate) async fn main(args: args::Deploy) -> Result<()> {
     progress.set_message(format!("{} Deploying exploit...", emoji::ROCKET));
 
     let client = KrigerClient::new(cli_config.client.rest_url);
-    let update_res = client
-        .update_exploit(&models::Exploit {
-            manifest,
-            image: tag,
-        })
-        .await;
+    let exploit = models::Exploit {
+        manifest,
+        image: tag,
+    };
+    let update_res = client.update_exploit(&exploit).await;
 
     progress.finish_and_clear();
     match update_res {
@@ -217,7 +216,57 @@ pub(crate) async fn main(args: args::Deploy) -> Result<()> {
             println!(
                 "  {} {}",
                 emoji::CHECK_MARK,
-                style("Deployment requested succcessfully").green().bold()
+                style("Deployment requested successfully").green().bold()
+            );
+        }
+    }
+
+    if args.no_execute {
+        println!(
+            "  {} {}",
+            emoji::INFORMATION,
+            style("The execution step has been skipped.")
+                .yellow()
+                .bold()
+        );
+        return Ok(());
+    }
+
+    // The exploit may be in a stale state at this point, meaning that the old version of the exploit
+    // may still be running and it may receive the execution request instead.
+    // TODO: Wait for the deployment to actually complete? Eg. the rollout completing
+    let execute_res = with_spinner("Scheduling exploit execution", || {
+        client.execute_exploit(&exploit.manifest.name)
+    })
+    .await;
+
+    match execute_res {
+        Err(err) => {
+            println!(
+                "  {} {}: {}",
+                emoji::CROSS_MARK,
+                style("Exploit execution failed").red().bold(),
+                err
+            );
+
+            // Propagate this error since it is unexpected
+            return Err(err.into());
+        }
+        Ok(models::responses::AppResponse::Error { message }) => {
+            println!(
+                "  {} {}: {}",
+                emoji::CROSS_MARK,
+                style("Exploit execution failed").red().bold(),
+                &message
+            );
+        }
+        Ok(models::responses::AppResponse::Ok(_)) => {
+            println!(
+                "  {} {}",
+                emoji::CHECK_MARK,
+                style("Exploit execution requested successfully")
+                    .green()
+                    .bold()
             );
         }
     }

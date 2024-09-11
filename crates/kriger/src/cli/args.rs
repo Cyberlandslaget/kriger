@@ -7,6 +7,10 @@ pub(crate) struct Deploy {
     /// Do not deploy the exploit. This will only build the exploit and push it to the registry.
     #[arg(long)]
     pub(crate) no_deploy: bool,
+
+    /// Do not immediately execute the exploit. This will not immediately execute the exploit after deploying.
+    #[arg(long)]
+    pub(crate) no_execute: bool,
 }
 
 /// Create a new exploit based on a template.

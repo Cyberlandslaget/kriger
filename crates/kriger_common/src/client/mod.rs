@@ -31,6 +31,14 @@ impl KrigerClient {
             .await
     }
 
+    pub async fn execute_exploit(
+        &self,
+        exploit_name: &str,
+    ) -> reqwest::Result<models::responses::AppResponse<()>> {
+        let url = format!("{}/exploits/{}/execute", &self.url, &exploit_name);
+        self.request(reqwest::Method::POST, url).await
+    }
+
     async fn request<U, R>(
         &self,
         method: reqwest::Method,
