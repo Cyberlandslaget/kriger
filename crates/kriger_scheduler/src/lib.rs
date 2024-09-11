@@ -7,6 +7,7 @@ use color_eyre::eyre;
 use color_eyre::eyre::{Context, ContextCompat};
 use dashmap::DashMap;
 use futures::StreamExt;
+use kriger_common::messaging::model::SchedulingRequest;
 use kriger_common::messaging::nats::MessageWrapper;
 use kriger_common::messaging::Bucket;
 use kriger_common::server::runtime::AppRuntime;
@@ -49,10 +50,17 @@ pub async fn main(runtime: AppRuntime) -> eyre::Result<()> {
     set.spawn(handle_scheduling(
         runtime.clone(),
         exploits.clone(),
-        services,
+        services.clone(),
         teams.clone(),
     ));
-    set.spawn(handle_hint_scheduling(runtime, exploits, teams));
+    set.spawn(handle_hint_scheduling(
+        runtime.clone(),
+        exploits.clone(),
+        teams.clone(),
+    ));
+    set.spawn(handle_scheduling_requests(
+        runtime, exploits, services, teams,
+    ));
 
     while let Some(res) = set.join_next().await {
         res??;
@@ -206,7 +214,7 @@ async fn handle_tick(
 
                 debug! {
                     ?request,
-                    "sending execution request"
+                    "publishing execution request"
                 }
 
                 // TODO: Parallelize this
@@ -328,7 +336,7 @@ async fn handle_hint_schedule(
 
     debug! {
         ?request,
-        "sending execution request"
+        "publishing execution request"
     }
 
     let executions_svc = runtime.messaging.executions();
@@ -342,6 +350,142 @@ async fn handle_hint_schedule(
             .publish_execution_request(&exploit.manifest.name, &request)
             .await?;
     }
+
+    Ok(())
+}
+
+async fn handle_scheduling_requests(
+    runtime: AppRuntime,
+    exploits: Arc<DashMap<String, models::Exploit>>,
+    services: Arc<DashMap<String, models::Service>>,
+    teams: Arc<DashMap<String, models::Team>>,
+) -> eyre::Result<()> {
+    let requests = runtime
+        .messaging
+        .scheduling()
+        .subscribe_requests(Some("scheduler".to_string()))
+        .await
+        .context("unable to subscribe to scheduling requests")?;
+    pin!(requests);
+
+    loop {
+        let maybe_message = select! {
+            _ = runtime.cancellation_token.cancelled() => return Ok(()),
+            maybe_message = requests.next() => maybe_message
+        };
+        let message = match maybe_message {
+            Some(Ok(message)) => message,
+            Some(Err(error)) => {
+                error! {
+                    ?error,
+                    "unexpected messaging error"
+                }
+                continue;
+            }
+            // End of stream
+            None => return Ok(()),
+        };
+        if let Err(error) =
+            handle_exploit_schedule(&runtime, &teams, &exploits, &services, &message).await
+        {
+            error! {
+                ?error,
+                "scheduling error"
+            }
+            if let Err(error) = message.retry_linear(Duration::from_secs(2), 5).await {
+                error! {
+                    ?error,
+                    "unable to ack message"
+                }
+            }
+            continue;
+        }
+        if let Err(error) = message.ack().await {
+            error! {
+                ?error,
+                "unable to ack message"
+            }
+        }
+    }
+}
+
+#[instrument(skip_all, fields(exploit.name = message.payload.exploit))]
+async fn handle_exploit_schedule(
+    runtime: &AppRuntime,
+    teams: &DashMap<String, models::Team>,
+    exploits: &DashMap<String, models::Exploit>,
+    services: &DashMap<String, models::Service>,
+    message: &MessageWrapper<SchedulingRequest>,
+) -> eyre::Result<()> {
+    debug!("scheduling request received");
+    message.progress().await?;
+
+    let exploit = exploits
+        .get(&message.payload.exploit)
+        .context("unable to find the requested exploit")?;
+
+    let service_name_b64 = STANDARD_NO_PAD.encode(&exploit.manifest.service);
+    let service = services
+        .get(&service_name_b64)
+        .context("unable to find the requested service")?;
+
+    if service.has_hint {
+        let hints = runtime
+            .messaging
+            .data()
+            .get_flag_hints(Some(&exploit.manifest.service))
+            .await
+            .context("unable to get flag hints")?;
+
+        for hint in hints {
+            if let Err(error) =
+                handle_exploit_schedule_hint(runtime, teams, exploit.key(), hint.payload).await
+            {
+                warn! {
+                    ?error,
+                    "unable to schedule exploit execution with hint"
+                }
+                // TODO: Should we fail fast here? Should we queue the entire logical operation for retry?
+            }
+        }
+    } else {
+        // TODO: Implement
+    }
+
+    Ok(())
+}
+
+#[instrument(skip_all, fields(team.id = hint.team_id, service.name = hint.service))]
+async fn handle_exploit_schedule_hint(
+    runtime: &AppRuntime,
+    teams: &DashMap<String, models::Team>,
+    exploit_name: &str,
+    hint: messaging::model::FlagHint,
+) -> eyre::Result<()> {
+    let team = teams
+        .get(&hint.team_id)
+        .context("unable to find the requested team")?;
+    let ip_address = team
+        .services
+        .get(&hint.service)
+        .or(team.ip_address.as_ref())
+        .context("unknown target ip address")?;
+
+    let request = messaging::model::ExecutionRequest {
+        ip_address: ip_address.clone(),
+        flag_hint: Some(hint.hint),
+        team_id: Some(team.key().clone()),
+    };
+    debug! {
+        ?request,
+        "publishing execution request"
+    }
+    runtime
+        .messaging
+        .executions()
+        .publish_execution_request(exploit_name, &request)
+        .await
+        .context("unable to publish execution request")?;
 
     Ok(())
 }

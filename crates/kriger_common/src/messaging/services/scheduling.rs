@@ -1,10 +1,12 @@
 use crate::messaging;
 use crate::messaging::model;
-use crate::messaging::nats::{publish, subscribe_ordered, MessageWrapper, MessagingServiceError};
+use crate::messaging::nats::{
+    publish, subscribe, subscribe_ordered, MessageWrapper, MessagingServiceError,
+};
 use async_nats::jetstream;
-use async_nats::jetstream::consumer::DeliverPolicy;
 
 const SCHEDULING_TICK_SUBJECT: &str = "scheduling.tick";
+const SCHEDULING_REQUEST_SUBJECT: &str = "scheduling.request";
 
 pub struct SchedulingService {
     pub(crate) context: jetstream::Context,
@@ -19,9 +21,16 @@ impl SchedulingService {
         publish(&self.context, SCHEDULING_TICK_SUBJECT, message).await
     }
 
+    pub async fn publish_request(
+        &self,
+        message: &model::SchedulingRequest,
+    ) -> Result<jetstream::context::PublishAckFuture, messaging::MessagingError> {
+        publish(&self.context, SCHEDULING_REQUEST_SUBJECT, message).await
+    }
+
     pub async fn subscribe_ticks_ordered(
         &self,
-        deliver_policy: DeliverPolicy,
+        deliver_policy: jetstream::consumer::DeliverPolicy,
     ) -> Result<
         impl futures::Stream<
             Item = Result<MessageWrapper<model::SchedulingTick>, MessagingServiceError>,
@@ -32,6 +41,28 @@ impl SchedulingService {
             &self.scheduling_stream,
             Some(SCHEDULING_TICK_SUBJECT.to_string()),
             deliver_policy,
+        )
+        .await
+    }
+
+    pub async fn subscribe_requests(
+        &self,
+        durable_name: Option<String>,
+    ) -> Result<
+        impl futures::Stream<
+            Item = Result<MessageWrapper<model::SchedulingRequest>, MessagingServiceError>,
+        >,
+        messaging::MessagingError,
+    > {
+        subscribe(
+            &self.scheduling_stream,
+            jetstream::consumer::pull::Config {
+                durable_name,
+                deliver_policy: jetstream::consumer::DeliverPolicy::New,
+                ack_policy: jetstream::consumer::AckPolicy::Explicit,
+                filter_subject: SCHEDULING_REQUEST_SUBJECT.to_string(),
+                ..Default::default()
+            },
         )
         .await
     }

@@ -77,3 +77,9 @@ pub struct SchedulingTick {
     #[serde(rename = "i")]
     pub tick: i64,
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SchedulingRequest {
+    #[serde(rename = "e")]
+    pub exploit: String,
+}

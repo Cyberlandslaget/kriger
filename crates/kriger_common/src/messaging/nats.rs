@@ -628,6 +628,19 @@ impl<T: DeserializeOwned> MessageWrapper<T> {
         self.inner.ack_with(jetstream::AckKind::Term).await?;
         Ok(())
     }
+
+    pub async fn retry_linear(&self, delay: Duration, retries: i64) -> Result<(), MessagingError> {
+        if self.info.delivered > retries {
+            self.inner.ack_with(jetstream::AckKind::Term).await?;
+            return Ok(());
+        }
+
+        self.inner
+            .ack_with(jetstream::AckKind::Nak(Some(delay)))
+            .await?;
+
+        Ok(())
+    }
 }
 
 pub trait Fetcher<T> {
