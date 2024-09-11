@@ -107,7 +107,9 @@ graph TB
     controller[kriger-controller]
     submitter[kriger-submitter]
     ws[kriger-ws]
-    exploits[exploits]
+    rest[kriger-rest]
+    frontend[kriger-frontend]
+    exploits["exploits (kriger-runner)"]
     k8s([Kubernetes])
     comp([Competition system])
     kv_exploits --> scheduler
@@ -119,8 +121,14 @@ graph TB
     submitter -- " Submit flags " --> comp
     fetcher -- " data.flag_hints.> " --> scheduler
     scheduler -- " executions.*.request " --> exploits
-    exploits -- " flags.submit " --> submitter
-    exploits -- " flags.submit " --> ws
+    exploits -- " flags.submit.* " --> submitter
+    exploits -- " flags.submit.* " --> ws
     submitter -- " flags.result " --> ws
     scheduler -- " scheduling.tick " --> ws
+    rest --> kv_exploits
+    rest --> kv_services
+    rest --> kv_teams
+    rest -- " scheduling.request " --> scheduler
+    frontend --> rest
+    frontend --> ws
 ```
