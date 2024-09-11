@@ -50,6 +50,10 @@ pub async fn main(runtime: AppRuntime, config: Config) -> eyre::Result<()> {
             get(routes::competition::get_services),
         )
         .route("/competition/teams", get(routes::competition::get_teams))
+        .route(
+            "/competition/flag_hints",
+            get(routes::competition::get_flag_hints),
+        )
         .route("/config/server", get(routes::config::get_server_config))
         .layer(TraceLayer::new_for_http())
         .layer(cors::CorsLayer::new().allow_origin(origins))

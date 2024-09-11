@@ -6,7 +6,7 @@ edition = "2021"
 [features]
 
 [dependencies]
-axum = { workspace = true, features = ["macros"] }
+axum = { workspace = true, features = ["macros", "query"] }
 clap.workspace = true
 clap_derive.workspace = true
 color-eyre.workspace = true

@@ -1,6 +1,6 @@
 use crate::messaging;
-use crate::messaging::model;
-use crate::messaging::nats::{publish_with_id, subscribe};
+use crate::messaging::nats::{list_stream, publish_with_id, subscribe};
+use crate::messaging::{model, MessagingError};
 use crate::messaging::{MessageWrapper, MessagingServiceError};
 use async_nats::jetstream;
 use base64::Engine;
@@ -54,6 +54,19 @@ impl DataService {
                 filter_subject: format_subject(None, None),
                 ..Default::default()
             },
+        )
+        .await
+    }
+
+    pub async fn get_flag_hints(
+        &self,
+        service_name: Option<&str>,
+    ) -> Result<Vec<MessageWrapper<model::FlagHint>>, MessagingError> {
+        let encoded_service =
+            service_name.map(|name| base64::engine::general_purpose::STANDARD_NO_PAD.encode(name));
+        list_stream(
+            &self.data_stream,
+            Some(format_subject(encoded_service.as_deref(), None)),
         )
         .await
     }

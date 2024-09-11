@@ -81,3 +81,11 @@ impl FlagSubmissionStatus {
         }
     }
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FlagHint {
+    pub team_id: String,
+    pub service: String,
+    pub hint: serde_json::Value,
+}

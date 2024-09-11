@@ -568,6 +568,15 @@ pub enum MessagingServiceError {
     Error(MessagingError),
 }
 
+impl Into<MessagingError> for MessagingServiceError {
+    fn into(self) -> MessagingError {
+        match self {
+            MessagingServiceError::ProcessingError { error, .. } => error,
+            MessagingServiceError::Error(error) => error,
+        }
+    }
+}
+
 impl<T: DeserializeOwned> MessageWrapper<T> {
     fn from(message: jetstream::Message) -> Result<Self, MessagingServiceError> {
         let payload = match serde_json::from_slice(message.payload.as_ref()) {
@@ -758,4 +767,41 @@ where
     let consumer = stream.create_consumer(config).await?;
     let subscription = StreamFetcher { consumer, limit };
     Ok(subscription)
+}
+
+pub async fn list_stream<T>(
+    stream: &jetstream::stream::Stream,
+    subject_filter: Option<String>,
+) -> Result<Vec<MessageWrapper<T>>, MessagingError>
+where
+    T: DeserializeOwned + ?Sized,
+{
+    let filter_subject = subject_filter.unwrap_or("".to_string());
+    let consumer = stream
+        .create_consumer(jetstream::consumer::pull::OrderedConfig {
+            replay_policy: ReplayPolicy::Instant,
+            deliver_policy: DeliverPolicy::All,
+            filter_subject,
+            ..Default::default()
+        })
+        .await?;
+
+    let num_pending = consumer.cached_info().num_pending;
+    if num_pending == 0 {
+        return Ok(vec![]);
+    }
+
+    let mut buf = Vec::with_capacity(num_pending as usize); // Let's hope that this never overflows
+    let mut stream = map_message_stream(consumer.messages().await?);
+    while let Some(maybe_message) = stream.next().await {
+        let message = maybe_message.map_err(Into::<MessagingError>::into)?;
+        let pending = message.info.pending;
+        buf.push(message);
+
+        if pending == 0 {
+            break;
+        }
+    }
+
+    Ok(buf)
 }

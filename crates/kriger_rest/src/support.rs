@@ -1,5 +1,5 @@
-use axum::extract::rejection::JsonRejection;
-use axum::extract::FromRequest;
+use axum::extract::rejection::{JsonRejection, QueryRejection};
+use axum::extract::{FromRequest, FromRequestParts, Query};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
@@ -15,6 +15,8 @@ pub(crate) enum AppError {
     MessagingError(#[from] MessagingError),
     #[error("{0}")]
     JsonRejection(#[from] JsonRejection),
+    #[error("{0}")]
+    QueryRejection(#[from] QueryRejection),
     #[error("Not found")]
     NotFound,
 }
@@ -25,6 +27,7 @@ impl AppError {
             // User errors
             AppError::BadInput(_) => StatusCode::BAD_REQUEST,
             AppError::JsonRejection(_) => StatusCode::BAD_REQUEST,
+            AppError::QueryRejection(_) => StatusCode::BAD_REQUEST,
 
             // General errors
             AppError::NotFound => StatusCode::NOT_FOUND,
@@ -60,5 +63,27 @@ where
 {
     fn into_response(self) -> Response {
         Json(self.0).into_response()
+    }
+}
+
+#[derive(FromRequestParts)]
+#[from_request(via(Query), rejection(AppError))]
+pub(crate) struct AppQuery<T>(pub(crate) T);
+
+impl<T> IntoResponse for AppQuery<T>
+where
+    Query<T>: IntoResponse,
+{
+    fn into_response(self) -> Response {
+        Query(self.0).into_response()
+    }
+}
+
+impl<T> std::ops::Deref for AppQuery<T> {
+    type Target = T;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
