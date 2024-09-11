@@ -12,6 +12,8 @@
   "dependencies": {
     "@fontsource/b612-mono": "^5.0.19",
     "@monaco-editor/react": "^4.6.0",
+    "@radix-ui/react-dialog": "^1.1.1",
+    "@radix-ui/react-switch": "^1.1.0",
     "@tanstack/react-router": "^1.45.0",
     "clsx": "^2.1.1",
     "jotai": "^2.9.0",
@@ -21,7 +23,10 @@
     "react-virtualized-auto-sizer": "^1.0.24",
     "react-window": "^1.8.10",
     "shiki": "^1.10.3",
+    "sonner": "^1.5.0",
     "swr": "^2.2.5",
+    "tailwind-merge": "^2.5.2",
+    "tailwindcss-animate": "^1.0.7",
     "usehooks-ts": "^3.1.0"
   },
   "devDependencies": {

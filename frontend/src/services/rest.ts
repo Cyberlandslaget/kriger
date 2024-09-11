@@ -3,6 +3,7 @@ import { CONFIG } from "../utils/constants";
 import type {
   APIErrorResponse,
   APISuccessResponse,
+  Exploit,
   ServerConfig,
   Service,
   Team,
@@ -50,3 +51,27 @@ export const useCompetitionTeams = () =>
     "/competition/teams",
     fetcher,
   );
+
+export const useExploitsData = () =>
+  useSWR<APISuccessResponse<Exploit[]>, APIErrorResponse>(
+    "/exploits",
+    fetcher,
+  );
+
+export const executeExploit = async (exploit: Exploit): Promise<unknown> => {
+  const response = await fetch(`${CONFIG.restUrl}/exploits/${exploit.manifest.name}/execute`, {
+    method: 'POST',
+  });
+  return await response.json();
+};
+
+export const updateExploit = async (exploit: Exploit): Promise<unknown> => {
+  const response = await fetch(`${CONFIG.restUrl}/exploits/${exploit.manifest.name}`, {
+    method: 'PUT',
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(exploit)
+  });
+  return await response.json();
+};

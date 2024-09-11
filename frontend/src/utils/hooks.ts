@@ -4,6 +4,7 @@ import type { WebSocketMessage } from "../services/models";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import {
   currentTickAtom,
+  exploitsAtom,
   serverConfigAtom,
   servicesAtom,
   teamFlagPurgeDispatch,
@@ -13,6 +14,7 @@ import {
 import {
   useCompetitionServices,
   useCompetitionTeams,
+  useExploitsData,
   useServerConfig,
 } from "../services/rest";
 
@@ -40,8 +42,8 @@ export const useWebSocketProvider = (url: string) => {
           const oldest =
             new Date(serverConfig.competition.start).getTime() +
             (currentTick - serverConfig.competition.flagValidity + 1) *
-              serverConfig.competition.tick *
-              1000;
+            serverConfig.competition.tick *
+            1000;
           if (event.published < oldest) {
             break;
           }
@@ -64,8 +66,8 @@ export const useWebSocketProvider = (url: string) => {
     const oldest =
       new Date(serverConfig.competition.start).getTime() +
       (currentTick - serverConfig.competition.flagValidity + 1) *
-        serverConfig.competition.tick *
-        1000;
+      serverConfig.competition.tick *
+      1000;
     flagPurgeDispatch(oldest);
   }, [currentTick, serverConfig, flagPurgeDispatch]);
 
@@ -84,8 +86,8 @@ export const useWebSocketProvider = (url: string) => {
       () =>
         Date.now() -
         serverConfig.competition.tick *
-          (serverConfig.competition.flagValidity + 1) *
-          1000,
+        (serverConfig.competition.flagValidity + 1) *
+        1000,
       (message) => {
         handleMessageRef.current?.(message);
       },
@@ -123,4 +125,16 @@ export const useCompetition = () => {
       setServices(services?.data?.sort((a, b) => a.name.localeCompare(b.name)));
     }
   }, [services, setServices]);
+};
+
+export const useExploits = () => {
+  const setExploits = useSetAtom(exploitsAtom);
+
+  const { data: exploits } = useExploitsData();
+
+  useEffect(() => {
+    if (exploits?.data) {
+      setExploits(exploits?.data?.sort((a, b) => a.manifest.service.localeCompare(b.manifest.service)));
+    }
+  }, [exploits, setExploits]);
 };

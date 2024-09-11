@@ -1,5 +1,6 @@
 import { atom } from "jotai";
 import type {
+  Exploit,
   FlagSubmissionMessage,
   FlagSubmissionResultMessage,
   ServerConfig,
@@ -24,7 +25,7 @@ export const currentTickAtom = atom(
     })),
 );
 
-export const exploitsAtom = atom<ExploitType[] | null>(null);
+export const exploitsAtom = atom<Exploit[] | null>(null);
 export const executionsAtom = atom<ExploitType[] | null>(null);
 
 export const teamsAtom = atom<Record<string, Team>>({});
@@ -59,7 +60,7 @@ export const teamFlagSubmissionDispatch = atom(
                 // - status was not defined previously
                 // - the message's status has a higher precedence over the previous status
                 "status" in message &&
-                (!prevStatus?.status || message.status < prevStatus?.status)
+                  (!prevStatus?.status || message.status < prevStatus?.status)
                   ? message.status
                   : prevStatus?.status,
               // Keep the timestamp of when the flag was originally submitted.
