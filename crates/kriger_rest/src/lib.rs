@@ -6,7 +6,7 @@ use crate::config::Config;
 use axum::http::header::InvalidHeaderValue;
 use axum::http::HeaderValue;
 use axum::routing::{get, post};
-use axum::{routing::put, Router};
+use axum::{http, routing::put, Router};
 use color_eyre::eyre;
 use color_eyre::eyre::Context;
 use kriger_common::server::runtime::AppRuntime;
@@ -63,7 +63,12 @@ pub async fn main(runtime: AppRuntime, config: Config) -> eyre::Result<()> {
         .layer(
             cors::CorsLayer::new()
                 .allow_origin(origins)
-                .allow_methods(cors::Any),
+                .allow_methods(cors::Any)
+                .allow_headers([
+                    http::header::ORIGIN,
+                    http::header::CONTENT_TYPE,
+                    http::header::ACCEPT,
+                ]),
         )
         .with_state(Arc::new(state));
 
