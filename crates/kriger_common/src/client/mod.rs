@@ -1,5 +1,5 @@
-use async_nats::subject::ToSubject;
 use serde::{de::DeserializeOwned, Serialize};
+use std::collections::HashMap;
 
 use crate::models;
 
@@ -14,6 +14,13 @@ impl KrigerClient {
             client: reqwest::Client::new(),
             url,
         }
+    }
+
+    pub async fn get_competition_teams(
+        &self,
+    ) -> reqwest::Result<models::responses::AppResponse<HashMap<String, models::Team>>> {
+        let url = format!("{}/competition/teams", &self.url);
+        self.request(reqwest::Method::GET, url).await
     }
 
     pub async fn get_competition_services(
