@@ -1,4 +1,4 @@
-use clap_derive::Parser;
+use clap_derive::{Parser, Subcommand};
 
 /// Deploy an exploit to the attack farm.
 #[derive(Parser, Debug)]
@@ -17,10 +17,21 @@ pub(crate) struct Deploy {
 #[derive(Parser, Debug)]
 #[command(version, about)]
 pub(crate) struct Create {
-    #[arg(long)]
     /// The service name that the exploit should target
+    #[arg(long)]
     pub(crate) service: Option<String>,
 
     /// The exploit's name
     pub(crate) name: Option<String>,
 }
+
+#[derive(Subcommand, Debug)]
+#[command(version, about)]
+pub(crate) enum ExploitCommand {
+    /// Retrieve flag hints
+    Hints(ExploitHints),
+}
+
+#[derive(Parser, Debug)]
+#[command(version, about)]
+pub(crate) struct ExploitHints {}

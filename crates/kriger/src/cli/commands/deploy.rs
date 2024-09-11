@@ -1,5 +1,6 @@
-use crate::cli::{self, read_cli_config, with_spinner};
+use crate::cli::commands::acquire_exploit_manifest;
 use crate::cli::{args, emoji, format_duration_secs, log};
+use crate::cli::{read_cli_config, with_spinner};
 use color_eyre::eyre::{Context, ContextCompat};
 use color_eyre::Result;
 use console::style;
@@ -12,19 +13,11 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::process::Stdio;
 use std::time::Duration;
-use tokio::fs;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 use tokio::time::Instant;
 use tokio_stream::wrappers::LinesStream;
 use tracing::debug;
-
-async fn read_exploit_manifest() -> Result<cli::models::ExploitManifest> {
-    let raw = fs::read("exploit.toml").await?;
-    let toml = std::str::from_utf8(&raw)?;
-
-    Ok(toml::from_str(toml)?)
-}
 
 // TODO: Eventually move to bollard if things work?
 async fn build_image(
@@ -101,19 +94,9 @@ pub(crate) async fn main(args: args::Deploy) -> Result<()> {
     let cli_config = read_cli_config().await?;
 
     // TODO: Honor the existing image in the CLI manifest
-    let cli_manifest = match read_exploit_manifest().await {
-        Ok(manifest) => manifest,
-        Err(err) => {
-            eprintln!(
-                "  {} {}",
-                emoji::CROSS_MARK,
-                style("Unable to read the exploit manifest (exploit.toml)")
-                    .red()
-                    .bold()
-            );
-            eprintln!("{err}");
-            return Ok(());
-        }
+    let cli_manifest = match acquire_exploit_manifest().await {
+        Some(manifest) => manifest,
+        None => return Ok(()),
     };
 
     // Convert the CLI manifest format to the common model format

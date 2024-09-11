@@ -1,3 +1,4 @@
+use async_nats::subject::ToSubject;
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::models;
@@ -20,6 +21,21 @@ impl KrigerClient {
     ) -> reqwest::Result<models::responses::AppResponse<Vec<models::Service>>> {
         let url = format!("{}/competition/services", &self.url);
         self.request(reqwest::Method::GET, url).await
+    }
+
+    pub async fn get_competition_flag_hints(
+        &self,
+        service_name: String,
+    ) -> reqwest::Result<models::responses::AppResponse<Vec<models::FlagHint>>> {
+        let url = format!("{}/competition/flag_hints", &self.url);
+        self.request_with_query(
+            reqwest::Method::GET,
+            url,
+            &models::requests::FlagHintQuery {
+                service: service_name,
+            },
+        )
+        .await
     }
 
     pub async fn update_exploit(
@@ -49,6 +65,22 @@ impl KrigerClient {
         R: DeserializeOwned + Serialize + ?Sized,
     {
         let response = self.client.request(method, url).send().await?;
+        let response: models::responses::AppResponse<R> = response.json().await?;
+        Ok(response)
+    }
+
+    async fn request_with_query<U, R, Q>(
+        &self,
+        method: reqwest::Method,
+        url: U,
+        query: &Q,
+    ) -> reqwest::Result<models::responses::AppResponse<R>>
+    where
+        U: reqwest::IntoUrl,
+        R: DeserializeOwned + Serialize + ?Sized,
+        Q: Serialize,
+    {
+        let response = self.client.request(method, url).query(query).send().await?;
         let response: models::responses::AppResponse<R> = response.json().await?;
         Ok(response)
     }

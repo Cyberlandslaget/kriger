@@ -47,6 +47,11 @@ async fn main() -> eyre::Result<()> {
             init_tracing(false)?;
             cli::commands::create::main(args).await
         }
+        #[cfg(feature = "cli")]
+        args::Commands::Exploit(args) => {
+            init_tracing(false)?;
+            cli::commands::exploit::main(args).await
+        }
     }
 }
 
