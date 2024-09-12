@@ -7,8 +7,8 @@ flag_format = "[A-Z0-9]{31}="
 
 [submitter]
 type = "cini"
-interval = 6 # 10 req/min
-batch = 2000 # body size limit: 200 kB
+interval = 3 # 20 req/min
+batch = 1000 # body size limit: 100 kB
 url = "http://10.10.0.1:8080/flags"
 token = ""
 

@@ -2,12 +2,11 @@ use crate::fetcher::{CompetitionData, FetchOptions, Fetcher, FetcherError, FlagH
 use async_trait::async_trait;
 use color_eyre::eyre;
 use dashmap::DashMap;
-use futures::future::join_all;
 use kriger_common::models;
 use serde::Deserialize;
 use serde_json::Value;
 use std::collections::HashMap;
-use tracing::{instrument, warn};
+use tracing::instrument;
 
 #[derive(Deserialize, PartialEq)]
 struct MetaResponse {
@@ -52,57 +51,15 @@ impl CiniFetcher {
         Ok(body)
     }
 
-    async fn get_flag_ids_by_service<S: AsRef<str>>(
-        &self,
-        service: S,
-    ) -> eyre::Result<FlagIdsResponse> {
+    async fn get_flag_ids(&self) -> Result<FlagIdsResponse, FetcherError> {
         let res = self
             .client
             .get(format!("{}/flagIds", &self.endpoint))
-            .query(&[("service", service.as_ref())])
             .send()
             .await?;
         let flag_ids: FlagIdsResponse = res.json().await?;
 
         Ok(flag_ids)
-    }
-
-    #[instrument(skip_all, fields(service))]
-    async fn handle_service(&self, service: String) -> Vec<FlagHint> {
-        let mut res = match self.get_flag_ids_by_service(&service).await {
-            Ok(res) => res,
-            Err(error) => {
-                warn! {
-                    ?error,
-                    "unable to fetch flag ids"
-                }
-                return vec![];
-            }
-        };
-        let teams = match res.remove(&service) {
-            Some(teams) => teams,
-            None => {
-                warn! {
-                    "unable to find the service in the flag ids response"
-                }
-                return vec![];
-            }
-        };
-
-        // TODO: Preallocate the vec?
-        let mut hints = Vec::new();
-        for (team_id, rounds) in teams {
-            for (round_id, hint) in rounds {
-                hints.push(FlagHint {
-                    round: round_id.parse().ok(),
-                    team_id: team_id.clone(),
-                    service: service.clone(),
-                    hint,
-                })
-            }
-        }
-
-        hints
     }
 }
 
@@ -112,17 +69,27 @@ impl Fetcher for CiniFetcher {
     async fn fetch(
         &self,
         options: &FetchOptions,
-        services: &DashMap<String, models::Service>,
+        _services: &DashMap<String, models::Service>,
     ) -> Result<CompetitionData, FetcherError> {
         let mut flag_hints: Option<Vec<FlagHint>> = None;
 
-        if options.require_hints {
-            let futures = services
-                .iter()
-                .filter(|service| service.has_hint)
-                .map(|service| self.handle_service(service.name.clone()));
+        let res = self.get_flag_ids().await?;
 
-            flag_hints = Some(join_all(futures).await.into_iter().flatten().collect());
+        if options.require_hints {
+            let mut hints = Vec::new();
+            for (service, teams) in res {
+                for (team_id, rounds) in teams {
+                    for (round_id, hint) in rounds {
+                        hints.push(FlagHint {
+                            round: round_id.parse().ok(),
+                            team_id: team_id.clone(),
+                            service: service.clone(),
+                            hint,
+                        })
+                    }
+                }
+            }
+            flag_hints = Some(hints);
         }
 
         Ok(CompetitionData { flag_hints })
