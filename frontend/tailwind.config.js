@@ -6,7 +6,6 @@ export default {
       colors: {
         "primary-bg": "#0f192e",
         background: "#0f192e",
-        border: "hsl(var(--border))",
         input: "rgb(148 163 184 / 0.4)", // bg-gray-200/70
         primary: "rgb(229 231 235 / 0.7)", // bg-slate-400/40
         red: {
