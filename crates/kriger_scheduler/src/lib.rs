@@ -174,6 +174,7 @@ async fn handle_tick(
                 warn! {
                     exploit.name = exploit.manifest.name,
                     service.name = exploit.manifest.service,
+                    ?services,
                     "unable to find the service referenced by the exploit"
                 }
                 continue;
