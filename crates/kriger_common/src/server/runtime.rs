@@ -72,8 +72,8 @@ pub fn create_shutdown_cancellation_token() -> CancellationToken {
         let signal_futures = signals.iter_mut().map(|signal| signal.recv().boxed());
         select_all(signal_futures).await;
 
-        signal_cancellation_token.cancel();
         info!("shutdown signal received");
+        signal_cancellation_token.cancel();
     });
     cancellation_token
 }

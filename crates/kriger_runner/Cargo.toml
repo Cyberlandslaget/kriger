@@ -7,14 +7,17 @@ edition = "2021"
 
 [dependencies]
 async-channel = "2.3.1"
+async-nats = "0.36.0"
 base64 = { workspace = true, features = ["alloc"] }
 clap.workspace = true
 clap_derive.workspace = true
 color-eyre.workspace = true
+flume.workspace = true
 futures.workspace = true
 kriger_common = { path = "../kriger_common" }
 num_cpus = "1.16.0"
 serde_json.workspace = true
+thiserror.workspace = true
 tokio = { workspace = true, features = ["process"] }
 tokio-util.workspace = true
 tokio-stream = { workspace = true, features = ["io-util"] }

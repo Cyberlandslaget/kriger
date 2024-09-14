@@ -1,44 +1,34 @@
 pub mod args;
-mod runner;
+pub mod runner;
 
 use crate::args::Args;
-use crate::runner::{Job, Runner, RunnerCallback};
-use color_eyre::eyre::{bail, Context, ContextCompat, Result};
+use crate::runner::simple::SimpleRunner;
+use crate::runner::{Runner, RunnerEvent, RunnerExecution, RunnerExecutionResult};
+use async_nats::jetstream::AckKind;
+use color_eyre::eyre;
+use color_eyre::eyre::{bail, Context, ContextCompat};
 use futures::StreamExt;
-use kriger_common::messaging::model::{ExecutionRequest, FlagSubmission};
-use kriger_common::messaging::nats::NatsMessaging;
+use kriger_common::messaging;
+use kriger_common::messaging::model::FlagSubmission;
+use kriger_common::messaging::nats::{MessageWrapper, MessagingServiceError, NatsMessaging};
 use kriger_common::messaging::services::flags::FlagsService;
 use kriger_common::server::runtime::create_shutdown_cancellation_token;
 use regex::Regex;
 use std::str;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::Semaphore;
-use tokio::{pin, select, spawn};
-use tracing::{debug, info, warn};
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
+use tokio::task::JoinSet;
+use tokio::{join, pin, select};
+use tokio_util::sync::CancellationToken;
+use tracing::{debug, error, info, instrument, warn};
 
-#[derive(Clone)]
-struct RunnerCallbackImpl {
-    flags_svc: FlagsService,
-    exploit: String,
-    service: Option<String>,
+pub struct Job {
+    pub request: MessageWrapper<messaging::model::ExecutionRequest>,
+    pub _permit: OwnedSemaphorePermit,
 }
 
-impl RunnerCallback for RunnerCallbackImpl {
-    async fn on_flag(&self, request: &ExecutionRequest, flag: &str) -> Result<()> {
-        let submission = FlagSubmission {
-            flag: flag.to_string(),
-            team_id: request.team_id.clone(),
-            service: self.service.clone(),
-            exploit: Some(self.exploit.clone()),
-        };
-        self.flags_svc.submit_flag(&submission).await?;
-
-        Ok(())
-    }
-}
-
-pub async fn main(args: Args) -> Result<()> {
+pub async fn main(args: Args) -> eyre::Result<()> {
     info!("initializing messaging");
     let messaging = NatsMessaging::new(&args.nats_url, None).await?;
     let cancellation_token = create_shutdown_cancellation_token();
@@ -61,63 +51,243 @@ pub async fn main(args: Args) -> Result<()> {
         .context("unable to subscribe to execution requests")?;
     pin!(stream);
 
+    let flags_svc = Arc::new(messaging.flags());
+
     let worker_count = args.workers.unwrap_or_else(|| 2 * num_cpus::get());
     let semaphore = Arc::new(Semaphore::new(worker_count));
     info!("using a maximum of {worker_count} workers");
 
     let (tx, rx) = async_channel::bounded::<Job>(worker_count);
 
-    let callback = RunnerCallbackImpl {
-        flags_svc: messaging.flags(),
-        exploit: args.exploit.clone(),
-        service: args.service,
-    };
-
-    let runner = Runner {
-        job_rx: rx,
-        exploit_name: args.exploit,
+    let runner = Arc::new(SimpleRunner {
+        exploit_name: args.exploit.clone(),
         exploit_command: args.command,
         exploit_args: args.args,
         flag_format,
         timeout: Duration::from_secs(args.timeout),
-    };
+    });
 
+    let mut set = JoinSet::new();
     for i in 0..worker_count {
-        spawn(
-            runner
-                .clone()
-                .worker(i, callback.clone(), cancellation_token.clone()),
-        );
+        set.spawn(worker(
+            i,
+            rx.clone(),
+            runner.clone(),
+            flags_svc.clone(),
+            args.exploit.clone(),
+            args.service.clone(),
+            cancellation_token.clone(),
+        ));
     }
 
     loop {
-        select! {
-            _ = cancellation_token.cancelled() => {
-                return Ok(());
+        let maybe_permit = select! {
+            _ = cancellation_token.cancelled() => break,
+            maybe_permit = semaphore.clone().acquire_owned() => maybe_permit
+        };
+
+        let permit = maybe_permit.context("permit acquisition failed")?;
+        debug!("permit acquired: {permit:?}");
+
+        let maybe_message = select! {
+            _ = cancellation_token.cancelled() => break,
+            maybe_message = stream.next() => maybe_message
+        };
+        match maybe_message.context("end of stream")? {
+            Ok(message) => {
+                let job = Job {
+                    request: message,
+                    _permit: permit,
+                };
+                if let Err(err) = tx.send(job).await {
+                    bail!("channel closed: {err:?}");
+                }
             }
-            maybe_permit = semaphore.clone().acquire_owned() => {
-                let permit = maybe_permit.context("permit acquisition failed")?;
-                debug!("permit acquired: {permit:?}");
-                select! {
-                    _ = cancellation_token.cancelled() => {
-                        return Ok(());
-                    }
-                    maybe_message = stream.next() => {
-                        match maybe_message.context("end of stream")? {
-                            Ok(message) => {
-                                let job = Job {
-                                    request: message,
-                                    _permit: permit,
-                                };
-                                if let Err(err) = tx.send(job).await {
-                                    bail!("channel closed: {err:?}");
-                                }
-                            }
-                            Err(err) => warn!("unable to parse message: {err:?}"),
-                        };
+            Err(MessagingServiceError::ProcessingError { message, error }) => {
+                warn! {
+                    ?error,
+                    "messaging processing error"
+                }
+                _ = message.ack_with(AckKind::Term).await;
+            }
+            Err(error) => {
+                error! {
+                    ?error,
+                    "unexpected messaging error"
+                }
+            }
+        };
+    }
+    while let Some(res) = set.join_next().await {
+        debug!("worker shutdown");
+        res.context("join error")?;
+    }
+    Ok(())
+}
+
+async fn worker(
+    idx: usize,
+    job_rx: async_channel::Receiver<Job>,
+    runner: Arc<impl Runner>,
+    flags_svc: Arc<FlagsService>,
+    exploit: String,
+    service: Option<String>,
+    cancellation_token: CancellationToken,
+) {
+    loop {
+        let maybe_job = select! {
+            // Wait for the jobs to gracefully shut down
+            _ = cancellation_token.cancelled() => return,
+            maybe_job = job_rx.recv() => maybe_job
+        };
+        let job = match maybe_job {
+            Ok(job) => job,
+            Err(error) => {
+                error! {
+                    ?error,
+                    "unable to receive job"
+                }
+
+                // Something is wrong. The channel has most likely been closed
+                cancellation_token.cancel();
+                return;
+            }
+        };
+        if let Err(error) = handle_job(
+            idx,
+            runner.as_ref(),
+            flags_svc.as_ref(),
+            &exploit,
+            &service,
+            job,
+        )
+        .await
+        {
+            error! {
+                ?error,
+                "unexpected job handling error"
+            }
+            // TODO: Consider delaying with jitter? Perhaps NATS is down?
+        }
+    }
+}
+
+#[instrument(level = "debug", skip_all, fields(
+    worker = worker_idx,
+    job.team_id = job.request.payload.team_id,
+    job.ip_address = job.request.payload.ip_address,
+    job.flag_hint = ?job.request.payload.flag_hint,
+))]
+async fn handle_job(
+    #[allow(unused_variables)] // This is used by tracing's `instrument` macro
+    worker_idx: usize,
+    runner: &impl Runner,
+    flags_svc: &FlagsService,
+    exploit: &str,
+    service: &Option<String>,
+    job: Job,
+) -> eyre::Result<()> {
+    debug!("processing job");
+    job.request.progress().await.context("unable to ack")?;
+
+    let payload = &job.request.payload;
+    let execution = match runner.run(&payload.ip_address, &payload.flag_hint).await {
+        Ok(execution) => execution,
+        Err(error) => {
+            error! {
+                ?error,
+                "unexpected runner error"
+            }
+            // TODO: Improve retry
+            job.request
+                .retry_linear(Duration::from_secs(2), 3)
+                .await
+                .context("unable to nak")?;
+            return Ok(());
+        }
+    };
+    let (has_events_failed, result) = join!(
+        handle_events(
+            flags_svc,
+            exploit,
+            service,
+            &payload.team_id,
+            execution.events()
+        ),
+        execution.complete()
+    );
+
+    let should_retry = match &result {
+        RunnerExecutionResult {
+            time,
+            error: Some(error),
+            exit_code,
+        } => {
+            warn! {
+                ?time,
+                ?error,
+                exit_code,
+                "exploit execution completed with an error"
+            }
+            true
+        }
+        // TODO: Retry on status
+        result => {
+            debug! {
+                ?result,
+                "exploit execution execution completed"
+            }
+            false
+        }
+    };
+
+    if has_events_failed || should_retry {
+        job.request
+            .retry_linear(Duration::from_secs(2), 3)
+            .await
+            .context("unable to nak")?;
+    } else {
+        job.request.ack().await.context("unable to ack")?;
+    }
+    Ok(())
+}
+
+async fn handle_events(
+    flags_svc: &FlagsService,
+    exploit: &str,
+    service: &Option<String>,
+    team_id: &Option<String>,
+    events: flume::Receiver<RunnerEvent>,
+) -> bool {
+    let mut should_retry = false;
+    while let Ok(event) = events.recv_async().await {
+        match event {
+            RunnerEvent::FlagMatch(flag) => {
+                debug! {
+                    flag,
+                    "flag matched"
+                }
+                let submission = FlagSubmission {
+                    flag: flag.to_string(),
+                    exploit: Some(exploit.to_string()),
+                    service: service.clone(),
+                    team_id: team_id.clone(),
+                };
+                if let Err(error) = flags_svc.submit_flag(&submission).await {
+                    should_retry = true;
+                    error! {
+                        ?error,
+                        "unable to submit flag"
                     }
                 }
             }
+            RunnerEvent::Stdout(line) => {
+                debug!("stdout: {line}");
+            }
+            RunnerEvent::Stderr(line) => {
+                debug!("stderr: {line}");
+            }
         }
     }
+    should_retry
 }
