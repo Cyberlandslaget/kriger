@@ -120,6 +120,9 @@ fn map_response_message(msg: &str) -> models::FlagSubmissionStatus {
     if msg.contains("already claimed") {
         return models::FlagSubmissionStatus::Duplicate;
     }
+    if msg.contains("didn't terminate") {
+        return models::FlagSubmissionStatus::Stale;
+    }
 
     warn!("unknown response message: {msg}");
     models::FlagSubmissionStatus::Unknown

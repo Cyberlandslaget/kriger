@@ -67,6 +67,9 @@ pub enum FlagSubmissionStatus {
     /// Server refused flag. Pre- or post-competition.
     /// Submitters should retry this status.
     Error = 8,
+    /// The flag that was placed by the checker is stale and is invalid.
+    /// Submitters should not retry this status.
+    Stale = 9,
     /// Unknown response. Submitters should definitely retry this status.
     Unknown = 200,
 }
