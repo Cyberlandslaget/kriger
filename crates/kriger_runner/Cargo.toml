@@ -22,4 +22,4 @@ tokio = { workspace = true, features = ["process"] }
 tokio-util.workspace = true
 tokio-stream = { workspace = true, features = ["io-util"] }
 tracing.workspace = true
-regex = "1.10.5"
+regex.workspace = true

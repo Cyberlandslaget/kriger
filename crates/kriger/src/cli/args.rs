@@ -30,8 +30,19 @@ pub(crate) struct Create {
 pub(crate) enum ExploitCommand {
     /// Retrieve flag hints
     Hints(ExploitHints),
+    /// Interactive exploit development
+    #[cfg(feature = "runner")]
+    Dev(ExploitDev),
 }
 
 #[derive(Parser, Debug)]
 #[command(version, about)]
 pub(crate) struct ExploitHints {}
+
+#[derive(Parser, Debug)]
+#[command(version, about)]
+#[cfg(feature = "runner")]
+pub(crate) struct ExploitDev {
+    /// The team ID to run the exploit against. Defaults to nop.
+    pub team_id: Option<String>,
+}

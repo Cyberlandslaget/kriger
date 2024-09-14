@@ -89,3 +89,28 @@ pub struct FlagHint {
     pub service: String,
     pub hint: serde_json::Value,
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct AppConfig {
+    pub competition: CompetitionConfig,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct CompetitionConfig {
+    /// The start time of the competition in UTC
+    pub start: chrono::DateTime<chrono::Utc>,
+    /// Tick/round length in seconds
+    pub tick: u64,
+    /// The start tick in ticks. This indicates the first ticking round between T+0 and T+tick.
+    pub tick_start: i64,
+    /// The validity of flags in rounds
+    pub flag_validity: u32,
+    /// The regular expression for the flag format
+    pub flag_format: String,
+    /// The team id of the NOP team
+    pub nop_team: Option<String>,
+    /// The team id of the self team
+    pub self_team: Option<String>,
+}

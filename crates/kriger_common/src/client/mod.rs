@@ -16,6 +16,13 @@ impl KrigerClient {
         }
     }
 
+    pub async fn get_server_config(
+        &self,
+    ) -> reqwest::Result<models::responses::AppResponse<models::AppConfig>> {
+        let url = format!("{}/config/server", &self.url);
+        self.request(reqwest::Method::GET, url).await
+    }
+
     pub async fn get_competition_teams(
         &self,
     ) -> reqwest::Result<models::responses::AppResponse<HashMap<String, models::Team>>> {

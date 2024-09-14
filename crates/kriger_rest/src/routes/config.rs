@@ -8,5 +8,6 @@ use std::sync::Arc;
 
 pub(crate) async fn get_server_config(state: State<Arc<AppState>>) -> impl IntoResponse {
     let config = state.runtime.config.deref().clone();
+    let config: models::AppConfig = config.into();
     Json(models::responses::AppResponse::Ok(config))
 }

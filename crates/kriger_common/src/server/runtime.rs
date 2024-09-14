@@ -1,4 +1,5 @@
 use crate::messaging::nats::NatsMessaging;
+use crate::models;
 use futures::future::select_all;
 use futures::FutureExt;
 use serde::{Deserialize, Serialize};
@@ -17,7 +18,7 @@ pub struct AppRuntime {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+#[serde(rename_all = "snake_case")]
 pub struct AppConfig {
     pub competition: CompetitionConfig,
     /// The submitter configuration. This will be dynamically checked by the submitter at runtime
@@ -28,7 +29,7 @@ pub struct AppConfig {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+#[serde(rename_all = "snake_case")]
 pub struct CompetitionConfig {
     /// The start time of the competition in UTC
     pub start: chrono::DateTime<chrono::Utc>,
@@ -44,6 +45,28 @@ pub struct CompetitionConfig {
     pub nop_team: Option<String>,
     /// The team id of the self team
     pub self_team: Option<String>,
+}
+
+impl Into<models::AppConfig> for AppConfig {
+    fn into(self) -> models::AppConfig {
+        models::AppConfig {
+            competition: self.competition.into(),
+        }
+    }
+}
+
+impl Into<models::CompetitionConfig> for CompetitionConfig {
+    fn into(self) -> models::CompetitionConfig {
+        models::CompetitionConfig {
+            start: self.start,
+            tick: self.tick,
+            tick_start: self.tick_start,
+            flag_validity: self.flag_validity,
+            flag_format: self.flag_format,
+            nop_team: self.nop_team,
+            self_team: self.self_team,
+        }
+    }
 }
 
 pub fn create_shutdown_cancellation_token() -> CancellationToken {

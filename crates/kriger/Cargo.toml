@@ -22,7 +22,7 @@ controller = ["dep:kriger_controller", "server"]
 fetcher = ["dep:kriger_fetcher", "server"]
 metrics = ["dep:kriger_metrics", "server"]
 rest = ["dep:kriger_rest", "server"]
-runner = ["dep:kriger_runner", "server"]
+runner = ["dep:kriger_runner", "server", "dep:regex"]
 scheduler = ["dep:kriger_scheduler", "server"]
 submitter = ["dep:kriger_submitter", "server"]
 ws = ["dep:kriger_ws", "server"]
@@ -49,6 +49,7 @@ console = { version = "0.15.8", optional = true }
 dirs = "5.0.1"
 futures.workspace = true
 flate2 = "1.0.33"
+flume.workspace = true
 humantime = { version = "2.1.0", optional = true }
 indicatif = { version = "0.17.8", optional = true }
 inquire = { version = "0.7.5", optional = true }
@@ -83,3 +84,4 @@ serde_json = { workspace = true, optional = true }
 tar = { version = "0.4.41", optional = true }
 toml.workspace = true
 reqwest.workspace = true
+regex = { workspace = true, optional = true }
