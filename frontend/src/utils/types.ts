@@ -1,4 +1,4 @@
-import type { FLAG_CODE } from "./enums";
+import type { FlagCode } from "./enums";
 
 export type TeamFlagMap = {
   [teamId: string]: TeamServiceMap;
@@ -13,8 +13,9 @@ export type TeamServiceFlags = {
 };
 
 export type TeamFlagStatus = {
-  status?: FLAG_CODE;
+  status?: FlagCode;
   published: number;
+  exploit: string | null;
 };
 
 export type ExecutionType = {

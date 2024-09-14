@@ -134,7 +134,13 @@ export const useExploits = () => {
 
   useEffect(() => {
     if (exploits?.data) {
-      setExploits(exploits?.data?.sort((a, b) => a.manifest.service.localeCompare(b.manifest.service)));
+      setExploits(
+        exploits?.data?.sort(
+          (a, b) =>
+            a.manifest.service.localeCompare(b.manifest.service) +
+            a.manifest.name.localeCompare(b.manifest.name),
+        ),
+      );
     }
   }, [exploits, setExploits]);
 };

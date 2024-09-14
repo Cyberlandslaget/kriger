@@ -2,7 +2,7 @@ import { createLazyFileRoute } from "@tanstack/react-router";
 import { useAtomValue } from "jotai";
 import SimpleDisplay from "../components/SimpleDisplay";
 import { flagStatusAggregateAtom } from "../utils/atoms";
-import { FLAG_CODE } from "../utils/enums";
+import { FlagCode } from "../utils/enums";
 
 function DashboardPage() {
   const flagStatusAggregate = useAtomValue(flagStatusAggregateAtom);
@@ -14,16 +14,16 @@ function DashboardPage() {
     {
       title: "Accepted flags",
       value:
-        (flagStatusAggregate.statusMap.get(FLAG_CODE.Ok) ?? 0) +
-        (flagStatusAggregate.statusMap.get(FLAG_CODE.Duplicate) ?? 0),
+        (flagStatusAggregate.statusMap.get(FlagCode.Ok) ?? 0) +
+        (flagStatusAggregate.statusMap.get(FlagCode.Duplicate) ?? 0),
     },
     {
       title: "Rejected flags",
-      value: flagStatusAggregate.statusMap.get(FLAG_CODE.Invalid) ?? 0,
+      value: flagStatusAggregate.statusMap.get(FlagCode.Invalid) ?? 0,
     },
     {
       title: "Pending flags",
-      value: flagStatusAggregate.statusMap.get(FLAG_CODE.Pending) ?? 0,
+      value: flagStatusAggregate.statusMap.get(FlagCode.Pending) ?? 0,
     },
   ];
 

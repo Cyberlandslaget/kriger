@@ -1,4 +1,4 @@
-export enum FLAG_CODE {
+export enum FlagCode {
   // Internal status code used by the frontend to represent "pending" flags
   Pending = -1,
 
@@ -21,12 +21,12 @@ export enum FLAG_CODE {
   /// Unknown response. Submitters should definitely retry this status.
   Unknown = 200,
 }
-export enum SERVICE_STATUS {
+export enum ServiceStatus {
   OK = 0,
   DOWN = 1,
   SYSTEM_ERROR = -1,
 }
 
-export const flagCodeLookup = new Map<FLAG_CODE | string, string>(
-  Object.entries(FLAG_CODE).map(([k, v]) => [v, k]),
+export const flagCodeLookup = new Map<FlagCode | string, string>(
+  Object.entries(FlagCode).map(([k, v]) => [v, k]),
 );

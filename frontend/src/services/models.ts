@@ -1,4 +1,4 @@
-import type { FLAG_CODE } from "../utils/enums";
+import type { FlagCode } from "../utils/enums";
 
 type RawWebSocketMessageTemplate<
   TName extends string,
@@ -69,7 +69,7 @@ type RawFlagSubmissionResultMessage = RawWebSocketMessageTemplate<
     /**
      * The flag submission result status
      */
-    r: FLAG_CODE;
+    r: FlagCode;
     /**
      * The points received
      */
@@ -103,7 +103,7 @@ export type FlagSubmissionResultMessage = {
   teamId: string | null;
   service: string | null;
   exploit: string | null;
-  status: FLAG_CODE;
+  status: FlagCode;
   points: number | null;
 };
 
@@ -165,8 +165,7 @@ export class FlagSubmissionMessageWrapper implements FlagSubmissionMessage {
 }
 
 export class FlagSubmissionResultMessageWrapper
-  implements FlagSubmissionResultMessage
-{
+  implements FlagSubmissionResultMessage {
   #raw: RawFlagSubmissionResultMessage;
 
   constructor(raw: RawFlagSubmissionResultMessage) {

@@ -1,7 +1,7 @@
 import clsx from "clsx";
 import { FlagIcon } from "lucide-react";
 import { useMemo } from "react";
-import { FLAG_CODE, flagCodeLookup } from "../utils/enums";
+import { FlagCode, flagCodeLookup } from "../utils/enums";
 import type { TeamServiceFlags } from "../utils/types";
 
 type StatusCellProps = {
@@ -11,23 +11,23 @@ type StatusCellProps = {
 export const StatusCell = ({ flags }: StatusCellProps) => {
   const aggregate = useMemo(() => {
     return Object.values(flags).reduce((map, { status }) => {
-      const key = status ?? FLAG_CODE.Pending;
+      const key = status ?? FlagCode.Pending;
       map.set(key, (map.get(key) ?? 0) + 1);
       return map;
-    }, new Map<FLAG_CODE, number>());
+    }, new Map<FlagCode, number>());
   }, [flags]);
 
   const borderColor = useMemo(() => {
     if (
-      aggregate.get(FLAG_CODE.Error) ||
-      aggregate.get(FLAG_CODE.Unknown) ||
-      aggregate.get(FLAG_CODE.Invalid) ||
-      aggregate.get(FLAG_CODE.Own) ||
-      aggregate.get(FLAG_CODE.Nop)
+      aggregate.get(FlagCode.Error) ||
+      aggregate.get(FlagCode.Unknown) ||
+      aggregate.get(FlagCode.Invalid) ||
+      aggregate.get(FlagCode.Own) ||
+      aggregate.get(FlagCode.Nop)
     ) {
       return "border-red-500/50";
     }
-    if (aggregate.get(FLAG_CODE.Resubmit) || aggregate.get(FLAG_CODE.Old)) {
+    if (aggregate.get(FlagCode.Resubmit) || aggregate.get(FlagCode.Old)) {
       return "border-amber-200/40";
     }
 
@@ -51,8 +51,8 @@ export const StatusCell = ({ flags }: StatusCellProps) => {
       <div className="flex flex-row items-center p-1.5 gap-1">
         {[
           ...Array(
-            (aggregate.get(FLAG_CODE.Ok) ?? 0) +
-            (aggregate.get(FLAG_CODE.Duplicate) ?? 0),
+            (aggregate.get(FlagCode.Ok) ?? 0) +
+              (aggregate.get(FlagCode.Duplicate) ?? 0),
           ),
         ].map((_, i) => (
           <FlagIcon
@@ -62,7 +62,7 @@ export const StatusCell = ({ flags }: StatusCellProps) => {
           />
         ))}
         {/* TODO: We probably want to limit the amount of pending flags here since they may overflow. */}
-        {[...Array(aggregate.get(FLAG_CODE.Pending) ?? 0)].map((_, i) => (
+        {[...Array(aggregate.get(FlagCode.Pending) ?? 0)].map((_, i) => (
           <FlagIcon
             className="stroke-slate-700 fill-slate-700 w-5 h-5"
             // biome-ignore lint/suspicious/noArrayIndexKey: <explanation>

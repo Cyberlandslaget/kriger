@@ -8,7 +8,7 @@ import type {
   Team,
 } from "../services/models";
 import type { ExploitType, TeamFlagMap } from "./types";
-import { FLAG_CODE } from "./enums";
+import { FlagCode } from "./enums";
 
 export const serverConfigAtom = atom<ServerConfig | undefined>(undefined);
 
@@ -26,6 +26,8 @@ export const currentTickAtom = atom(
 );
 
 export const exploitsAtom = atom<Exploit[] | null>(null);
+export const exploitsCountAtom = atom<Record<string, number>>({});
+
 export const executionsAtom = atom<ExploitType[] | null>(null);
 
 export const teamsAtom = atom<Record<string, Team>>({});
@@ -67,6 +69,7 @@ export const teamFlagSubmissionDispatch = atom(
               published: prevStatus?.published
                 ? Math.min(prevStatus.published, message.published)
                 : message.published,
+              exploit: message.exploit ?? prevStatus.exploit,
             },
           },
         },
@@ -102,14 +105,20 @@ export const flagStatusAggregateAtom = atom((get) => {
   const flagStatus = get(teamFlagStatusAtom);
 
   let count = 0;
-  const map = new Map<FLAG_CODE, number>();
+  const statusMap = new Map<FlagCode, number>();
+  const exploitCountMap: Map<string, number> = new Map();
 
   // We probably don't want to do FP here to avoid a lot of extra allocations
   for (const [_, serviceMap] of Object.entries(flagStatus)) {
     for (const [_, serviceFlags] of Object.entries(serviceMap)) {
       for (const [_, status] of Object.entries(serviceFlags)) {
-        const key = status.status ?? FLAG_CODE.Pending;
-        map.set(key, (map.get(key) ?? 0) + 1);
+        const key = status.status ?? FlagCode.Pending;
+        statusMap.set(key, (statusMap.get(key) ?? 0) + 1);
+
+        // Do counting per exploits
+        if (status.exploit) {
+          exploitCountMap.set(status.exploit, (exploitCountMap.get(status.exploit) ?? 0) + 1);
+        }
         ++count;
       }
     }
@@ -117,6 +126,7 @@ export const flagStatusAggregateAtom = atom((get) => {
 
   return {
     count,
-    statusMap: map,
+    statusMap,
+    exploitCountMap,
   };
 });
