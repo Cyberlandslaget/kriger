@@ -61,6 +61,9 @@ function SimpleDisplay() {
                   {services.map((service) => (
                     <StatusCell
                       flags={teamFlagMap[teamId]?.[service.name] ?? {}}
+                      teamId={teamId}
+                      teamName={team.name}
+                      serviceName={service.name}
                       key={service.name}
                     />
                   ))}

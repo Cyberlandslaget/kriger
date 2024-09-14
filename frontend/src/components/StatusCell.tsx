@@ -1,14 +1,24 @@
 import clsx from "clsx";
 import { FlagIcon } from "lucide-react";
 import { useMemo } from "react";
-import { FlagCode, flagCodeLookup } from "../utils/enums";
+import { FlagCode } from "../utils/enums";
 import type { TeamServiceFlags } from "../utils/types";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "./HoverCard";
+import { StatusCellCard } from "./StatusCellCard";
 
 type StatusCellProps = {
   flags: TeamServiceFlags;
+  teamId: string;
+  teamName: string | null;
+  serviceName: string;
 };
 
-export const StatusCell = ({ flags }: StatusCellProps) => {
+export const StatusCell = ({
+  flags,
+  teamId,
+  teamName,
+  serviceName,
+}: StatusCellProps) => {
   const aggregate = useMemo(() => {
     return Object.values(flags).reduce((map, { status }) => {
       const key = status ?? FlagCode.Pending;
@@ -34,42 +44,47 @@ export const StatusCell = ({ flags }: StatusCellProps) => {
     return "border-slate-950/20";
   }, [aggregate]);
 
-  const aggregateSummary = useMemo(() => {
-    return Array.from(aggregate)
-      .map(([code, count]) => `${flagCodeLookup.get(code)}: ${count}`)
-      .join("\n");
-  }, [aggregate]);
-
   return (
     <td
       className={clsx(
         "w-full min-w-36 max-w-72 ml-2 h-10 bg-slate-950 bg-opacity-20 border-2 rounded-sm",
         borderColor,
       )}
-      title={aggregateSummary}
     >
-      <div className="flex flex-row items-center p-1.5 gap-1">
-        {[
-          ...Array(
-            (aggregate.get(FlagCode.Ok) ?? 0) +
-              (aggregate.get(FlagCode.Duplicate) ?? 0),
-          ),
-        ].map((_, i) => (
-          <FlagIcon
-            className="stroke-green-500 fill-green-500 w-5 h-5"
-            // biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
-            key={i}
+      <HoverCard openDelay={50} closeDelay={50}>
+        <HoverCardTrigger>
+          <div className="flex flex-row items-center p-1.5 gap-1">
+            {[
+              ...Array(
+                (aggregate.get(FlagCode.Ok) ?? 0) +
+                  (aggregate.get(FlagCode.Duplicate) ?? 0),
+              ),
+            ].map((_, i) => (
+              <FlagIcon
+                className="stroke-green-500 fill-green-500 w-5 h-5"
+                // biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
+                key={i}
+              />
+            ))}
+            {/* TODO: We probably want to limit the amount of pending flags here since they may overflow. */}
+            {[...Array(aggregate.get(FlagCode.Pending) ?? 0)].map((_, i) => (
+              <FlagIcon
+                className="stroke-slate-700 fill-slate-700 w-5 h-5"
+                // biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
+                key={i}
+              />
+            ))}
+          </div>
+        </HoverCardTrigger>
+        <HoverCardContent align="start">
+          <StatusCellCard
+            flags={flags}
+            serviceName={serviceName}
+            teamId={teamId}
+            teamName={teamName}
           />
-        ))}
-        {/* TODO: We probably want to limit the amount of pending flags here since they may overflow. */}
-        {[...Array(aggregate.get(FlagCode.Pending) ?? 0)].map((_, i) => (
-          <FlagIcon
-            className="stroke-slate-700 fill-slate-700 w-5 h-5"
-            // biome-ignore lint/suspicious/noArrayIndexKey: <explanation>
-            key={i}
-          />
-        ))}
-      </div>
+        </HoverCardContent>
+      </HoverCard>
     </td>
   );
 };

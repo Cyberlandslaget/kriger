@@ -13,6 +13,7 @@
     "@fontsource/b612-mono": "^5.0.19",
     "@monaco-editor/react": "^4.6.0",
     "@radix-ui/react-dialog": "^1.1.1",
+    "@radix-ui/react-hover-card": "^1.1.1",
     "@radix-ui/react-switch": "^1.1.0",
     "@tanstack/react-router": "^1.45.0",
     "clsx": "^2.1.1",
