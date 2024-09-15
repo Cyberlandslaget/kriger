@@ -172,7 +172,7 @@ export const exploitExecutionRequestDispatch = atom(
       }
 
       const prevStatus =
-        prev[message.exploitName]?.[message.teamId]?.[message.sequence];
+        prev[message.teamId]?.[message.exploitName]?.[message.sequence];
 
       return {
         ...prev,
@@ -200,7 +200,7 @@ export const exploitExecutionResultDispatch = atom(
       }
 
       const prevStatus =
-        prev[message.exploitName]?.[message.teamId]?.[message.sequence];
+        prev[message.teamId]?.[message.exploitName]?.[message.requestSequence];
 
       return {
         ...prev,
