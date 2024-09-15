@@ -1,5 +1,6 @@
 use crate::models::FlagSubmissionStatus;
 use serde::{Deserialize, Serialize};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FlagHint {
@@ -25,8 +26,23 @@ pub struct ExecutionRequest {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ExecutionResult {
+    /// Time taken to execute the exploit in milliseconds
+    #[serde(rename = "t")]
+    pub time: u128,
     #[serde(rename = "e")]
     pub exit_code: Option<i32>,
+    #[serde(rename = "s")]
+    pub status: ExecutionResultStatus,
+    #[serde(rename = "a")]
+    pub attempt: Option<i64>,
+}
+
+#[derive(Debug, Serialize_repr, Deserialize_repr, PartialEq)]
+#[repr(u8)]
+pub enum ExecutionResultStatus {
+    Success = 0,
+    Timeout = 1,
+    Error = 2,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

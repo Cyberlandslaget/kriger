@@ -32,6 +32,7 @@ pub struct NatsMessaging {
     services_store: Store,
     teams_store: Store,
     executions_wq_stream: jetstream::stream::Stream,
+    executions_stream: jetstream::stream::Stream,
     data_stream: jetstream::stream::Stream,
     flags_submissions_stream: jetstream::stream::Stream,
     flags_results_stream: jetstream::stream::Stream,
@@ -55,6 +56,7 @@ impl NatsMessaging {
         let teams_store = context.get_key_value("teams").await?;
 
         let executions_wq_stream = context.get_stream("executions_wq").await?;
+        let executions_stream = context.get_stream("executions").await?;
         let data_stream = context.get_stream("data").await?;
         let flags_submissions_stream = context.get_stream("flag_submissions").await?;
         let flags_results_stream = context.get_stream("flag_results").await?;
@@ -66,6 +68,7 @@ impl NatsMessaging {
             services_store,
             teams_store,
             executions_wq_stream,
+            executions_stream,
             data_stream,
             flags_submissions_stream,
             flags_results_stream,
@@ -110,6 +113,7 @@ impl NatsMessaging {
         ExecutionsService {
             context: self.context.clone(),
             executions_wq_stream: self.executions_wq_stream.clone(),
+            executions_stream: self.executions_stream.clone(),
         }
     }
 
@@ -397,6 +401,16 @@ async fn do_migration(
             // Important: this will provide idempotency for execution requests
             duplicate_window: Duration::from_secs(max_age),
             max_age: Duration::from_secs(max_age),
+            ..Default::default()
+        })
+        .await?;
+
+    debug!("creating executions stream");
+    context
+        .create_stream(jetstream::stream::Config {
+            name: "executions".to_string(),
+            subjects: vec!["executions.*.result".to_string()],
+            discard: jetstream::stream::DiscardPolicy::Old,
             ..Default::default()
         })
         .await?;

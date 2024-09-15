@@ -3,7 +3,7 @@ pub mod runner;
 
 use crate::args::Args;
 use crate::runner::simple::SimpleRunner;
-use crate::runner::{Runner, RunnerEvent, RunnerExecution, RunnerExecutionResult};
+use crate::runner::{Runner, RunnerError, RunnerEvent, RunnerExecution, RunnerExecutionResult};
 use async_nats::jetstream::AckKind;
 use color_eyre::eyre;
 use color_eyre::eyre::{bail, Context, ContextCompat};
@@ -11,6 +11,7 @@ use futures::StreamExt;
 use kriger_common::messaging;
 use kriger_common::messaging::model::FlagSubmission;
 use kriger_common::messaging::nats::{MessageWrapper, MessagingServiceError, NatsMessaging};
+use kriger_common::messaging::services::executions::ExecutionsService;
 use kriger_common::messaging::services::flags::FlagsService;
 use kriger_common::server::runtime::create_shutdown_cancellation_token;
 use regex::Regex;
@@ -36,13 +37,15 @@ pub async fn main(args: Args) -> eyre::Result<()> {
     let flag_format =
         Regex::new(&args.flag_format).context("unable to parse the flag format regex")?;
 
+    let executions_svc = Arc::new(messaging.executions());
+    let flags_svc = Arc::new(messaging.flags());
+
     info!("using the flag format: `{flag_format}`");
     info!(
         "subscribing to execution requests for exploit: {}",
         &args.exploit
     );
-    let stream = messaging
-        .executions()
+    let stream = executions_svc
         .subscribe_execution_requests(
             Some(format!("exploit:{}", &args.exploit)),
             Some(args.exploit.as_str()),
@@ -50,8 +53,6 @@ pub async fn main(args: Args) -> eyre::Result<()> {
         .await
         .context("unable to subscribe to execution requests")?;
     pin!(stream);
-
-    let flags_svc = Arc::new(messaging.flags());
 
     let worker_count = args.workers.unwrap_or_else(|| 2 * num_cpus::get());
     let semaphore = Arc::new(Semaphore::new(worker_count));
@@ -74,6 +75,7 @@ pub async fn main(args: Args) -> eyre::Result<()> {
             rx.clone(),
             runner.clone(),
             flags_svc.clone(),
+            executions_svc.clone(),
             args.exploit.clone(),
             args.service.clone(),
             cancellation_token.clone(),
@@ -130,6 +132,7 @@ async fn worker(
     job_rx: async_channel::Receiver<Job>,
     runner: Arc<impl Runner>,
     flags_svc: Arc<FlagsService>,
+    executions_svc: Arc<ExecutionsService>,
     exploit: String,
     service: Option<String>,
     cancellation_token: CancellationToken,
@@ -157,6 +160,7 @@ async fn worker(
             idx,
             runner.as_ref(),
             flags_svc.as_ref(),
+            executions_svc.as_ref(),
             &exploit,
             &service,
             job,
@@ -183,7 +187,8 @@ async fn handle_job(
     worker_idx: usize,
     runner: &impl Runner,
     flags_svc: &FlagsService,
-    exploit: &str,
+    executions_svc: &ExecutionsService,
+    exploit_name: &str,
     service: &Option<String>,
     job: Job,
 ) -> eyre::Result<()> {
@@ -209,7 +214,7 @@ async fn handle_job(
     let (has_events_failed, result) = join!(
         handle_events(
             flags_svc,
-            exploit,
+            exploit_name,
             service,
             &payload.team_id,
             execution.events()
@@ -240,8 +245,37 @@ async fn handle_job(
             false
         }
     };
+    let result_message = messaging::model::ExecutionResult {
+        time: result.time.as_millis(),
+        exit_code: result.exit_code,
+        status: match &result {
+            RunnerExecutionResult {
+                error: Some(RunnerError::ExecutionTimeout),
+                ..
+            } => messaging::model::ExecutionResultStatus::Timeout,
+            RunnerExecutionResult { error: Some(_), .. } => {
+                messaging::model::ExecutionResultStatus::Error
+            }
+            _ => messaging::model::ExecutionResultStatus::Success,
+        },
+        attempt: Some(job.request.info.delivered),
+    };
 
-    if has_events_failed || should_retry {
+    let res = executions_svc
+        .publish_execution_result(&exploit_name, &result_message)
+        .await;
+    let result_published = match res {
+        Ok(_) => true,
+        Err(error) => {
+            error! {
+                ?error,
+                "unable to publish execution result"
+            }
+            false
+        }
+    };
+
+    if has_events_failed || should_retry || !result_published {
         job.request
             .retry_linear(Duration::from_secs(2), 3)
             .await

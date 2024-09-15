@@ -1,14 +1,18 @@
 use crate::messaging;
 use crate::messaging::model;
-use crate::messaging::nats::{publish, subscribe, MessageWrapper, MessagingServiceError};
+use crate::messaging::nats::{
+    publish, subscribe, subscribe_ordered, MessageWrapper, MessagingServiceError,
+};
 use async_nats::jetstream;
 
 const EXECUTIONS_SUBJECT_PREFIX: &str = "executions.";
 const EXECUTION_REQUEST: &str = "request";
+const EXECUTION_RESULT: &str = "result";
 
 pub struct ExecutionsService {
     pub(crate) context: jetstream::Context,
     pub(crate) executions_wq_stream: jetstream::stream::Stream,
+    pub(crate) executions_stream: jetstream::stream::Stream,
 }
 
 impl ExecutionsService {
@@ -20,6 +24,19 @@ impl ExecutionsService {
         publish(
             &self.context,
             format_request_subject(Some(exploit_name)),
+            message,
+        )
+        .await
+    }
+
+    pub async fn publish_execution_result(
+        &self,
+        exploit_name: &str,
+        message: &model::ExecutionResult,
+    ) -> Result<jetstream::context::PublishAckFuture, messaging::MessagingError> {
+        publish(
+            &self.context,
+            format_result_subject(Some(exploit_name)),
             message,
         )
         .await
@@ -47,6 +64,42 @@ impl ExecutionsService {
         )
         .await
     }
+
+    pub async fn subscribe_execution_requests_ordered(
+        &self,
+        exploit_name: Option<&str>,
+        deliver_policy: jetstream::consumer::DeliverPolicy,
+    ) -> Result<
+        impl futures::Stream<
+                Item = Result<MessageWrapper<model::ExecutionRequest>, MessagingServiceError>,
+            > + Sized,
+        messaging::MessagingError,
+    > {
+        subscribe_ordered(
+            &self.executions_wq_stream,
+            Some(format_request_subject(exploit_name)),
+            deliver_policy,
+        )
+        .await
+    }
+
+    pub async fn subscribe_execution_results_ordered(
+        &self,
+        exploit_name: Option<&str>,
+        deliver_policy: jetstream::consumer::DeliverPolicy,
+    ) -> Result<
+        impl futures::Stream<
+                Item = Result<MessageWrapper<model::ExecutionResult>, MessagingServiceError>,
+            > + Sized,
+        messaging::MessagingError,
+    > {
+        subscribe_ordered(
+            &self.executions_stream,
+            Some(format_result_subject(exploit_name)),
+            deliver_policy,
+        )
+        .await
+    }
 }
 
 #[inline]
@@ -56,5 +109,15 @@ fn format_request_subject(exploit_name: Option<&str>) -> String {
         EXECUTIONS_SUBJECT_PREFIX,
         exploit_name.unwrap_or("*"),
         EXECUTION_REQUEST
+    )
+}
+
+#[inline]
+fn format_result_subject(exploit_name: Option<&str>) -> String {
+    format!(
+        "{}{}.{}",
+        EXECUTIONS_SUBJECT_PREFIX,
+        exploit_name.unwrap_or("*"),
+        EXECUTION_RESULT
     )
 }

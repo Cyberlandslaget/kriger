@@ -13,7 +13,9 @@ use hyper::service::service_fn;
 use hyper::{Request, Response};
 use hyper_util::rt::{TokioExecutor, TokioIo};
 use hyper_util::server::conn::auto::Builder;
-use kriger_common::messaging::model::{FlagSubmission, FlagSubmissionResult, SchedulingTick};
+use kriger_common::messaging::model::{
+    ExecutionRequest, ExecutionResult, FlagSubmission, FlagSubmissionResult, SchedulingTick,
+};
 use kriger_common::server::runtime::AppRuntime;
 use serde::Serialize;
 use std::net::SocketAddr;
@@ -179,6 +181,7 @@ async fn subscribe_all(
     }
 
     let flags_svc = runtime.messaging.flags();
+    let executions_svc = runtime.messaging.executions();
 
     let flag_submissions_stream = flags_svc
         .subscribe_submissions_ordered(deliver_policy)
@@ -200,6 +203,26 @@ async fn subscribe_all(
                 payload: WebSocketPayload::FlagSubmissionResult(msg.payload),
             })
         });
+    let execution_requests_stream = executions_svc
+        .subscribe_execution_requests_ordered(None, deliver_policy)
+        .await
+        .context("unable to watch execution requests")?
+        .filter_map(|res| async {
+            res.ok().map(|msg| WebSocketEvent {
+                published: msg.info.published_millis(),
+                payload: WebSocketPayload::ExecutionRequest(msg.payload),
+            })
+        });
+    let execution_results_stream = executions_svc
+        .subscribe_execution_results_ordered(None, deliver_policy)
+        .await
+        .context("unable to watch execution results")?
+        .filter_map(|res| async {
+            res.ok().map(|msg| WebSocketEvent {
+                published: msg.info.published_millis(),
+                payload: WebSocketPayload::ExecutionResult(msg.payload),
+            })
+        });
     let scheduling_start_stream = runtime
         .messaging
         .scheduling()
@@ -214,9 +237,11 @@ async fn subscribe_all(
         });
 
     let mut fused_stream = select_all(vec![
+        scheduling_start_stream.boxed(),
         flag_submissions_stream.boxed(),
         flag_results_stream.boxed(),
-        scheduling_start_stream.boxed(),
+        execution_requests_stream.boxed(),
+        execution_results_stream.boxed(),
     ]);
     while let Some(event) = fused_stream.next().await {
         tx.send_async(event).await.context("send error")?;
@@ -239,5 +264,7 @@ struct WebSocketEvent {
 enum WebSocketPayload {
     FlagSubmission(FlagSubmission),
     FlagSubmissionResult(FlagSubmissionResult),
+    ExecutionRequest(ExecutionRequest),
+    ExecutionResult(ExecutionResult),
     SchedulingStart(SchedulingTick),
 }
