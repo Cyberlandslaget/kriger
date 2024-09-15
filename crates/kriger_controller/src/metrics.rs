@@ -18,17 +18,17 @@ pub(crate) struct ControllerMetrics {
 impl ControllerMetrics {
     pub(crate) fn register(&self, registry: &mut Registry) {
         registry.register(
-            "kriger_controller_reconciliation_requests_total",
+            "kriger_controller_reconciliation_requests",
             "The number of reconciliation requests",
             self.requests.clone(),
         );
         registry.register(
-            "kriger_controller_reconciliation_complete_total",
+            "kriger_controller_reconciliation_complete",
             "The number of completed reconciliations",
             self.complete.clone(),
         );
         registry.register(
-            "kriger_controller_reconciliation_error_total",
+            "kriger_controller_reconciliation_error",
             "The number of errored reconciliations",
             self.error.clone(),
         );

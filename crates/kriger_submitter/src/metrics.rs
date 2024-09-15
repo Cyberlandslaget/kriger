@@ -53,17 +53,17 @@ pub(crate) struct SubmitterMetrics {
 impl SubmitterMetrics {
     pub(crate) fn register(&self, registry: &mut Registry) {
         registry.register(
-            "kriger_submitter_submission_start_total",
+            "kriger_submitter_submission_start",
             "The number of submission batch start",
             self.start.clone(),
         );
         registry.register(
-            "kriger_submitter_submission_complete_total",
+            "kriger_submitter_submission_complete",
             "The number of submission batch complete",
             self.complete.clone(),
         );
         registry.register(
-            "kriger_submitter_submission_error_total",
+            "kriger_submitter_submission_error",
             "The number of submission batch error",
             self.error.clone(),
         );
@@ -73,12 +73,12 @@ impl SubmitterMetrics {
             self.duration.clone(),
         );
         registry.register(
-            "kriger_submitter_flag_submissions_total",
+            "kriger_submitter_flag_submissions",
             "The number of flag submissions consumed",
             self.flag_submissions.clone(),
         );
         registry.register(
-            "kriger_submitter_flag_results_total",
+            "kriger_submitter_flag_results",
             "The number of flag results received",
             self.flag_results.clone(),
         );

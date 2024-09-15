@@ -12,17 +12,17 @@ pub(crate) struct FetcherMetrics {
 impl FetcherMetrics {
     pub(crate) fn register(&self, registry: &mut Registry) {
         registry.register(
-            "kriger_fetcher_start_total",
+            "kriger_fetcher_start",
             "The number of fetch start",
             self.start.clone(),
         );
         registry.register(
-            "kriger_fetcher_complete_total",
+            "kriger_fetcher_complete",
             "The number of fetch complete",
             self.complete.clone(),
         );
         registry.register(
-            "kriger_fetcher_error_total",
+            "kriger_fetcher_error",
             "The number of fetch errors",
             self.error.clone(),
         );
