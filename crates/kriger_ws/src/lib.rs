@@ -190,6 +190,7 @@ async fn subscribe_all(
         .filter_map(|res| async {
             res.ok().map(|msg| WebSocketEvent {
                 published: msg.info.published_millis(),
+                sequence: msg.info.stream_sequence,
                 payload: WebSocketPayload::FlagSubmission(msg.payload),
             })
         });
@@ -200,6 +201,7 @@ async fn subscribe_all(
         .filter_map(|res| async {
             res.ok().map(|msg| WebSocketEvent {
                 published: msg.info.published_millis(),
+                sequence: msg.info.stream_sequence,
                 payload: WebSocketPayload::FlagSubmissionResult(msg.payload),
             })
         });
@@ -210,7 +212,11 @@ async fn subscribe_all(
         .filter_map(|res| async {
             res.ok().map(|msg| WebSocketEvent {
                 published: msg.info.published_millis(),
-                payload: WebSocketPayload::ExecutionRequest(msg.payload),
+                sequence: msg.info.stream_sequence,
+                payload: WebSocketPayload::ExecutionRequest {
+                    exploit_name: msg.inner.subject.split('.').nth(1).map(str::to_string),
+                    payload: msg.payload,
+                },
             })
         });
     let execution_results_stream = executions_svc
@@ -220,7 +226,11 @@ async fn subscribe_all(
         .filter_map(|res| async {
             res.ok().map(|msg| WebSocketEvent {
                 published: msg.info.published_millis(),
-                payload: WebSocketPayload::ExecutionResult(msg.payload),
+                sequence: msg.info.stream_sequence,
+                payload: WebSocketPayload::ExecutionResult {
+                    exploit_name: msg.inner.subject.split('.').nth(1).map(str::to_string),
+                    payload: msg.payload,
+                },
             })
         });
     let scheduling_start_stream = runtime
@@ -232,6 +242,7 @@ async fn subscribe_all(
         .filter_map(|res| async {
             res.ok().map(|msg| WebSocketEvent {
                 published: msg.info.published_millis(),
+                sequence: msg.info.stream_sequence,
                 payload: WebSocketPayload::SchedulingStart(msg.payload),
             })
         });
@@ -255,6 +266,9 @@ struct WebSocketEvent {
     /// Unix timestamp in UTC
     #[serde(rename = "p")]
     published: i64,
+    /// The message sequence number
+    #[serde(rename = "s")]
+    sequence: u64,
     #[serde(flatten)]
     payload: WebSocketPayload,
 }
@@ -264,7 +278,17 @@ struct WebSocketEvent {
 enum WebSocketPayload {
     FlagSubmission(FlagSubmission),
     FlagSubmissionResult(FlagSubmissionResult),
-    ExecutionRequest(ExecutionRequest),
-    ExecutionResult(ExecutionResult),
+    ExecutionRequest {
+        #[serde(rename = "n")]
+        exploit_name: Option<String>,
+        #[serde(flatten)]
+        payload: ExecutionRequest,
+    },
+    ExecutionResult {
+        #[serde(rename = "n")]
+        exploit_name: Option<String>,
+        #[serde(flatten)]
+        payload: ExecutionResult,
+    },
     SchedulingStart(SchedulingTick),
 }

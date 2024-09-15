@@ -246,6 +246,7 @@ async fn handle_job(
         }
     };
     let result_message = messaging::model::ExecutionResult {
+        team_id: payload.team_id.clone(),
         time: result.time.as_millis(),
         exit_code: result.exit_code,
         status: match &result {
@@ -258,6 +259,7 @@ async fn handle_job(
             }
             _ => messaging::model::ExecutionResultStatus::Success,
         },
+        request_sequence: job.request.info.stream_sequence,
         attempt: Some(job.request.info.delivered),
     };
 

@@ -26,14 +26,20 @@ pub struct ExecutionRequest {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ExecutionResult {
+    /// The Team ID that this execution is targeted towards. This should only be optional for
+    /// manual/emergency runs.
+    #[serde(rename = "t", skip_serializing_if = "Option::is_none")]
+    pub team_id: Option<String>,
     /// Time taken to execute the exploit in milliseconds
-    #[serde(rename = "t")]
+    #[serde(rename = "d")]
     pub time: u128,
-    #[serde(rename = "e")]
+    #[serde(rename = "e", skip_serializing_if = "Option::is_none")]
     pub exit_code: Option<i32>,
     #[serde(rename = "s")]
     pub status: ExecutionResultStatus,
-    #[serde(rename = "a")]
+    #[serde(rename = "r")]
+    pub request_sequence: u64,
+    #[serde(rename = "a", skip_serializing_if = "Option::is_none")]
     pub attempt: Option<i64>,
 }
 
