@@ -1,4 +1,4 @@
-import type { FlagCode } from "../utils/enums";
+import type { ExecutionResultStatusCode, FlagCode } from "../utils/enums";
 
 type RawWebSocketMessageTemplate<
   TName extends string,
@@ -16,6 +16,10 @@ type RawWebSocketMessageTemplate<
    * The publishing time of the message in Unix millis timestamp (UTC)
    */
   p: number;
+  /**
+   * The stream sequence number of the message
+   */
+  s: number;
 };
 type RawSchedulingStartMessage = RawWebSocketMessageTemplate<
   "scheduling_start",
@@ -76,10 +80,78 @@ type RawFlagSubmissionResultMessage = RawWebSocketMessageTemplate<
     p: number | null;
   }
 >;
+
+type RawExecutionRequestMessage = RawWebSocketMessageTemplate<
+  "execution_request",
+  {
+    /**
+     * The exploit name
+     */
+    n?: string;
+
+    /**
+     * The target IP address
+     */
+    a: string;
+
+    /**
+     * The flag hint
+     */
+    h?: unknown;
+
+    /**
+     * The team id
+     */
+    t?: string;
+  }
+>;
+
+type RawExecutionResultMessage = RawWebSocketMessageTemplate<
+  "execution_result",
+  {
+    /**
+     * The exploit name
+     */
+    n?: string;
+
+    /**
+     * The team id
+     */
+    t?: string;
+
+    /**
+     * The time taken to execute the exploit in milliseconds
+     */
+    d: number;
+
+    /**
+     * The execution process' exit code
+     */
+    e?: number;
+
+    /**
+     * The execution's resulting status
+     */
+    s: ExecutionResultStatusCode;
+
+    /**
+     * The request sequence
+     */
+    r: number;
+
+    /**
+     * The execution attempt number
+     */
+    a?: number;
+  }
+>;
+
 type RawWebSocketMessage =
   | RawSchedulingStartMessage
   | RawFlagSubmissionMessage
-  | RawFlagSubmissionResultMessage;
+  | RawFlagSubmissionResultMessage
+  | RawExecutionRequestMessage
+  | RawExecutionResultMessage;
 
 export type SchedulingStartMessage = {
   type: "scheduling_start";
@@ -107,10 +179,35 @@ export type FlagSubmissionResultMessage = {
   points: number | null;
 };
 
+export type ExecutionRequestMessage = {
+  type: "execution_request";
+  published: number;
+  sequence: number;
+  exploitName?: string;
+  ipAddress: string;
+  flagHint?: unknown;
+  teamId?: string;
+};
+
+export type ExecutionResultMessage = {
+  type: "execution_result";
+  published: number;
+  sequence: number;
+  exploitName?: string;
+  teamId?: string;
+  time: number;
+  exitCode?: number;
+  status: ExecutionResultStatusCode;
+  requestSequence: number;
+  attempt?: number;
+};
+
 export type WebSocketMessage =
   | SchedulingStartMessage
   | FlagSubmissionMessage
-  | FlagSubmissionResultMessage;
+  | FlagSubmissionResultMessage
+  | ExecutionRequestMessage
+  | ExecutionResultMessage;
 
 export class SchedulingStartMessageWrapper implements SchedulingStartMessage {
   #raw: RawSchedulingStartMessage;
@@ -165,7 +262,8 @@ export class FlagSubmissionMessageWrapper implements FlagSubmissionMessage {
 }
 
 export class FlagSubmissionResultMessageWrapper
-  implements FlagSubmissionResultMessage {
+  implements FlagSubmissionResultMessage
+{
   #raw: RawFlagSubmissionResultMessage;
 
   constructor(raw: RawFlagSubmissionResultMessage) {
@@ -205,6 +303,82 @@ export class FlagSubmissionResultMessageWrapper
   }
 }
 
+export class ExecutionRequestMessageWrapper implements ExecutionRequestMessage {
+  #raw: RawExecutionRequestMessage;
+
+  constructor(raw: RawExecutionRequestMessage) {
+    this.#raw = raw;
+  }
+
+  get type() {
+    return this.#raw.t;
+  }
+
+  get published() {
+    return this.#raw.p;
+  }
+
+  get sequence() {
+    return this.#raw.s;
+  }
+
+  get exploitName() {
+    return this.#raw.d.n;
+  }
+
+  get ipAddress() {
+    return this.#raw.d.a;
+  }
+
+  get flagHint() {
+    return this.#raw.d.h;
+  }
+
+  get teamId() {
+    return this.#raw.d.t;
+  }
+}
+
+export class ExecutionResultMessageWrapper implements ExecutionResultMessage {
+  #raw: RawExecutionResultMessage;
+
+  constructor(raw: RawExecutionResultMessage) {
+    this.#raw = raw;
+  }
+
+  get type() {
+    return this.#raw.t;
+  }
+
+  get published() {
+    return this.#raw.p;
+  }
+
+  get sequence() {
+    return this.#raw.s;
+  }
+
+  get exploitName() {
+    return this.#raw.d.n;
+  }
+
+  get teamId() {
+    return this.#raw.d.t;
+  }
+
+  get time() {
+    return this.#raw.d.d;
+  }
+
+  get status() {
+    return this.#raw.d.s;
+  }
+
+  get requestSequence() {
+    return this.#raw.d.r;
+  }
+}
+
 export const mapWebSocketMessage = (
   raw: RawWebSocketMessage,
 ): WebSocketMessage => {
@@ -215,6 +389,10 @@ export const mapWebSocketMessage = (
       return new FlagSubmissionMessageWrapper(raw);
     case "flag_submission_result":
       return new FlagSubmissionResultMessageWrapper(raw);
+    case "execution_request":
+      return new ExecutionRequestMessageWrapper(raw);
+    case "execution_result":
+      return new ExecutionResultMessageWrapper(raw);
     default:
       throw new Error(`Unsupported message: ${JSON.stringify(raw)}`);
   }
@@ -276,3 +454,4 @@ export type ExploitResources = {
   memLimit: string;
   timeout: number;
 };
+

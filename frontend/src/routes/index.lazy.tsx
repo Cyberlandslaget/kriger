@@ -1,15 +1,24 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { useAtomValue } from "jotai";
 import SimpleDisplay from "../components/SimpleDisplay";
-import { flagStatusAggregateAtom } from "../utils/atoms";
+import {
+  executionStatusAggregateAtom,
+  exploitsAtom,
+  flagStatusAggregateAtom,
+} from "../utils/atoms";
 import { FlagCode } from "../utils/enums";
 
 function DashboardPage() {
   const flagStatusAggregate = useAtomValue(flagStatusAggregateAtom);
+  const executionStatusAggregate = useAtomValue(executionStatusAggregateAtom);
+  const exploits = useAtomValue(exploitsAtom);
 
   const statCards = [
-    { title: "Executions in queue", value: "?" },
-    { title: "Exploits", value: "?" },
+    {
+      title: "Pending executions",
+      value: executionStatusAggregate.pendingCount,
+    },
+    { title: "Exploits", value: exploits?.length },
     { title: "Flags received", value: flagStatusAggregate.count },
     {
       title: "Accepted flags",

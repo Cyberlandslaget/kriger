@@ -38,6 +38,11 @@ export enum ServiceStatus {
   DOWN = 1,
   SYSTEM_ERROR = -1,
 }
+export enum ExecutionResultStatusCode {
+  Success = 0,
+  Timeout = 1,
+  Error = 2,
+}
 
 export const flagCodeLookup = new Map<FlagCode | string, string>(
   Object.entries(FlagCode).map(([k, v]) => [v, k]),

@@ -1,7 +1,12 @@
 import AutoSizer from "react-virtualized-auto-sizer";
 import { forwardRef } from "react";
 import { useAtomValue } from "jotai";
-import { servicesAtom, teamFlagStatusAtom, teamsAtom } from "../utils/atoms";
+import {
+  servicesAtom,
+  teamFlagStatusAtom,
+  teamsAtom,
+  teamServiceExecutionAggregateAtom,
+} from "../utils/atoms";
 import { StatusCell } from "./StatusCell";
 import { FixedSizeList as List } from "react-window";
 
@@ -9,6 +14,9 @@ function SimpleDisplay() {
   const services = useAtomValue(servicesAtom);
   const teams = useAtomValue(teamsAtom);
   const teamFlagMap = useAtomValue(teamFlagStatusAtom);
+  const teamServiceExecutionAggregate = useAtomValue(
+    teamServiceExecutionAggregateAtom,
+  );
 
   return (
     <div className="flex flex-col h-full relative rounded-md">
@@ -61,6 +69,11 @@ function SimpleDisplay() {
                   {services.map((service) => (
                     <StatusCell
                       flags={teamFlagMap[teamId]?.[service.name] ?? {}}
+                      hasPendingExecution={
+                        (teamServiceExecutionAggregate.pendingCountMap
+                          ?.get(teamId)
+                          ?.get(service.name) ?? 0) > 0
+                      }
                       teamId={teamId}
                       teamName={team.name}
                       serviceName={service.name}

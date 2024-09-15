@@ -4,6 +4,9 @@ import type { WebSocketMessage } from "../services/models";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import {
   currentTickAtom,
+  exploitExecutionRequestDispatch,
+  exploitExecutionResultDispatch,
+  exploitExecutionsPurgeDispatch,
   exploitsAtom,
   serverConfigAtom,
   servicesAtom,
@@ -22,11 +25,23 @@ export const useWebSocketProvider = (url: string) => {
   const [currentTick, setCurrentTick] = useAtom(currentTickAtom);
   const flagSubmissionDispatch = useSetAtom(teamFlagSubmissionDispatch);
   const flagPurgeDispatch = useSetAtom(teamFlagPurgeDispatch);
+  const executionRequestDispatch = useSetAtom(exploitExecutionRequestDispatch);
+  const executionResultDispatch = useSetAtom(exploitExecutionResultDispatch);
+  const executionPurgeDispatch = useSetAtom(exploitExecutionsPurgeDispatch);
   const serverConfig = useAtomValue(serverConfigAtom);
 
   const handleMessage = useCallback(
     (event: WebSocketMessage) => {
       if (!serverConfig) return;
+
+      // Ignore messages that are older than what we expect
+      // If the currentTick has not been updated yet, we'll consume the event
+      // and hope that old data gets purged once the currentTick state is updated
+      const oldest =
+        new Date(serverConfig.competition.start).getTime() +
+        (currentTick - serverConfig.competition.flagValidity + 1) *
+          serverConfig.competition.tick *
+          1000;
 
       switch (event.type) {
         case "scheduling_start":
@@ -34,16 +49,6 @@ export const useWebSocketProvider = (url: string) => {
           break;
         case "flag_submission":
         case "flag_submission_result": {
-          // TODO: Investigate and check if the message timing is working as expected and that everything is aggregated properly
-
-          // Ignore messages that are older than what we expect
-          // If the currentTick has not been updated yet, we'll consume the event
-          // and hope that old data gets purged once the currentTick state is updated
-          const oldest =
-            new Date(serverConfig.competition.start).getTime() +
-            (currentTick - serverConfig.competition.flagValidity + 1) *
-            serverConfig.competition.tick *
-            1000;
           if (event.published < oldest) {
             break;
           }
@@ -51,9 +56,30 @@ export const useWebSocketProvider = (url: string) => {
           flagSubmissionDispatch(event);
           break;
         }
+        case "execution_request":
+          if (event.published < oldest) {
+            break;
+          }
+
+          executionRequestDispatch(event);
+          break;
+        case "execution_result":
+          if (event.published < oldest) {
+            break;
+          }
+
+          executionResultDispatch(event);
+          break;
       }
     },
-    [serverConfig, currentTick, setCurrentTick, flagSubmissionDispatch],
+    [
+      serverConfig,
+      currentTick,
+      setCurrentTick,
+      flagSubmissionDispatch,
+      executionRequestDispatch,
+      executionResultDispatch,
+    ],
   );
 
   const handleMessageRef = useRef<typeof handleMessage>();
@@ -66,10 +92,11 @@ export const useWebSocketProvider = (url: string) => {
     const oldest =
       new Date(serverConfig.competition.start).getTime() +
       (currentTick - serverConfig.competition.flagValidity + 1) *
-      serverConfig.competition.tick *
-      1000;
+        serverConfig.competition.tick *
+        1000;
     flagPurgeDispatch(oldest);
-  }, [currentTick, serverConfig, flagPurgeDispatch]);
+    executionPurgeDispatch(oldest);
+  }, [currentTick, serverConfig, flagPurgeDispatch, executionPurgeDispatch]);
 
   useEffect(() => {
     handleMessageRef.current = handleMessage;
@@ -86,8 +113,8 @@ export const useWebSocketProvider = (url: string) => {
       () =>
         Date.now() -
         serverConfig.competition.tick *
-        (serverConfig.competition.flagValidity + 1) *
-        1000,
+          (serverConfig.competition.flagValidity + 1) *
+          1000,
       (message) => {
         handleMessageRef.current?.(message);
       },

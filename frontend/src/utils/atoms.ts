@@ -1,5 +1,7 @@
 import { atom } from "jotai";
 import type {
+  ExecutionRequestMessage,
+  ExecutionResultMessage,
   Exploit,
   FlagSubmissionMessage,
   FlagSubmissionResultMessage,
@@ -7,7 +9,7 @@ import type {
   Service,
   Team,
 } from "../services/models";
-import type { ExploitType, TeamFlagMap } from "./types";
+import type { TeamExecutionMap, TeamFlagMap } from "./types";
 import { FlagCode } from "./enums";
 
 export const serverConfigAtom = atom<ServerConfig | undefined>(undefined);
@@ -26,14 +28,41 @@ export const currentTickAtom = atom(
 );
 
 export const exploitsAtom = atom<Exploit[] | null>(null);
-export const exploitsCountAtom = atom<Record<string, number>>({});
-
-export const executionsAtom = atom<ExploitType[] | null>(null);
+export const teamExecutionsAtom = atom<TeamExecutionMap>({});
 
 export const teamsAtom = atom<Record<string, Team>>({});
 export const servicesAtom = atom<Service[]>([]);
 
 export const teamFlagStatusAtom = atom<TeamFlagMap>({});
+
+export const serviceExploitAssociateAtom = atom((get) => {
+  const exploits = get(exploitsAtom);
+
+  const map = new Map<string, Exploit[]>();
+  if (!exploits) return map;
+
+  for (const exploit of exploits) {
+    map.set(exploit.manifest.service, [
+      ...(map.get(exploit.manifest.service) ?? []),
+      exploit,
+    ]);
+  }
+
+  return map;
+});
+
+export const exploitServiceAssociateAtom = atom((get) => {
+  const exploits = get(exploitsAtom);
+
+  const map = new Map<string, string>();
+  if (!exploits) return map;
+
+  for (const exploit of exploits) {
+    map.set(exploit.manifest.name, exploit.manifest.service);
+  }
+
+  return map;
+});
 
 export const teamFlagSubmissionDispatch = atom(
   null,
@@ -62,7 +91,7 @@ export const teamFlagSubmissionDispatch = atom(
                 // - status was not defined previously
                 // - the message's status has a higher precedence over the previous status
                 "status" in message &&
-                  (!prevStatus?.status || message.status < prevStatus?.status)
+                (!prevStatus?.status || message.status < prevStatus?.status)
                   ? message.status
                   : prevStatus?.status,
               // Keep the timestamp of when the flag was originally submitted.
@@ -117,7 +146,10 @@ export const flagStatusAggregateAtom = atom((get) => {
 
         // Do counting per exploits
         if (status.exploit) {
-          exploitCountMap.set(status.exploit, (exploitCountMap.get(status.exploit) ?? 0) + 1);
+          exploitCountMap.set(
+            status.exploit,
+            (exploitCountMap.get(status.exploit) ?? 0) + 1,
+          );
         }
         ++count;
       }
@@ -128,5 +160,145 @@ export const flagStatusAggregateAtom = atom((get) => {
     count,
     statusMap,
     exploitCountMap,
+  };
+});
+
+export const exploitExecutionRequestDispatch = atom(
+  null,
+  (_get, set, message: ExecutionRequestMessage) => {
+    set(teamExecutionsAtom, (prev) => {
+      if (!message.teamId || !message.exploitName) {
+        return prev;
+      }
+
+      const prevStatus =
+        prev[message.exploitName]?.[message.teamId]?.[message.sequence];
+
+      return {
+        ...prev,
+        [message.teamId]: {
+          ...prev[message.teamId],
+          [message.exploitName]: {
+            ...prev[message.teamId]?.[message.exploitName],
+            [message.sequence]: {
+              ...prevStatus,
+              published: message.published,
+            },
+          },
+        },
+      };
+    });
+  },
+);
+
+export const exploitExecutionResultDispatch = atom(
+  null,
+  (_get, set, message: ExecutionResultMessage) => {
+    set(teamExecutionsAtom, (prev) => {
+      if (!message.teamId || !message.exploitName) {
+        return prev;
+      }
+
+      const prevStatus =
+        prev[message.exploitName]?.[message.teamId]?.[message.sequence];
+
+      return {
+        ...prev,
+        [message.teamId]: {
+          ...prev[message.teamId],
+          [message.exploitName]: {
+            ...prev[message.teamId]?.[message.exploitName],
+            [message.requestSequence]: {
+              published: prevStatus
+                ? Math.min(message.published, prevStatus.published)
+                : message.published,
+              result:
+                prevStatus?.result &&
+                prevStatus.result.sequence > message.sequence
+                  ? prevStatus.result
+                  : message,
+            },
+          },
+        },
+      };
+    });
+  },
+);
+
+export const exploitExecutionsPurgeDispatch = atom(
+  null,
+  (_get, set, oldest: number) => {
+    set(teamExecutionsAtom, (current) => {
+      return Object.fromEntries(
+        Object.entries(current).map(([teamId, executionMap]) => [
+          teamId,
+          Object.fromEntries(
+            Object.entries(executionMap).map(([exploit, executions]) => [
+              exploit,
+              Object.fromEntries(
+                Object.entries(executions).filter(
+                  ([_, entry]) => entry.published >= oldest,
+                ),
+              ),
+            ]),
+          ),
+        ]),
+      );
+    });
+  },
+);
+
+export const executionStatusAggregateAtom = atom((get) => {
+  const teamExecutions = get(teamExecutionsAtom);
+
+  let count = 0;
+  let pendingCount = 0;
+
+  // We probably don't want to do FP here to avoid a lot of extra allocations
+  for (const [_, exploitMap] of Object.entries(teamExecutions)) {
+    for (const [_, executions] of Object.entries(exploitMap)) {
+      for (const [_, status] of Object.entries(executions)) {
+        ++count;
+        if (!status.result) {
+          ++pendingCount;
+        }
+      }
+    }
+  }
+
+  return {
+    count,
+    pendingCount,
+  };
+});
+
+export const teamServiceExecutionAggregateAtom = atom((get) => {
+  const teamExecutions = get(teamExecutionsAtom);
+  const exploitServiceMap = get(exploitServiceAssociateAtom);
+
+  const pendingCountMap = new Map<string, Map<string, number>>();
+
+  // We probably don't want to do FP here to avoid a lot of extra allocations
+  for (const [teamId, exploitMap] of Object.entries(teamExecutions)) {
+    const servicePendingCountMap = new Map<string, number>();
+    for (const [exploit, executions] of Object.entries(exploitMap)) {
+      const service = exploitServiceMap.get(exploit);
+      if (!service) continue;
+
+      for (const [_, status] of Object.entries(executions)) {
+        if (status.result) {
+          continue;
+        }
+        servicePendingCountMap.set(
+          service,
+          (servicePendingCountMap.get(service) ?? 0) + 1,
+        );
+      }
+    }
+    pendingCountMap.set(teamId, servicePendingCountMap);
+  }
+
+  return {
+    pendingCountMap,
   };
 });

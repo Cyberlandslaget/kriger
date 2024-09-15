@@ -1,3 +1,4 @@
+import type { ExecutionResultMessage } from "../services/models";
 import type { FlagCode } from "./enums";
 
 export type TeamFlagMap = {
@@ -18,27 +19,19 @@ export type TeamFlagStatus = {
   exploit: string | null;
 };
 
-export type ExecutionType = {
-  id: number;
-  exploit_id: number;
-  output: string;
-  exit_code: number;
-  started_at: string;
-  finished_at: string;
-  target_id: number;
-
-  service: string;
-  target_tick: number;
-  team: string;
+export type TeamExecutionMap = {
+  [teamId: string]: ExploitExecutionMap;
 };
 
-export type ExploitType = {
-  id: number;
-  name: string;
-  enabled: boolean;
-  service: string;
-  pool_size: number;
-  docker_image: string;
-  docker_containers: string[];
-  blacklist: string[];
+export type ExploitExecutionMap = {
+  [exploit: string]: TeamExploitExecutions;
+};
+
+export type TeamExploitExecutions = {
+  [sequence: number]: TeamExecutionStatus;
+};
+
+export type TeamExecutionStatus = {
+  published: number;
+  result?: ExecutionResultMessage;
 };

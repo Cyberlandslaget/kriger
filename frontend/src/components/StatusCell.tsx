@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import { FlagIcon } from "lucide-react";
+import { FlagIcon, LoaderCircleIcon } from "lucide-react";
 import { useMemo } from "react";
 import { FlagCode } from "../utils/enums";
 import type { TeamServiceFlags } from "../utils/types";
@@ -8,6 +8,7 @@ import { StatusCellCard } from "./StatusCellCard";
 
 type StatusCellProps = {
   flags: TeamServiceFlags;
+  hasPendingExecution: boolean;
   teamId: string;
   teamName: string | null;
   serviceName: string;
@@ -18,6 +19,7 @@ export const StatusCell = ({
   teamId,
   teamName,
   serviceName,
+  hasPendingExecution,
 }: StatusCellProps) => {
   const aggregate = useMemo(() => {
     return Object.values(flags).reduce((map, { status }) => {
@@ -78,6 +80,10 @@ export const StatusCell = ({
                 key={i}
               />
             ))}
+            <div className="flex-1" />
+            {hasPendingExecution && (
+              <LoaderCircleIcon className="animate-spin stroke-slate-400" />
+            )}
           </div>
         </HoverCardTrigger>
         <HoverCardContent align="start">
