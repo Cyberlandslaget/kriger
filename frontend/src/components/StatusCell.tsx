@@ -2,25 +2,42 @@ import clsx from "clsx";
 import { FlagIcon, LoaderCircleIcon } from "lucide-react";
 import { useMemo } from "react";
 import { FlagCode } from "../utils/enums";
-import type { TeamServiceFlags } from "../utils/types";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "./HoverCard";
 import { StatusCellCard } from "./StatusCellCard";
+import { useAtomValue } from "jotai";
+import {
+  teamFlagStatusAtom,
+  teamServiceExecutionAggregateAtom,
+} from "../utils/atoms";
 
 type StatusCellProps = {
-  flags: TeamServiceFlags;
-  hasPendingExecution: boolean;
   teamId: string;
   teamName: string | null;
   serviceName: string;
 };
 
 export const StatusCell = ({
-  flags,
   teamId,
   teamName,
   serviceName,
-  hasPendingExecution,
 }: StatusCellProps) => {
+  const teamFlagMap = useAtomValue(teamFlagStatusAtom);
+  const teamServiceExecutionAggregate = useAtomValue(
+    teamServiceExecutionAggregateAtom,
+  );
+
+  const hasPendingExecution = useMemo(
+    () =>
+      (teamServiceExecutionAggregate.pendingCountMap
+        ?.get(teamId)
+        ?.get(serviceName) ?? 0) > 0,
+    [teamServiceExecutionAggregate, teamId, serviceName],
+  );
+
+  const flags = useMemo(
+    () => teamFlagMap[teamId]?.[serviceName] ?? {},
+    [teamFlagMap, teamId, serviceName],
+  );
   const aggregate = useMemo(() => {
     return Object.values(flags).reduce((map, { status }) => {
       const key = status ?? FlagCode.Pending;
