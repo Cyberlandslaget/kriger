@@ -3,10 +3,12 @@ use kriger_common::messaging::nats::NatsMessaging;
 use kriger_common::server::runtime::{create_shutdown_cancellation_token, AppConfig, AppRuntime};
 use std::path::Path;
 use std::sync::Arc;
+use tokio::sync::RwLock;
 use tokio::task::JoinSet;
 use tracing::{info, warn};
 
 pub(crate) mod args;
+mod metrics;
 
 async fn read_app_config<P: AsRef<Path>>(path: P) -> eyre::Result<AppConfig> {
     let content = tokio::fs::read_to_string(path).await?;
@@ -25,6 +27,7 @@ pub(crate) async fn main(args: args::Args) -> eyre::Result<()> {
     let runtime = AppRuntime {
         config: Arc::new(app_config),
         messaging: Arc::new(messaging),
+        metrics_registry: Arc::new(RwLock::new(prometheus_client::registry::Registry::default())),
         cancellation_token,
     };
 
@@ -59,6 +62,13 @@ pub(crate) async fn main(args: args::Args) -> eyre::Result<()> {
     #[cfg(feature = "ws")]
     if args.components.enable_ws || args.components.single {
         set.spawn(kriger_ws::main(runtime.clone(), args.ws));
+    }
+
+    if !args.components.disable_openmetrics {
+        set.spawn(metrics::run_metrics_server(
+            runtime.clone(),
+            args.openmetrics,
+        ));
     }
 
     if set.is_empty() {

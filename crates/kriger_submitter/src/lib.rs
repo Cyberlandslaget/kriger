@@ -1,6 +1,8 @@
+mod metrics;
 mod submitter;
 mod utils;
 
+use crate::metrics::{FlagSubmissionStatusLabels, SubmitterMetrics};
 use crate::submitter::{Submitter, SubmitterConfig};
 use async_nats::jetstream::AckKind;
 use color_eyre::eyre;
@@ -11,13 +13,17 @@ use kriger_common::messaging::nats::{Fetcher, MessageWrapper, MessagingServiceEr
 use kriger_common::messaging::services::flags::FlagsService;
 use kriger_common::server::runtime::AppRuntime;
 use kriger_common::{messaging, models};
+use std::ops::DerefMut;
 use std::time::Duration;
 use tokio::select;
-use tokio::time::MissedTickBehavior;
+use tokio::time::{Instant, MissedTickBehavior};
 use tracing::{debug, error, info, instrument, warn};
 
 pub async fn main(runtime: AppRuntime) -> eyre::Result<()> {
     info!("starting submitter");
+
+    let metrics = SubmitterMetrics::default();
+    metrics.register(runtime.metrics_registry.write().await.deref_mut());
 
     let flags_bucket = runtime.messaging.flags();
     let flags_svc = Box::leak(Box::new(flags_bucket));
@@ -78,12 +84,13 @@ pub async fn main(runtime: AppRuntime) -> eyre::Result<()> {
             }
         };
         let submissions = submissions.collect().await;
-        handle_submit(submitter.as_ref(), submissions, flags_svc).await;
+        handle_submit(submitter.as_ref(), &metrics, submissions, flags_svc).await;
     }
 }
 #[instrument(skip_all, fields(flag_count = %requests.len()))]
 async fn handle_submit(
     submitter: &(dyn Submitter + Send + Sync),
+    metrics: &SubmitterMetrics,
     requests: Vec<MessageWrapper<messaging::model::FlagSubmission>>,
     flags_svc: &FlagsService,
 ) {
@@ -96,6 +103,8 @@ async fn handle_submit(
         flags.count = requests.len(),
         "preparing to submit flags"
     }
+    metrics.start.inc();
+    metrics.flag_submissions.inc_by(requests.len() as u64);
 
     let flags: Vec<&str> = requests
         .iter()
@@ -107,8 +116,26 @@ async fn handle_submit(
     let progress_futures = requests.iter().map(|req| req.progress());
     join_all(progress_futures).await;
 
-    match submitter.submit(&flags).await {
+    let start = Instant::now();
+    let res = submitter.submit(&flags).await;
+    let elapsed = start.elapsed();
+    metrics
+        .duration
+        .observe(elapsed.as_micros() as f64 / 1_000_000.0);
+
+    match res {
         Ok(mut results) => {
+            metrics.complete.inc();
+
+            for (_, status) in &results {
+                metrics
+                    .flag_results
+                    .get_or_create(&FlagSubmissionStatusLabels {
+                        status: status.into(),
+                    })
+                    .inc();
+            }
+
             let futures = requests.into_iter().map(|message| {
                 handle_result(
                     flags_svc,
@@ -123,6 +150,8 @@ async fn handle_submit(
                 ?error,
                 "unable to submit flags"
             }
+            metrics.error.inc();
+
             let backoff = Some(Duration::from_secs(2));
             let futures = requests.iter().map(|message| message.nak(backoff));
             join_all(futures).await;

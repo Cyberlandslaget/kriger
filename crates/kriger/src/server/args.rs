@@ -27,6 +27,9 @@ pub(crate) struct Args {
     #[command(flatten, next_help_heading = "WebSocket server configuration options")]
     pub ws: kriger_ws::config::Config,
 
+    #[command(flatten, next_help_heading = "OpenMetrics configuration options")]
+    pub openmetrics: OpenMetricsConfig,
+
     /// The server configuration file. Accepted file format: TOML.
     #[arg(env, value_hint = ValueHint::FilePath)]
     pub config_file: String,
@@ -74,4 +77,17 @@ pub(crate) struct Components {
     #[cfg(feature = "ws")]
     #[arg(env, long)]
     pub enable_ws: bool,
+
+    /// Disable the OpenMetrics component
+    #[arg(env, long)]
+    pub disable_openmetrics: bool,
+}
+
+#[derive(Parser, Debug)]
+#[command(version, about)]
+#[group(skip)]
+pub struct OpenMetricsConfig {
+    /// The socket address to listen to
+    #[arg(env, long, default_value = "[::]:8009")]
+    pub(crate) openmetrics_listen: String,
 }

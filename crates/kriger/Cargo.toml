@@ -6,7 +6,7 @@ default-run = "kriger"
 
 [features]
 default = ["server-all", "otel", "cli"]
-server = []
+server = ["dep:axum", "dep:prometheus-client"]
 server-all = [
     "server",
     "controller",
@@ -41,6 +41,7 @@ cli = [
 ]
 
 [dependencies]
+axum = { workspace = true, optional = true }
 chrono = { workspace = true, optional = true }
 clap.workspace = true
 clap_derive.workspace = true
@@ -79,6 +80,7 @@ kriger_scheduler = { path = "../kriger_scheduler", optional = true }
 kriger_submitter = { path = "../kriger_submitter", optional = true }
 kriger_ws = { path = "../kriger_ws", optional = true }
 oci-distribution = { version = "0.11.0", optional = true }
+prometheus-client = { workspace = true, optional = true }
 serde.workspace = true
 serde_json = { workspace = true, optional = true }
 tar = { version = "0.4.41", optional = true }

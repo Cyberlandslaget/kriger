@@ -12,5 +12,6 @@ color-eyre.workspace = true
 dashmap.workspace = true
 futures.workspace = true
 kriger_common.path = "../kriger_common"
+prometheus-client.workspace = true
 tokio.workspace = true
 tracing.workspace = true

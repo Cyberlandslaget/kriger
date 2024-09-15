@@ -1,6 +1,8 @@
 mod fetcher;
+mod metrics;
 
 use crate::fetcher::{FetchOptions, Fetcher, FetcherConfig};
+use crate::metrics::FetcherMetrics;
 use color_eyre::eyre::{Context, Result};
 use dashmap::DashMap;
 use kriger_common::messaging;
@@ -8,12 +10,16 @@ use kriger_common::messaging::services::data::DataService;
 use kriger_common::messaging::Bucket;
 use kriger_common::models::Service;
 use kriger_common::server::runtime::AppRuntime;
-use tokio::time::MissedTickBehavior;
+use std::ops::DerefMut;
+use tokio::time::{Instant, MissedTickBehavior};
 use tokio::{select, time};
 use tracing::{debug, error, info, instrument, warn};
 
 pub async fn main(runtime: AppRuntime) -> Result<()> {
     info!("starting data fetcher");
+
+    let metrics = FetcherMetrics::default();
+    metrics.register(runtime.metrics_registry.write().await.deref_mut());
 
     let config: FetcherConfig = runtime
         .config
@@ -50,7 +56,7 @@ pub async fn main(runtime: AppRuntime) -> Result<()> {
             }
         }
 
-        handle_fetcher_tick(&services, &data_svc, fetcher.as_ref(), &options).await;
+        handle_fetcher_tick(&services, &data_svc, &metrics, fetcher.as_ref(), &options).await;
     }
 }
 
@@ -58,20 +64,32 @@ pub async fn main(runtime: AppRuntime) -> Result<()> {
 async fn handle_fetcher_tick(
     services: &DashMap<String, Service>,
     data_svc: &DataService,
+    metrics: &FetcherMetrics,
     fetcher: &dyn Fetcher,
     options: &FetchOptions,
 ) {
     debug!("fetcher tick");
-    let data = match fetcher.fetch(&options, &services).await {
+    metrics.start.inc();
+    let start = Instant::now();
+    let fetcher_res = fetcher.fetch(&options, &services).await;
+    let elapsed = start.elapsed();
+
+    metrics
+        .duration
+        .observe((elapsed.as_micros() as f64) / 1_000_000.0);
+
+    let data = match fetcher_res {
         Ok(data) => data,
         Err(error) => {
             warn! {
                 ?error,
                 "fetcher error"
             }
+            metrics.error.inc();
             return;
         }
     };
+    metrics.complete.inc();
     debug!("received fetcher data");
 
     if let Some(flag_hints) = data.flag_hints {

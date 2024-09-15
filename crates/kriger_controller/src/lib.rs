@@ -1,6 +1,8 @@
 pub mod config;
+mod metrics;
 
 use crate::config::Config;
+use crate::metrics::{ControllerMetrics, ExploitLabels};
 use async_nats::jetstream::consumer::{AckPolicy, DeliverPolicy};
 use color_eyre::eyre::{Context, Result};
 use futures::StreamExt;
@@ -18,12 +20,16 @@ use kriger_common::server::runtime::AppRuntime;
 use kube::api::{Patch, PatchParams};
 use kube::{Api, Client};
 use std::collections::BTreeMap;
+use std::ops::DerefMut;
 use std::time::Duration;
 use tokio::{pin, select};
 use tracing::{info, warn};
 
 pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
     info!("starting controller");
+
+    let metrics = ControllerMetrics::default();
+    metrics.register(runtime.metrics_registry.write().await.deref_mut());
 
     // This will construct a Kubernetes client with the default kubeconfig file or the in-cluster
     // configuration.
@@ -60,10 +66,20 @@ pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
         };
         match res {
             Some(Ok(message)) => {
-                if let Err(error) = handle_message(&deployments, message, &runtime, &config).await {
-                    warn! {
-                        ?error,
-                        "unable to handle message"
+                let labels = &ExploitLabels {
+                    exploit: message.payload.manifest.name.clone(),
+                };
+                metrics.requests.get_or_create(&labels).inc();
+                match handle_message(&deployments, message, &runtime, &config).await {
+                    Ok(_) => {
+                        metrics.complete.get_or_create(&labels).inc();
+                    }
+                    Err(error) => {
+                        warn! {
+                            ?error,
+                            "unable to handle message"
+                        }
+                        metrics.error.get_or_create(&labels).inc();
                     }
                 }
             }

@@ -5,6 +5,7 @@ use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::signal::unix::SignalKind;
+use tokio::sync::RwLock;
 use tokio::{signal, spawn};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
@@ -14,6 +15,7 @@ use tracing::{error, info};
 pub struct AppRuntime {
     pub config: Arc<AppConfig>,
     pub messaging: Arc<NatsMessaging>,
+    pub metrics_registry: Arc<RwLock<prometheus_client::registry::Registry>>,
     pub cancellation_token: CancellationToken,
 }
 

@@ -13,6 +13,7 @@ color-eyre.workspace = true
 dashmap.workspace = true
 futures.workspace = true
 kriger_common = { path = "../kriger_common" }
+prometheus-client.workspace = true
 reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true
