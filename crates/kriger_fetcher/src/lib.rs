@@ -31,11 +31,12 @@ pub async fn main(runtime: AppRuntime) -> Result<()> {
 
     let data_svc = runtime.messaging.data();
 
-    let fetcher = config.into_fetcher();
+    let fetcher = config.inner.into_fetcher();
 
-    // TODO: Un-hardcode this and align the start to the start of a tick
-    let tick_duration = time::Duration::from_secs(20);
-    let mut interval = time::interval(tick_duration);
+    let tick_duration = time::Duration::from_secs(config.interval);
+    let instant =
+        kriger_common::utils::time::get_instant_from_datetime(runtime.config.competition.start)?;
+    let mut interval = time::interval_at(instant, tick_duration);
     interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
     let options = FetchOptions {

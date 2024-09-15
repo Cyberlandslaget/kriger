@@ -12,5 +12,6 @@ host = "10.10.0.1:31337"
 
 [fetcher]
 type = "faust"
+interval = 10 # 6 req/min
 url = "http://10.10.0.1:5000/competition/teams.json"
 ip_format = "10.60.{}.1"

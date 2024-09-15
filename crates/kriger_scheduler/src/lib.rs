@@ -96,7 +96,7 @@ async fn handle_scheduling(
 
     // TODO: Perhaps add tick delay to ensure that we're not going "too fast" and to account for clock skews
     let tick = Duration::from_secs(config.competition.tick);
-    let instant = utils::get_instant_from_datetime(config.competition.start)?;
+    let instant = kriger_common::utils::time::get_instant_from_datetime(config.competition.start)?;
 
     let mut interval = interval_at(instant, tick);
     interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
