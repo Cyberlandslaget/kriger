@@ -9,16 +9,28 @@ export enum FlagCode {
   Old = 5, // DENIED: flag too old
   Invalid = 6, // DENIED: invalid flag
 
-  /// The server explicitly requests the flag to be resubmitted.
-  /// This can be due to the fact that the flag is not yet valid.
-  /// Submitters should retry this status.
-  Resubmit = 7, // RESUBMIT: the flag is not active yet, wait for next round
+  /**
+   * The server explicitly requests the flag to be resubmitted.
+   * This can be due to the fact that the flag is not yet valid.
+   * Submitters should retry this status.
+   */
+  Resubmit = 7,
 
-  /// Server refused flag. Pre- or post-competition.
-  /// Submitters should retry this status.
-  Error = 8, // ERROR: notify the organizers and retry later
+  /**
+   * Server refused flag. Pre- or post-competition.
+   * Submitters should retry this status.
+   */
+  Error = 8,
 
-  /// Unknown response. Submitters should definitely retry this status.
+  /**
+   * The flag that was placed by the checker is stale and is invalid.
+   * Submitters should not retry this status.
+   */
+  Stale = 9,
+
+  /**
+   * Unknown response. Submitters should definitely retry this status.
+   */
   Unknown = 200,
 }
 export enum ServiceStatus {

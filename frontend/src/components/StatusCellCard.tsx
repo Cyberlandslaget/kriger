@@ -31,6 +31,9 @@ export const StatusCellCard = ({
         <div className="text-slate-300">{serviceName}</div>
       </div>
       <div className="grid grid-cols-[auto_1fr_auto] gap-x-4">
+        {Object.keys(flags).length === 0 && (
+          <span className="text-amber-200">No flags received</span>
+        )}
         {Object.entries(flags)
           .reverse()
           .map(([flag, status]) => (

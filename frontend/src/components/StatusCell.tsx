@@ -37,7 +37,11 @@ export const StatusCell = ({
     ) {
       return "border-red-500/50";
     }
-    if (aggregate.get(FlagCode.Resubmit) || aggregate.get(FlagCode.Old)) {
+    if (
+      aggregate.get(FlagCode.Resubmit) ||
+      aggregate.get(FlagCode.Old) ||
+      aggregate.get(FlagCode.Stale)
+    ) {
       return "border-amber-200/40";
     }
 
@@ -53,7 +57,7 @@ export const StatusCell = ({
     >
       <HoverCard openDelay={50} closeDelay={50}>
         <HoverCardTrigger>
-          <div className="flex flex-row items-center p-1.5 gap-1">
+          <div className="flex flex-row items-center p-1.5 gap-1 h-full">
             {[
               ...Array(
                 (aggregate.get(FlagCode.Ok) ?? 0) +
