@@ -1,28 +1,14 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
-import { useCallback } from "react";
+import ExecutionDisplay from "../components/ExecutionDisplay";
 
-export const Route = createLazyFileRoute("/executions")({
-  component: () => executions(),
-});
-
-function executions() {
-  const onChangeHandler = useCallback(
-    (event: React.ChangeEvent<HTMLInputElement>) => {
-      // TODO
-    },
-    [],
-  );
-
+function Executions() {
   return (
-    <main className="flex flex-col gap-6">
-      <div>
-        <input
-          className="w-full bg-slate-950/80 px-2 py-1 text-slate-300 rounded-sm"
-          type="text"
-          value={""}
-          onChange={onChangeHandler}
-        />
-      </div>
+    <main className="relative grid grid-rows-[30px_1fr] gap-3 min-h-0 h-[calc(100vh-6rem)]">
+      <ExecutionDisplay />
     </main>
   );
 }
+
+export const Route = createLazyFileRoute("/executions")({
+  component: () => Executions(),
+});

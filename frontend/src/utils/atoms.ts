@@ -1,5 +1,7 @@
 import { atom } from "jotai";
 import type {
+  Execution,
+  ExecutionMap,
   ExecutionRequestMessage,
   ExecutionResultMessage,
   Exploit,
@@ -29,6 +31,10 @@ export const currentTickAtom = atom(
 
 export const exploitsAtom = atom<Exploit[] | null>(null);
 export const teamExecutionsAtom = atom<TeamExecutionMap>({});
+export const executionsAtom = atom<ExecutionMap>({
+  executions: {},
+  sortedSequence: [],
+});
 
 export const teamsAtom = atom<Record<string, Team>>({});
 export const servicesAtom = atom<Service[]>([]);
@@ -163,9 +169,62 @@ export const flagStatusAggregateAtom = atom((get) => {
   };
 });
 
+const binarySearchInsertIndex = (
+  sortedSequence: number[],
+  executions: { [sequence: number]: Execution },
+  published: number,
+): number => {
+  let low = 0;
+  let high = sortedSequence.length;
+  let mid = (low + high) >>> 1;
+  while (low < high) {
+    mid = (low + high) >>> 1;
+    if (executions[sortedSequence[mid]].published > published) {
+      low = mid + 1;
+    } else {
+      high = mid;
+    }
+  }
+  return low;
+};
 export const exploitExecutionRequestDispatch = atom(
   null,
   (_get, set, message: ExecutionRequestMessage) => {
+    // Seperate execution map sorted by key published for easier displaying of execution logs
+    set(executionsAtom, (prev) => {
+      if (!message.teamId || !message.exploitName) {
+        return prev;
+      }
+      const prevStatus = prev.executions[message.sequence];
+      const updatedExecutions = {
+        ...prev.executions,
+        [message.sequence]: {
+          ...prevStatus,
+          type: message.type,
+          published: message.published,
+          sequence: message.sequence,
+          exploitName: message.exploitName,
+          teamId: message.teamId,
+          flagHint: JSON.stringify(message.flagHint),
+          ipAddress: message.ipAddress,
+        },
+      };
+      // Remove old sequence in the sorted array before inserting it back in
+      const index = prev.sortedSequence.indexOf(message.sequence);
+      if (index > -1) prev.sortedSequence.splice(index, 1);
+
+      const insertIndex = binarySearchInsertIndex(
+        prev.sortedSequence,
+        updatedExecutions,
+        message.published,
+      );
+      prev.sortedSequence.splice(insertIndex, 0, message.sequence);
+      return {
+        sortedSequence: prev.sortedSequence,
+        executions: updatedExecutions,
+      };
+    });
+
     set(teamExecutionsAtom, (prev) => {
       if (!message.teamId || !message.exploitName) {
         return prev;
@@ -194,6 +253,43 @@ export const exploitExecutionRequestDispatch = atom(
 export const exploitExecutionResultDispatch = atom(
   null,
   (_get, set, message: ExecutionResultMessage) => {
+    // Seperate execution map sorted by key published for easier displaying of execution logs
+    set(executionsAtom, (prev) => {
+      if (!message.teamId || !message.exploitName) {
+        return prev;
+      }
+      const prevStatus = prev.executions[message.requestSequence];
+      const updatedExecutions = {
+        ...prev.executions,
+        [message.requestSequence]: {
+          ...prevStatus,
+          type: message.type,
+          published: message.published,
+          sequence: message.sequence,
+          exploitName: message.exploitName,
+          teamId: message.teamId,
+          exitCode: message.exitCode,
+          attempt: message.attempt,
+          time: message.time,
+          status: message.status,
+        },
+      };
+      // Remove old sequence in the sorted array before inserting it back in
+      const index = prev.sortedSequence.indexOf(message.requestSequence);
+      if (index > -1) prev.sortedSequence.splice(index, 1);
+
+      const insertIndex = binarySearchInsertIndex(
+        prev.sortedSequence,
+        updatedExecutions,
+        message.published,
+      );
+      prev.sortedSequence.splice(insertIndex, 0, message.requestSequence);
+      return {
+        sortedSequence: prev.sortedSequence,
+        executions: updatedExecutions,
+      };
+    });
+
     set(teamExecutionsAtom, (prev) => {
       if (!message.teamId || !message.exploitName) {
         return prev;

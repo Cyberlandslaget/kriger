@@ -455,3 +455,21 @@ export type ExploitResources = {
   timeout: number;
 };
 
+export type ExecutionMap = {
+  executions: { [sequence: number]: Execution };
+  sortedSequence: number[];
+};
+export type Execution = {
+  type: string;
+  published: number;
+  sequence: number;
+  exploitName: string;
+  ipAddress: string;
+  flagHint: string;
+  teamId: string;
+  time?: number;
+  exitCode?: number;
+  status?: ExecutionResultStatusCode;
+  attempt?: number;
+  requestSequence?: number;
+};
