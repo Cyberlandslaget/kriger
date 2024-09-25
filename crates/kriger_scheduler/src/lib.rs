@@ -1,5 +1,5 @@
-mod utils;
 mod metrics;
+mod utils;
 
 use crate::utils::{get_current_non_offsetting_tick, is_team_excluded};
 use base64::{engine::general_purpose::STANDARD_NO_PAD, Engine};
@@ -255,7 +255,8 @@ async fn handle_hint_scheduling(
         .context("unable to watch flag hints")?;
     pin!(data_hints);
 
-    // TODO: Add Nak delays
+    // TODO: Do we want to expire this, eventually?
+    let backoff = Some(Duration::from_secs(2));
     loop {
         let maybe_message = select! {
             _ = runtime.cancellation_token.cancelled() => return Ok(()),
@@ -279,7 +280,7 @@ async fn handle_hint_scheduling(
                 ?error,
                 "scheduling error"
             }
-            if let Err(error) = message.nak(None).await {
+            if let Err(error) = message.nak(backoff).await {
                 error! {
                     ?error,
                     "unable to ack message"

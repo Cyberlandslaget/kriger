@@ -23,7 +23,7 @@ use std::collections::BTreeMap;
 use std::ops::DerefMut;
 use std::time::Duration;
 use tokio::{pin, select};
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 
 pub async fn main(runtime: AppRuntime, config: Config) -> Result<()> {
     info!("starting controller");
@@ -114,11 +114,11 @@ async fn handle_message(
             message.ack().await?;
         }
         Err(err) => {
-            warn!(
+            error!(
                 "reconciliation error for exploit: {}: {:?}",
                 exploit.manifest.name, err
             );
-            message.nak(None).await?;
+            message.nak(Some(Duration::from_secs(2))).await?;
         }
     };
     Ok(())
