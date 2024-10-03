@@ -52,7 +52,7 @@ function ExecutionDisplay() {
                       <th className="min-w-24 max-w-48 h-10 items-center font-bold p-2 shadow-inner bg-slate-950/30 border-slate-950 border-opacity-20 border-2 rounded-sm text-right">
                         Time
                       </th>
-                      <th className="min-w-36 max-w-48 h-10 items-center font-bold p-2 shadow-inner bg-slate-950/30 border-slate-950 border-opacity-20 border-2 rounded-sm text-right">
+                      <th className="min-w-36 max-w-48 h-10 items-center font-bold p-2 shadow-inner bg-slate-950/30 border-slate-950 border-opacity-20 border-2 rounded-sm text-right pr-2.5">
                         Published
                       </th>
                     </tr>
@@ -78,7 +78,7 @@ function ExecutionDisplay() {
                     key={`key-${index}`}
                     style={{ ...style }}
                     className={clsx(
-                      "flex min-w-full !h-10 mt-12 gap-2 bg-slate-950 bg-opacity-30 border-opacity-20 border-2 text-sm rounded-sm",
+                      "flex min-w-full items-center !h-10 mt-12 gap-2 bg-slate-950 bg-opacity-30 border-opacity-20 border-2 text-sm rounded-sm",
                       borderColor,
                     )}
                   >
@@ -99,7 +99,7 @@ function ExecutionDisplay() {
                     </td>
                     <td className="min-w-24 max-w-48 h-10">
                       <div className="w-full flex items-center justify-end p-1.5 h-full">
-                        {execution?.status ? (
+                        {execution?.status !== undefined ? (
                           <p className="truncate">
                             {ExecutionResultStatusCode[execution.status]}
                           </p>
@@ -120,8 +120,14 @@ function ExecutionDisplay() {
                       </div>
                     </td>
                     <td className="min-w-36 max-w-48 h-8">
-                      <div className="w-full flex items-center justify-end p-1.5 h-full">
-                        <p className="truncate">{execution.published}</p>
+                      <div className="w-full flex items-center justify-end p-1.5 h-full pr-2.5">
+                        <p className="truncate">
+                          {
+                            new Date(execution.published)
+                              .toTimeString()
+                              .split(" ")[0]
+                          }
+                        </p>
                       </div>
                     </td>
                   </tr>
