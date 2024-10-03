@@ -112,7 +112,7 @@ function ExecutionDisplay() {
                       <div className="w-full flex items-center justify-end p-1.5 h-full">
                         {execution?.time ? (
                           <p className="truncate">
-                            {Math.floor((execution?.time ?? 0) / 1000)}s
+                            {((execution?.time ?? 0) / 1000).toFixed(3)}s
                           </p>
                         ) : (
                           <></>
