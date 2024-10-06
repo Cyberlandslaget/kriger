@@ -49,6 +49,7 @@ pub async fn main(runtime: AppRuntime, config: Config) -> eyre::Result<()> {
             "/exploits/:name/execute",
             post(routes::exploits::execute_exploit),
         )
+        .route("/flags", post(routes::flags::submit_flags))
         .route(
             "/competition/services",
             get(routes::competition::get_services),

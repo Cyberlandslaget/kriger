@@ -4,3 +4,8 @@ use serde::{Deserialize, Serialize};
 pub struct FlagHintQuery {
     pub service: String,
 }
+
+#[derive(Serialize, Deserialize)]
+pub struct FlagSubmitRequest {
+    pub flags: Vec<String>,
+}
