@@ -6,4 +6,4 @@ COPY requirements.txt .
 RUN /usr/bin/uv pip install --system -r requirements.txt
 COPY . .
 
-CMD ["python", "exploit.py"]
+CMD ["python3", "exploit.py"]
