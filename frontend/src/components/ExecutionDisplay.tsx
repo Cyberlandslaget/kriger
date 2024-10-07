@@ -1,5 +1,9 @@
 import { useAtomValue } from "jotai";
-import { executionsAtom, executionStatusAggregateAtom } from "../utils/atoms";
+import {
+  executionsAtom,
+  executionStatusAggregateAtom,
+  exploitsAtom,
+} from "../utils/atoms";
 import { useMemo } from "react";
 import AutoSizer from "react-virtualized-auto-sizer";
 import { forwardRef } from "react";
@@ -10,11 +14,18 @@ import clsx from "clsx";
 function ExecutionDisplay() {
   const executionStatusAggregate = useAtomValue(executionStatusAggregateAtom);
   const executionMap = useAtomValue(executionsAtom);
+  const exploits = useAtomValue(exploitsAtom);
 
   const executions = useMemo(() => {
     // TODO: add filtering here
     return executionMap.executions;
   }, [executionMap]);
+
+  const exploitNames = useMemo(() => {
+    return Object.fromEntries(
+      exploits?.map((e) => [e.manifest.name, e.manifest.service]) ?? [],
+    );
+  }, [exploits]);
 
   return (
     <>
@@ -45,6 +56,9 @@ function ExecutionDisplay() {
                       </th>
                       <th className="min-w-48 w-full h-10 items-center font-bold p-2 shadow-inner bg-slate-950/30 border-slate-950 border-opacity-20 border-2 rounded-sm">
                         Exploit name
+                      </th>
+                      <th className="min-w-24 w-full h-10 items-center font-bold p-2 shadow-inner bg-slate-950/30 border-slate-950 border-opacity-20 border-2 rounded-sm text-right">
+                        Service
                       </th>
                       <th className="min-w-24 max-w-48 h-10 items-center font-bold p-2 shadow-inner bg-slate-950/30 border-slate-950 border-opacity-20 border-2 rounded-sm text-right">
                         Status
@@ -95,6 +109,13 @@ function ExecutionDisplay() {
                     <td className="min-w-48 w-full h-10">
                       <div className="w-full flex items-center text-sm p-1.5 h-full shadow-inner  rounded-sm transition-all duration-150 truncate">
                         {execution.exploitName}
+                      </div>
+                    </td>
+                    <td className="min-w-24 max-w-48 w-full h-10">
+                      <div className="w-full flex items-center justify-end text-sm p-1.5 h-full shadow-inner  rounded-sm transition-all duration-150">
+                        <p className="truncate">
+                          {exploitNames[execution.exploitName]}
+                        </p>
                       </div>
                     </td>
                     <td className="min-w-24 max-w-48 h-10">
