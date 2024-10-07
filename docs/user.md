@@ -64,7 +64,7 @@ rest_url = "https://kriger.o99.no/api"
 ws_url = "wss://kriger.o99.no/ws"
 ```
 
-> ![NOTE]
+> [!NOTE]
 > The configuration file name is `cli.dev.toml`
 > when [debug_assertions](https://doc.rust-lang.org/reference/conditional-compilation.html#debug_assertions) are
 > enabled. In practice, this means that `cli.dev.toml` will be used during local development.
