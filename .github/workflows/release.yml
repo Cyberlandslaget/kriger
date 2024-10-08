@@ -16,7 +16,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build
-        run: cargo build -p kriger --release && strip target/release/kriger && mv target/release/kriger target/release/kriger_amd64
+        run: cargo build -p kriger --release && mv target/release/kriger target/release/kriger_amd64
 
       - name: Release
         uses: softprops/action-gh-release@v4
