@@ -142,6 +142,7 @@ export const flagStatusAggregateAtom = atom((get) => {
   let count = 0;
   const statusMap = new Map<FlagCode, number>();
   const exploitCountMap: Map<string, number> = new Map();
+  const exploitRejectedCountMap: Map<string, number> = new Map();
 
   // We probably don't want to do FP here to avoid a lot of extra allocations
   for (const [_, serviceMap] of Object.entries(flagStatus)) {
@@ -152,10 +153,17 @@ export const flagStatusAggregateAtom = atom((get) => {
 
         // Do counting per exploits
         if (status.exploit) {
-          exploitCountMap.set(
-            status.exploit,
-            (exploitCountMap.get(status.exploit) ?? 0) + 1,
-          );
+          if (status.status === FlagCode.Ok) {
+            exploitCountMap.set(
+              status.exploit,
+              (exploitCountMap.get(status.exploit) ?? 0) + 1,
+            );
+          } else {
+            exploitRejectedCountMap.set(
+              status.exploit,
+              (exploitRejectedCountMap.get(status.exploit) ?? 0) + 1,
+            );
+          }
         }
         ++count;
       }
@@ -166,6 +174,7 @@ export const flagStatusAggregateAtom = atom((get) => {
     count,
     statusMap,
     exploitCountMap,
+    exploitRejectedCountMap,
   };
 });
 
