@@ -2,8 +2,9 @@ name: Release kriger
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, feat/gh-actions ]
   workflow_dispatch:
+
 
 permissions: read-all
 
