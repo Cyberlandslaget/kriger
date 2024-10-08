@@ -2,7 +2,8 @@ name: Release kriger
 
 on:
   push:
-    branches: [ refs/tags/*, feat/gh-actions ]
+    tags:
+      - '*'
   workflow_dispatch:
 
 
