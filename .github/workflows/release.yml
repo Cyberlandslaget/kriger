@@ -1,8 +1,11 @@
 name: Release kriger
 
-on: 
+on:
   push:
-    - main
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions: read-all
 
 jobs:
   release-ubuntu:
@@ -16,10 +19,9 @@ jobs:
         run: cargo build -p kriger --release && strip target/release/kriger && mv target/release/kriger target/release/kriger_amd64
 
       - name: Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v4
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
             target/release/kriger_amd64
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
