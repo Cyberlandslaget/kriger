@@ -25,6 +25,14 @@ pub(crate) struct Create {
     pub(crate) name: Option<String>,
 }
 
+/// Manually submit a flag
+#[derive(Parser, Debug)]
+#[command(version, about)]
+pub(crate) struct Submit {
+    /// The input containing the flag(s) to submit
+    pub(crate) input: String,
+}
+
 #[derive(Subcommand, Debug)]
 #[command(version, about)]
 pub(crate) enum ExploitCommand {

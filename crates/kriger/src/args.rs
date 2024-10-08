@@ -23,6 +23,9 @@ pub(crate) enum Commands {
     /// Create an exploit
     #[cfg(feature = "cli")]
     Create(crate::cli::args::Create),
+    /// Manually submit flag(s)
+    #[cfg(feature = "cli")]
+    Submit(crate::cli::args::Submit),
     /// Exploit-related commands
     #[cfg(feature = "cli")]
     #[command(subcommand)]

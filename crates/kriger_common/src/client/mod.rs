@@ -69,6 +69,19 @@ impl KrigerClient {
         self.request(reqwest::Method::POST, url).await
     }
 
+    pub async fn submit_flags(
+        &self,
+        flags: Vec<String>,
+    ) -> reqwest::Result<models::responses::AppResponse<()>> {
+        let url = format!("{}/flags", &self.url);
+        self.request_with_body(
+            reqwest::Method::POST,
+            url,
+            &models::requests::FlagSubmitRequest { flags },
+        )
+        .await
+    }
+
     async fn request<U, R>(
         &self,
         method: reqwest::Method,

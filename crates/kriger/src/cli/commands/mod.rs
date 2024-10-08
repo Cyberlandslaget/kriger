@@ -6,6 +6,7 @@ use tokio::fs;
 pub(crate) mod create;
 pub(crate) mod deploy;
 pub(crate) mod exploit;
+pub(crate) mod submit;
 
 pub(crate) async fn read_exploit_manifest() -> color_eyre::Result<cli::models::ExploitManifest> {
     let raw = fs::read("exploit.toml").await?;
