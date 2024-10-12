@@ -5,7 +5,7 @@
 ![](.github/assets/banner.png)
 
 An exploit farm for attack/defense (A/D) CTFs. This is the next-generation exploit farm based on the work done
-in [angrepa](https://github.com/Cyberlandslaget/angrepa).
+in [angrepa](https://github.com/Cyberlandslaget/angrepa).  Kriger is a free software licensed under [AGPLv3](LICENSE).
 
 ## Documentation
 
