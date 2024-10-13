@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright Authors of kriger
+
 use crate::runner::{Runner, RunnerError, RunnerEvent, RunnerExecution, RunnerExecutionResult};
 use futures::stream::select_all;
 use futures::StreamExt;

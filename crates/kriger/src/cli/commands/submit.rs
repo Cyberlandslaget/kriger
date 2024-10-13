@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright Authors of kriger
+
 use crate::cli::{args, read_cli_config};
 use color_eyre::eyre;
 use color_eyre::eyre::{bail, Context};

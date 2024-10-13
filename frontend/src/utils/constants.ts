@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright Authors of kriger
+
 export const CONFIG = {
   webSocketUrl: new URL(
     import.meta.env.VITE_WS_URL ?? "http://localhost:8001",

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright Authors of kriger
+
 import { Link } from "@tanstack/react-router";
 import clsx from "clsx";
 import { useAtomValue } from "jotai";

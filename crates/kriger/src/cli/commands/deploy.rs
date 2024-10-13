@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright Authors of kriger
+
 use crate::cli::commands::acquire_exploit_manifest;
 use crate::cli::{args, emoji, format_duration_secs, log};
 use crate::cli::{read_cli_config, with_spinner};

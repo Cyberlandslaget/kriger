@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright Authors of kriger
+
 use crate::server::args::OpenMetricsConfig;
 use axum::http::{header, StatusCode};
 use axum::response::IntoResponse;

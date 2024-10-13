@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright Authors of kriger
+
 use crate::messaging;
 use crate::messaging::nats::{list_stream, publish_with_id, subscribe};
 use crate::messaging::{model, MessagingError};

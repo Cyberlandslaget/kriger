@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright Authors of kriger
+
 import type { ExecutionResultMessage } from "../services/models";
 import type { FlagCode } from "./enums";
 

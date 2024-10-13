@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright Authors of kriger
+
 use crate::fetcher::{CompetitionData, FetchOptions, Fetcher, FetcherError, FlagHint};
 use async_trait::async_trait;
 use color_eyre::eyre;

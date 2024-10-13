@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright Authors of kriger
+
 use kriger_common::models;
 use serde::{Deserialize, Serialize};
 

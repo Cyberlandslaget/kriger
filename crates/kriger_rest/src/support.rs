@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright Authors of kriger
+
 use axum::extract::rejection::{JsonRejection, QueryRejection};
 use axum::extract::{FromRequest, FromRequestParts, Query};
 use axum::http::StatusCode;

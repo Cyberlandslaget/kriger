@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright Authors of kriger
+
 use clap::Parser;
 use color_eyre::eyre;
 use color_eyre::eyre::Context;

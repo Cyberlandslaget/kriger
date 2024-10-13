@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright Authors of kriger
+
 pub fn encode(buf: &mut [u8]) {
     for ch in buf {
         let x = *ch % 36;

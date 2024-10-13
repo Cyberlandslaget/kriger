@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright Authors of kriger
+
 import { createLazyFileRoute } from "@tanstack/react-router";
 import MonacoEditor, { type Monaco } from "@monaco-editor/react";
 import { useCallback, useEffect, useRef } from "react";

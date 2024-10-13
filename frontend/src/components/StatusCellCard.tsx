@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright Authors of kriger
+
 import { useInterval } from "usehooks-ts";
 import type { TeamServiceFlags } from "../utils/types";
 import { Fragment, useState } from "react";

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright Authors of kriger
+
 use serde::{de::DeserializeOwned, Serialize};
 use std::collections::HashMap;
 

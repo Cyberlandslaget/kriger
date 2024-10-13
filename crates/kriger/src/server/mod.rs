@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright Authors of kriger
+
 use color_eyre::eyre;
 use kriger_common::messaging::nats::NatsMessaging;
 use kriger_common::server::runtime::{create_shutdown_cancellation_token, AppConfig, AppRuntime};

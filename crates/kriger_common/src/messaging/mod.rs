@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright Authors of kriger
+
 use crate::messaging::nats::{MessageWrapper, MessagingServiceError};
 use async_nats::jetstream;
 use dashmap::DashMap;

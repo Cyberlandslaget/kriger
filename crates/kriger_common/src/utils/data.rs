@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright Authors of kriger
+
 use dashmap::DashMap;
 use std::borrow::Borrow;
 use std::collections::HashMap;

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright Authors of kriger
+
 use serde::{Deserialize, Serialize};
 
 /// The structure used to serialize consistent responses to the consumer.

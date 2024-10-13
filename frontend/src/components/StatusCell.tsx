@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright Authors of kriger
+
 import clsx from "clsx";
 import { FlagIcon, LoaderCircleIcon } from "lucide-react";
 import { useMemo } from "react";

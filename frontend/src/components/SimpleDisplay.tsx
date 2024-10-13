@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright Authors of kriger
+
 import AutoSizer from "react-virtualized-auto-sizer";
 import { forwardRef } from "react";
 import { useAtomValue } from "jotai";
