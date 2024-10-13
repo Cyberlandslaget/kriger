@@ -1,7 +1,6 @@
-permissions: read-all
 on:
   push:
-    branches: [main]
+    branches: [ main ]
     paths:
       - ".github/workflows/templates.yml"
       - "data/templates/**"
@@ -12,7 +11,10 @@ name: Package templates
 jobs:
   package-templates:
     name: Package exploit template ${{ matrix.name }}
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     strategy:
       fail-fast: false
       matrix:
@@ -28,10 +30,10 @@ jobs:
 
       - name: Log in to the OCI registry
         run: |
-          oras login -u "$REGISTRY_USER" --password-stdin r.o99.no <<<"$REGISTRY_PASS"
+          oras login -u "$REGISTRY_USER" --password-stdin ghcr.io <<<"$REGISTRY_PASS"
         env:
-          REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
-          REGISTRY_PASS: ${{ secrets.REGISTRY_PASS }}
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_PASS: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Archive the template
         run: |
@@ -39,4 +41,4 @@ jobs:
 
       - name: Push the template
         run: |
-          oras push r.o99.no/kriger/exploit-templates:${{ matrix.name }} template.tar.gz:application/vnd.kriger.exploit.template.v1.tar+gzip
+          oras push ghcr.io/cyberlandslaget/kriger-exploit-templates:${{ matrix.name }} template.tar.gz:application/vnd.kriger.exploit.template.v1.tar+gzip

@@ -1,4 +1,3 @@
-permissions: read-all
 on:
   push:
     branches: [ main ]
@@ -9,14 +8,17 @@ name: Build container images
 jobs:
   build:
     name: Build ${{ matrix.tag }}
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     strategy:
       fail-fast: false
       matrix:
         include:
-          - tag: kriger/kriger
+          - tag: cyberlandslaget/kriger
             path: .
-          - tag: kriger/frontend
+          - tag: cyberlandslaget/kriger-frontend
             path: frontend
     steps:
       - name: Check out the repo
@@ -24,18 +26,13 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-        id: builder
-        with:
-          # See: https://github.com/docker/buildx/issues/298
-          driver-opts: |
-            network=host
 
       - name: Log in to the Container registry
         uses: docker/login-action@v3
         with:
-          registry: r.o99.no
-          username: ${{ secrets.REGISTRY_USER }}
-          password: ${{ secrets.REGISTRY_PASS }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -43,23 +40,24 @@ jobs:
           context: ${{ matrix.path }}
           file: ${{ matrix.path }}/Dockerfile
           push: true
-          tags: r.o99.no/${{ matrix.tag }}:latest,r.o99.no/${{ matrix.tag }}:${{ github.run_number }}
-          cache-from: type=registry,ref=r.o99.no/${{ matrix.tag }}:buildcache
-          # See https://github.com/goharbor/harbor/pull/18105#issuecomment-1811951274 for the Harbor workaround
-          cache-to: type=registry,ref=r.o99.no/${{ matrix.tag }}:buildcache,mode=max,image-manifest=true,oci-mediatypes=true
-          builder: ${{ steps.builder.outputs.name }}
+          tags: ghcr.io/${{ matrix.tag }}:main,ghcr.io/${{ matrix.tag }}:main-${{ github.run_number }}
+          cache-from: type=registry,ref=ghcr.io/${{ matrix.tag }}:buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ matrix.tag }}:buildcache,mode=max
 
   build_exploit_base:
     strategy:
       fail-fast: false
       matrix:
         include:
-          - tag: kriger/exploit-base:python
+          - tag: cyberlandslaget/kriger-exploit-base:python
             path: data/base/python
-          - tag: kriger/exploit-base:python-slim
+          - tag: cyberlandslaget/kriger-exploit-base:python-slim
             path: data/base/python-slim
     name: Build exploit base ${{ matrix.tag }}
     runs-on: self-hosted
+    permissions:
+      contents: read
+      packages: write
     needs: [ build ]
     steps:
       - name: Check out the repo
@@ -67,17 +65,13 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-        id: builder
-        with:
-          driver-opts: |
-            network=host
 
       - name: Log in to the Container registry
         uses: docker/login-action@v3
         with:
-          registry: r.o99.no
-          username: ${{ secrets.REGISTRY_USER }}
-          password: ${{ secrets.REGISTRY_PASS }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -85,8 +79,6 @@ jobs:
           context: ${{ matrix.path }}
           file: ${{ matrix.path }}/Dockerfile
           push: true
-          tags: r.o99.no/${{ matrix.tag }}
-          cache-from: type=registry,ref=r.o99.no/${{ matrix.tag }}-buildcache
-          # See https://github.com/goharbor/harbor/pull/18105#issuecomment-1811951274 for the Harbor workaround
-          cache-to: type=registry,ref=r.o99.no/${{ matrix.tag }}-buildcache,mode=max,image-manifest=true,oci-mediatypes=true
-          builder: ${{ steps.builder.outputs.name }}
+          tags: ghcr.io/${{ matrix.tag }}
+          cache-from: type=registry,ref=ghcr.io/${{ matrix.tag }}:buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ matrix.tag }}:buildcache,mode=max

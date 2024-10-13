@@ -127,6 +127,7 @@ pub(crate) async fn main(args: args::Deploy) -> Result<()> {
     ));
 
     // Prepare build arguments
+    // TODO: Provide a way to deal with custom registries - this is currently unused by the Dockerfile
     let mut build_args: HashMap<&str, &str> = HashMap::new();
     build_args.insert("REGISTRY", &cli_config.registry.registry);
 

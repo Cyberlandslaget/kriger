@@ -1,9 +1,7 @@
-ARG REGISTRY="r.o99.no"
-
 # https://github.com/astral-sh/uv/pkgs/container/uv
 FROM ghcr.io/astral-sh/uv:0.3.3 AS uv
 
-FROM $REGISTRY/kriger/kriger AS runner
+FROM ghcr.io/cyberlandslaget/kriger AS runner
 
 FROM python:3.12-slim-bookworm
 COPY --from=uv /uv /usr/bin/uv
