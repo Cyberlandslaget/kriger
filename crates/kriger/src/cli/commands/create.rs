@@ -43,8 +43,10 @@ pub(crate) async fn main(args: args::Create) -> eyre::Result<()> {
         None => return Ok(()), // Should be handled by inquire_service
     };
 
+    let templates_repository = args.templates_repository;
     let client = create_oci_client(&cli_config);
-    let template_tags = get_template_tags(&client, &cli_config).await?;
+    let template_tags =
+        get_template_tags(&client, &cli_config, templates_repository.as_str()).await?;
 
     let template_select = inquire::Select::new("Template:", template_tags.tags);
     let template = template_select.prompt()?;
@@ -53,7 +55,14 @@ pub(crate) async fn main(args: args::Create) -> eyre::Result<()> {
         .await
         .context("unable to create the exploit directory")?;
 
-    handle_template_download(&client, &cli_config, &template, &exploit_name).await?;
+    handle_template_download(
+        &client,
+        &cli_config,
+        templates_repository.as_str(),
+        &template,
+        &exploit_name,
+    )
+    .await?;
 
     let manifest = create_manifest(&exploit_name, service);
     let manifest_toml =
@@ -157,9 +166,10 @@ fn create_oci_client_auth(config: &CliConfig) -> oci_distribution::secrets::Regi
 async fn get_template_tags(
     client: &oci_distribution::Client,
     config: &CliConfig,
+    templates_repository: &str,
 ) -> eyre::Result<oci_distribution::client::TagResponse> {
     let reference: oci_distribution::Reference =
-        format!("{}/kriger/exploit-templates", &config.registry.registry).parse()?;
+        format!("{}/{}", &config.registry.registry, templates_repository).parse()?;
     let auth = create_oci_client_auth(&config);
 
     let tags = client
@@ -172,12 +182,13 @@ async fn get_template_tags(
 async fn handle_template_download(
     client: &oci_distribution::Client,
     config: &CliConfig,
+    templates_repository: &str,
     tag: &str,
     dest: impl AsRef<Path>,
 ) -> eyre::Result<()> {
     let reference: oci_distribution::Reference = format!(
-        "{}/kriger/exploit-templates:{}",
-        &config.registry.registry, tag
+        "{}/{}:{}",
+        &config.registry.registry, templates_repository, tag
     )
     .parse()?;
     let auth = create_oci_client_auth(&config);

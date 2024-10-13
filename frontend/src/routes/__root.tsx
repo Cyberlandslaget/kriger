@@ -13,7 +13,7 @@ import { CONFIG } from "../utils/constants";
 import { Toaster } from "sonner";
 
 export const RootComponent = () => {
-  useWebSocketProvider(CONFIG.webSocketUrl);
+  useWebSocketProvider(CONFIG.webSocketUrl.toString());
   useConfigProvider();
   useCompetition();
   useExploits();

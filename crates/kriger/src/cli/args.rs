@@ -20,6 +20,10 @@ pub(crate) struct Deploy {
 #[derive(Parser, Debug)]
 #[command(version, about)]
 pub(crate) struct Create {
+    /// The exploit template repository
+    #[arg(long, default_value = "cyberlandslaget/kriger-exploit-templates")]
+    pub(crate) templates_repository: String,
+
     /// The service name that the exploit should target
     #[arg(long)]
     pub(crate) service: Option<String>,
