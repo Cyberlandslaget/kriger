@@ -1,8 +1,11 @@
 [package]
 name = "kriger"
-version = "0.0.1"
-edition = "2021"
 default-run = "kriger"
+version.workspace = true
+edition.workspace = true
+description.workspace = true
+repository.workspace = true
+license.workspace = true
 
 [features]
 default = ["server-all", "otel", "cli"]

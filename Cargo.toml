@@ -2,6 +2,13 @@
 members = ["crates/*"]
 resolver = "2"
 
+[workspace.package]
+version = "0.0.1"
+edition = "2021"
+description = "An exploit farm for attack/defense CTFs."
+repository = "https://github.com/Cyberlandslaget/kriger"
+license = "AGPL-3.0-only"
+
 [workspace.dependencies]
 async-nats = "0.36.0"
 async-trait = "0.1.81"

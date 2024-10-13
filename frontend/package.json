@@ -1,5 +1,12 @@
 {
   "name": "kriger_frontend",
+  "description": "An exploit farm for attack/defense CTFs.",
+  "license": "AGPL-3.0-only",
+  "homepage": "https://github.com/Cyberlandslaget/kriger#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Cyberlandslaget/kriger.git"
+  },
   "private": true,
   "version": "0.0.0",
   "type": "module",

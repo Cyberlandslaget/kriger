@@ -1,7 +1,10 @@
 [package]
 name = "kriger_common"
-version = "0.0.1"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
+description.workspace = true
+repository.workspace = true
+license.workspace = true
 
 [features]
 default = ["server", "client"]
