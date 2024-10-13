@@ -54,7 +54,7 @@ jobs:
           - tag: cyberlandslaget/kriger-exploit-base:python-slim
             path: data/base/python-slim
     name: Build exploit base ${{ matrix.tag }}
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
