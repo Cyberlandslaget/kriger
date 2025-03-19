@@ -40,7 +40,7 @@ jobs:
           context: ${{ matrix.path }}
           file: ${{ matrix.path }}/Dockerfile
           push: true
-          tags: ghcr.io/${{ matrix.tag }}:main,ghcr.io/${{ matrix.tag }}:main-${{ github.run_number }}
+          tags: ghcr.io/${{ matrix.tag }}:latest,ghcr.io/${{ matrix.tag }}:main-${{ github.run_number }}
           cache-from: type=registry,ref=ghcr.io/${{ matrix.tag }}:buildcache
           cache-to: type=registry,ref=ghcr.io/${{ matrix.tag }}:buildcache,mode=max
 
