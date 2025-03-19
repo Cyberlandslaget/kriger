@@ -80,5 +80,5 @@ jobs:
           file: ${{ matrix.path }}/Dockerfile
           push: true
           tags: ghcr.io/${{ matrix.tag }}
-          cache-from: type=registry,ref=ghcr.io/${{ matrix.tag }}:buildcache
-          cache-to: type=registry,ref=ghcr.io/${{ matrix.tag }}:buildcache,mode=max
+          cache-from: type=registry,ref=ghcr.io/${{ matrix.tag }}-buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ matrix.tag }}-buildcache,mode=max
