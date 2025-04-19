@@ -233,7 +233,7 @@ async fn reconcile(
                     ..Default::default()
                 }],
                 image_pull_secrets: Some(vec![LocalObjectReference {
-                    name: Some("registry".to_string()),
+                    name: "registry".to_string(),
                 }]),
                 automount_service_account_token: Some(false),
                 enable_service_links: Some(false),

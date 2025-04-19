@@ -14,7 +14,7 @@ use axum::{
     Json, Router,
 };
 use clap::Parser;
-use rand::{distributions::DistString, SeedableRng};
+use rand::{distr::SampleString, SeedableRng};
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use tracing::debug;
@@ -338,7 +338,7 @@ fn get_hint_thing(hasher: &RandomState, s: &str, i: u32, t: u32) -> String {
     let mut seed = [0; 32];
     seed[0..8].copy_from_slice(&a.to_le_bytes());
     let mut rng = rand::rngs::StdRng::from_seed(seed);
-    rand::distributions::Alphanumeric.sample_string(&mut rng, 10)
+    rand::distr::Alphanumeric.sample_string(&mut rng, 10)
 }
 
 #[derive(Parser)]

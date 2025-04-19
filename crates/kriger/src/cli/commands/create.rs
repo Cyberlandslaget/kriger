@@ -144,31 +144,31 @@ fn create_manifest(name: &str, service: String) -> cli::models::ExploitManifest 
     }
 }
 
-fn create_oci_client(config: &CliConfig) -> oci_distribution::Client {
+fn create_oci_client(config: &CliConfig) -> oci_client::Client {
     let protocol = match config.registry.secure {
-        true => oci_distribution::client::ClientProtocol::Https,
-        false => oci_distribution::client::ClientProtocol::Http,
+        true => oci_client::client::ClientProtocol::Https,
+        false => oci_client::client::ClientProtocol::Http,
     };
-    let client_config = oci_distribution::client::ClientConfig {
+    let client_config = oci_client::client::ClientConfig {
         protocol,
         ..Default::default()
     };
-    oci_distribution::Client::new(client_config)
+    oci_client::Client::new(client_config)
 }
 
-fn create_oci_client_auth(config: &CliConfig) -> oci_distribution::secrets::RegistryAuth {
-    oci_distribution::secrets::RegistryAuth::Basic(
+fn create_oci_client_auth(config: &CliConfig) -> oci_client::secrets::RegistryAuth {
+    oci_client::secrets::RegistryAuth::Basic(
         config.registry.username.clone(),
         config.registry.password.clone(),
     )
 }
 
 async fn get_template_tags(
-    client: &oci_distribution::Client,
+    client: &oci_client::Client,
     config: &CliConfig,
     templates_repository: &str,
-) -> eyre::Result<oci_distribution::client::TagResponse> {
-    let reference: oci_distribution::Reference =
+) -> eyre::Result<oci_client::client::TagResponse> {
+    let reference: oci_client::Reference =
         format!("{}/{}", &config.registry.registry, templates_repository).parse()?;
     let auth = create_oci_client_auth(&config);
 
@@ -180,13 +180,13 @@ async fn get_template_tags(
 }
 
 async fn handle_template_download(
-    client: &oci_distribution::Client,
+    client: &oci_client::Client,
     config: &CliConfig,
     templates_repository: &str,
     tag: &str,
     dest: impl AsRef<Path>,
 ) -> eyre::Result<()> {
-    let reference: oci_distribution::Reference = format!(
+    let reference: oci_client::Reference = format!(
         "{}/{}:{}",
         &config.registry.registry, templates_repository, tag
     )
@@ -200,8 +200,8 @@ async fn handle_template_download(
     .context("unable to pull the template manifest")?;
 
     let manifest = match manifest {
-        oci_distribution::manifest::OciManifest::Image(manifest) => manifest,
-        oci_distribution::manifest::OciManifest::ImageIndex(index) => {
+        oci_client::manifest::OciManifest::Image(manifest) => manifest,
+        oci_client::manifest::OciManifest::ImageIndex(index) => {
             bail!("unexpected oci manifest variant: {index:?}")
         }
     };

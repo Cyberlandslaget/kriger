@@ -24,8 +24,8 @@ impl Submitter for DummySubmitter {
 }
 
 fn gen_submission_status() -> models::FlagSubmissionStatus {
-    let mut rng = rand::thread_rng();
-    let r = rng.gen_range(0..=99);
+    let mut rng = rand::rng();
+    let r = rng.random_range(0..=99);
     match r {
         0..=69 => models::FlagSubmissionStatus::Ok,
         70..=74 => models::FlagSubmissionStatus::Duplicate,
