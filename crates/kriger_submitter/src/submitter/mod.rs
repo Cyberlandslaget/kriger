@@ -68,6 +68,7 @@ impl InnerSubmitterConfig {
 
 /// Did not manage to submit
 #[derive(Error, Debug)]
+#[allow(dead_code)]
 pub enum SubmitError {
     #[error("network error")]
     NetworkError(#[from] std::io::Error),
@@ -82,6 +83,7 @@ pub enum SubmitError {
 }
 
 #[derive(Error, Debug)]
+#[allow(dead_code)]
 pub enum FormatErrorKind {
     #[error("eof reached")]
     EOF,

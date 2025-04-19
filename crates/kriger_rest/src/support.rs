@@ -10,6 +10,7 @@ use kriger_common::messaging::MessagingError;
 use kriger_common::models;
 
 #[derive(thiserror::Error, Debug)]
+#[allow(dead_code)]
 #[non_exhaustive]
 pub(crate) enum AppError {
     #[error("Bad input: {0}")]

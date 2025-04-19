@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright Authors of kriger
 
-mod metrics;
 mod utils;
 
 use crate::utils::{get_current_non_offsetting_tick, is_team_excluded};

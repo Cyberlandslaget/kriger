@@ -22,11 +22,12 @@ pub(crate) struct FlagHint {
 }
 
 #[derive(thiserror::Error, Debug)]
+#[allow(dead_code)]
 pub enum FetcherError {
     #[error("network error")]
     NetworkError(#[from] std::io::Error),
-    #[error("format error")]
     /// The format of the response was not as expected
+    #[error("format error")]
     FormatError,
     #[error("serde")]
     SerdeJson(#[from] serde_json::Error),
