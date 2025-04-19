@@ -21,7 +21,13 @@
 
 ### Alternative 1: Building and installing the CLI
 
-Run the following command in the project's root directory:
+Run the following command to pull and build the CLI from the Git repository:
+
+```bash
+cargo install --git https://github.com/Cyberlandslaget/kriger kriger
+```
+
+***Or***, run the following command in the project's root directory:
 
 ```bash
 cargo install --path crates/kriger --bin kriger
