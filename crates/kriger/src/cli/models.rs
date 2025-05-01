@@ -19,6 +19,8 @@ pub(crate) struct CliClientConfig {
 pub(crate) struct CliRegistryConfig {
     pub secure: bool,
     pub registry: String,
+    /// If true, the registry will be used for exploit templates too
+    pub custom_templates: bool,
     pub username: String,
     pub password: String,
 }

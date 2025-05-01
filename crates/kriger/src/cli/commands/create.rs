@@ -18,6 +18,7 @@ use tokio_util::compat::FuturesAsyncReadCompatExt;
 use tokio_util::io::SyncIoBridge;
 
 const OCI_TEMPLATE_LAYER_MEDIA_TYPE: &str = "application/vnd.kriger.exploit.template.v1.tar+gzip";
+const DEFAULT_TEMPLATE_REGISTRY: &str = "ghcr.io";
 
 // TODO: Handle the error in a user friendly way
 pub(crate) async fn main(args: args::Create) -> eyre::Result<()> {
@@ -168,9 +169,16 @@ async fn get_template_tags(
     config: &CliConfig,
     templates_repository: &str,
 ) -> eyre::Result<oci_client::client::TagResponse> {
+    let registry = match config.registry.custom_templates {
+        true => &config.registry.registry,
+        false => DEFAULT_TEMPLATE_REGISTRY,
+    };
     let reference: oci_client::Reference =
-        format!("{}/{}", &config.registry.registry, templates_repository).parse()?;
-    let auth = create_oci_client_auth(&config);
+        format!("{}/{}", registry, templates_repository).parse()?;
+    let auth = match config.registry.custom_templates {
+        true => create_oci_client_auth(config),
+        false => oci_client::secrets::RegistryAuth::Anonymous,
+    };
 
     let tags = client
         .list_tags(&reference, &auth, None, None)
@@ -186,12 +194,16 @@ async fn handle_template_download(
     tag: &str,
     dest: impl AsRef<Path>,
 ) -> eyre::Result<()> {
-    let reference: oci_client::Reference = format!(
-        "{}/{}:{}",
-        &config.registry.registry, templates_repository, tag
-    )
-    .parse()?;
-    let auth = create_oci_client_auth(&config);
+    let registry = match config.registry.custom_templates {
+        true => &config.registry.registry,
+        false => DEFAULT_TEMPLATE_REGISTRY,
+    };
+    let reference: oci_client::Reference =
+        format!("{}/{}:{}", registry, templates_repository, tag).parse()?;
+    let auth = match config.registry.custom_templates {
+        true => create_oci_client_auth(config),
+        false => oci_client::secrets::RegistryAuth::Anonymous,
+    };
 
     let (manifest, _) = with_spinner("Pulling template manifest", || {
         client.pull_manifest(&reference, &auth)

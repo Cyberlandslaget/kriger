@@ -62,6 +62,7 @@ Replace the required values and save the configuration file.
 [registry]
 secure = true
 registry = "r.o99.no"
+custom_templates = false
 username = "user"
 password = "[FILL IN HERE]"
 
