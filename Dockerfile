@@ -1,5 +1,5 @@
-FROM rust:1.86 AS base
-RUN cargo install --locked cargo-chef sccache
+FROM lukemathwalker/cargo-chef:latest-rust-1.86-slim-bookworm AS base
+RUN apt-get update && apt-get install -y sccache
 ENV RUSTC_WRAPPER=sccache SCCACHE_DIR=/sccache
 
 FROM base AS planner
