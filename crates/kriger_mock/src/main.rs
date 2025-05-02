@@ -362,8 +362,8 @@ async fn main() -> Result<()> {
     let state = Arc::new(AppState { fs, ticker });
 
     let app = Router::new()
-        .route("/getflag/:team", get(getflag))
-        .route("/getflags/:team", get(getflags))
+        .route("/getflag/{team}", get(getflag))
+        .route("/getflags/{team}", get(getflags))
         .route("/flags", put(flags))
         .route("/forceTick", put(force_tick))
         .route("/flagId", get(flag_id))

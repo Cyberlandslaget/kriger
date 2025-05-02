@@ -47,9 +47,9 @@ pub async fn main(runtime: AppRuntime, config: Config) -> eyre::Result<()> {
 
     let app = Router::new()
         .route("/exploits", get(routes::exploits::get_exploits))
-        .route("/exploits/:name", put(routes::exploits::update_exploit))
+        .route("/exploits/{name}", put(routes::exploits::update_exploit))
         .route(
-            "/exploits/:name/execute",
+            "/exploits/{name}/execute",
             post(routes::exploits::execute_exploit),
         )
         .route("/flags", post(routes::flags::submit_flags))
