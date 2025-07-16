@@ -7,7 +7,7 @@ use dashmap::DashMap;
 use kriger_common::models;
 use serde::{self, Deserialize};
 use std::collections::HashMap;
-use tracing::{debug, instrument};
+use tracing::{debug, instrument, warn};
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -67,12 +67,20 @@ impl Fetcher for EnowarsFetcher {
         for (service, info) in info.services {
             for (team_ip, round_hints) in info.0 {
                 for (round, hint) in round_hints {
-                     flag_hints.push(FlagHint {
-                    round: Some(round.parse::<i64>().unwrap()),
-                    team_id: team_ip.clone(),
-                    service: service.clone(),
-                    hint,
-                });
+                    match round.parse::<i64>() {
+                        Ok(round_id) => {
+                            flag_hints.push(FlagHint {
+                                round: Some(round_id),
+                                team_id: team_ip.clone(),
+                                service: service.clone(),
+                                hint,
+                            });
+                        },
+                        Err(err) => {
+                            warn!("Error trying to parse round_id: {err:?}");
+                        }
+                    }
+                     
                 }
             }
         }
