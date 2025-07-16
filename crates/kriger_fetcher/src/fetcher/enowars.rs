@@ -18,7 +18,7 @@ pub struct AttackInfo {
 
 // service/team ip -> service flag info
 #[derive(Deserialize, Debug)]
-pub struct ServiceInfo(HashMap<String, serde_json::Value>);
+pub struct ServiceInfo(HashMap<String, HashMap<String, serde_json::Value>>);
 
 // flag type -> vec[vec[str/user]]
 // #[derive(Deserialize, Debug)]
@@ -65,13 +65,15 @@ impl Fetcher for EnowarsFetcher {
 
         let mut flag_hints = Vec::new();
         for (service, info) in info.services {
-            for (team_ip, hint) in info.0 {
-                flag_hints.push(FlagHint {
-                    round: None,
+            for (team_ip, round_hints) in info.0 {
+                for (round, hint) in round_hints {
+                     flag_hints.push(FlagHint {
+                    round: Some(round.parse::<i64>().unwrap()),
                     team_id: team_ip.clone(),
                     service: service.clone(),
                     hint,
                 });
+                }
             }
         }
 
@@ -125,17 +127,14 @@ mod tests {
         );
         assert_eq!(team, "10.1.52.1");
         
-        let team_service = service.0[team].as_object().unwrap();
-        let rounds = team_service.keys().collect::<Vec<&String>>();
-
-        let round_7 = rounds[0];
-        let round_7_results = team_service.get(round_7).unwrap().as_array().unwrap();
+        let round_hints = &service.0[team];
+        
+        let round_7_results = round_hints.get("7").unwrap().as_array().unwrap();
         
         assert_eq!(round_7_results[0].as_array().unwrap()[0], "user73");
         assert_eq!(round_7_results[1].as_array().unwrap()[0], "user5");
 
-        let round_8 = rounds[1];
-        let round_8_results = team_service.get(round_8).unwrap().as_array().unwrap();
+        let round_8_results = round_hints.get("8").unwrap().as_array().unwrap();
         
         assert_eq!(round_8_results[0].as_array().unwrap()[0], "user96");
         assert_eq!(round_8_results[1].as_array().unwrap()[0], "user314");
