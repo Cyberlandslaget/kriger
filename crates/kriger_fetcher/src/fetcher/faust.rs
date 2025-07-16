@@ -41,7 +41,7 @@ impl FaustFetcher {
     }
 
     /// This fetches the FAUST GameServer's team.json data
-    async fn get_attack_into(&self) -> Result<AttackInfo, FetcherError> {
+    async fn get_attack_info(&self) -> Result<AttackInfo, FetcherError> {
         let info: AttackInfo = self.client.get(&self.url).send().await?.json().await?;
         Ok(info)
     }
@@ -55,7 +55,7 @@ impl Fetcher for FaustFetcher {
         _options: &FetchOptions,
         _services: &DashMap<String, models::Service>,
     ) -> Result<CompetitionData, FetcherError> {
-        let info = self.get_attack_into().await?;
+        let info = self.get_attack_info().await?;
 
         debug! {
             team_count = info.teams.len(),

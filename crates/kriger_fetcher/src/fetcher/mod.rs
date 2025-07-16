@@ -4,6 +4,7 @@
 mod cini;
 pub mod dummy;
 pub mod faust;
+pub mod enowars;
 
 use async_trait::async_trait;
 use dashmap::DashMap;
@@ -63,6 +64,11 @@ pub(crate) enum InnerFetcherConfig {
         /// correct IP address.
         ip_format: String,
     },
+    Enowars {
+        /// The URL of the "flag ids" service endpoint. This is usually located at
+        /// /scoreboard/attack.json
+        url: String,
+    }
 }
 
 impl InnerFetcherConfig {
@@ -72,6 +78,9 @@ impl InnerFetcherConfig {
             InnerFetcherConfig::Cini { url } => Box::new(cini::CiniFetcher::new(url)),
             InnerFetcherConfig::Faust { url, ip_format } => {
                 Box::new(faust::FaustFetcher::new(url, ip_format))
+            },
+            InnerFetcherConfig::Enowars { url } => {
+                Box::new(enowars::EnowarsFetcher::new(url))
             }
         }
     }

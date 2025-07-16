@@ -1,0 +1,16 @@
+[competition]
+start = "2025-07-19T12:00:00Z"
+tick = 60
+tick_start = 0
+flag_validity = 10 # Assuming it's same this year as 2023 https://github.com/Cyberlandslaget/angrepa/blob/105fee562830776f868f85ebfd112aeb6ac12f79/config/enowars7.toml
+flag_format = "ENO[A-Za-z0-9+\\/=]{48}"
+
+[submitter]
+type = "enowars"
+interval = 1
+host = "10.0.13.37:1337"
+
+[fetcher]
+type = "enowars"
+interval = 10 # 6 req/min
+url = "https://9.enowars.com/scoreboard/attack.json"
