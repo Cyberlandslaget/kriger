@@ -10,8 +10,8 @@ use std::collections::HashMap;
 use tracing::{debug, instrument};
 
 #[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct AttackInfo {
-    #[serde(alias = "availableTeams")]
     pub available_teams: Vec<String>,
     pub services: HashMap<String, ServiceInfo>, // service name -> ServiceInfo
 }
