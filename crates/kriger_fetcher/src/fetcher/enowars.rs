@@ -40,7 +40,7 @@ impl EnowarsFetcher {
         Self { url, client }
     }
 
-    /// This fetches the FAUST GameServer's team.json data
+    /// This fetches the ENOWARS GameServer's team.json data
     async fn get_attack_into(&self) -> Result<AttackInfo, FetcherError> {
         let info: AttackInfo = self.client.get(&self.url).send().await?.json().await?;
         Ok(info)
@@ -141,27 +141,4 @@ mod tests {
         assert_eq!(round_8_results[1].as_array().unwrap()[0], "user314");
 
     }
-
-    // #[tokio::test]
-    // async fn faust_local_test() {
-    //     let gameserver = tokio::spawn(async move {
-    //         let teams = warp::path!("teams").map(|| TEAMS_JSON);
-    //         let scoreboard = warp::path!("scoreboard").map(|| SCOREBOARD_JSON);
-    //         warp::serve(teams.or(scoreboard))
-    //             .run(([127, 0, 0, 1], 8888))
-    //             .await
-    //     });
-    //
-    //     let fetcher = FaustFetcher::new(
-    //         "http://localhost:8888/teams".to_string(),
-    //         "http://localhost:8888/scoreboard".to_string(),
-    //         "1.20.{x}.1".to_string(),
-    //     );
-    //
-    //     let services = fetcher.services().await.unwrap();
-    //
-    //     dbg!(&services);
-    //
-    //     gameserver.abort();
-    // }
 }
