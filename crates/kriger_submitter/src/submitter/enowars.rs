@@ -146,57 +146,62 @@ fn map_status_code(code: &str) -> models::FlagSubmissionStatus {
     }
 }
 
-#[test]
-fn should_respond_with_ok_when_valid_flag() {
-    let (flag, code) = parse_flag_response("ENO736a6b6473616a6b647361736a6b64736b646a736b6b6b6b OK\n".to_string()).unwrap();
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    let status_code = map_status_code(&code);
-    assert_eq!(flag, "ENO736a6b6473616a6b647361736a6b64736b646a736b6b6b6b".to_string());
-    assert_eq!(code, "OK".to_string());
-    assert_eq!(status_code, models::FlagSubmissionStatus::Ok);
+    #[test]
+    fn should_respond_with_ok_when_valid_flag() {
+        let (flag, code) = parse_flag_response("ENO736a6b6473616a6b647361736a6b64736b646a736b6b6b6b OK\n".to_string()).unwrap();
+
+        let status_code = map_status_code(&code);
+        assert_eq!(flag, "ENO736a6b6473616a6b647361736a6b64736b646a736b6b6b6b".to_string());
+        assert_eq!(code, "OK".to_string());
+        assert_eq!(status_code, models::FlagSubmissionStatus::Ok);
+    }
+
+    #[test]
+    fn should_respond_with_dup_when_duplicate_flag() {
+        let (flag, code) = parse_flag_response("ENO727577716b726a6c776b6a6c6b66736a61666b6c73616b6b DUP\n".to_string()).unwrap();
+
+        let status_code = map_status_code(&code);
+        assert_eq!(flag, "ENO727577716b726a6c776b6a6c6b66736a61666b6c73616b6b".to_string());
+        assert_eq!(code, "DUP".to_string());
+        assert_eq!(status_code, models::FlagSubmissionStatus::Duplicate);
+    }
+
+    #[test]
+    fn should_respond_with_own_when_own_flag() {
+        let (flag, code) = parse_flag_response("ENO6e6576657220676f6e6e61206769766520796f752075702d OWN\n".to_string()).unwrap();
+
+        let status_code = map_status_code(&code);
+        assert_eq!(flag, "ENO6e6576657220676f6e6e61206769766520796f752075702d".to_string());
+        assert_eq!(code, "OWN".to_string());
+        assert_eq!(status_code, models::FlagSubmissionStatus::Own);
+    }
+
+    #[test]
+    fn should_respond_with_inv_when_invalid_flag() {
+        let (flag, code) = parse_flag_response("ENO746869736973686578636f64655f666f7274657374696e67 INV\n".to_string()).unwrap();
+
+        let status_code = map_status_code(&code);
+        assert_eq!(flag, "ENO746869736973686578636f64655f666f7274657374696e67".to_string());
+        assert_eq!(code, "INV".to_string());
+        assert_eq!(status_code, models::FlagSubmissionStatus::Invalid);
+    }
+
+    #[test]
+    fn should_return_error_when_no_spaces_in_response() {
+        let response = parse_flag_response("INVALID_RESPONSE\n".to_string());
+
+        assert!(response.is_err());
+    }
+
+    #[test]
+    fn should_return_error_when_only_newline_in_response() {
+        let response = parse_flag_response("\n".to_string());
+
+        assert!(response.is_err());
+    }
+
 }
-
-#[test]
-fn should_respond_with_dup_when_duplicate_flag() {
-    let (flag, code) = parse_flag_response("ENO727577716b726a6c776b6a6c6b66736a61666b6c73616b6b DUP\n".to_string()).unwrap();
-
-    let status_code = map_status_code(&code);
-    assert_eq!(flag, "ENO727577716b726a6c776b6a6c6b66736a61666b6c73616b6b".to_string());
-    assert_eq!(code, "DUP".to_string());
-    assert_eq!(status_code, models::FlagSubmissionStatus::Duplicate);
-}
-
-#[test]
-fn should_respond_with_own_when_own_flag() {
-    let (flag, code) = parse_flag_response("ENO6e6576657220676f6e6e61206769766520796f752075702d OWN\n".to_string()).unwrap();
-
-    let status_code = map_status_code(&code);
-    assert_eq!(flag, "ENO6e6576657220676f6e6e61206769766520796f752075702d".to_string());
-    assert_eq!(code, "OWN".to_string());
-    assert_eq!(status_code, models::FlagSubmissionStatus::Own);
-}
-
-#[test]
-fn should_respond_with_inv_when_invalid_flag() {
-    let (flag, code) = parse_flag_response("ENO746869736973686578636f64655f666f7274657374696e67 INV\n".to_string()).unwrap();
-
-    let status_code = map_status_code(&code);
-    assert_eq!(flag, "ENO746869736973686578636f64655f666f7274657374696e67".to_string());
-    assert_eq!(code, "INV".to_string());
-    assert_eq!(status_code, models::FlagSubmissionStatus::Invalid);
-}
-
-#[test]
-fn should_return_error_when_no_spaces_in_response() {
-    let response = parse_flag_response("INVALID_RESPONSE\n".to_string());
-
-    assert!(response.is_err());
-}
-
-#[test]
-fn should_return_error_when_only_newline_in_response() {
-    let response = parse_flag_response("\n".to_string());
-
-    assert!(response.is_err());
-}
-
