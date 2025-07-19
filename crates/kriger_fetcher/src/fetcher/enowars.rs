@@ -66,21 +66,24 @@ impl Fetcher for EnowarsFetcher {
         let mut flag_hints = Vec::new();
         for (service, info) in info.services {
             for (team_ip, round_hints) in info.0 {
+                let team_id = match team_ip.splitn(4, '.').nth(2) {
+                    Some(id) => id,
+                    None => continue,
+                };
                 for (round, hint) in round_hints {
                     match round.parse::<i64>() {
                         Ok(round_id) => {
                             flag_hints.push(FlagHint {
                                 round: Some(round_id),
-                                team_id: team_ip.clone(),
+                                team_id: team_id.to_string(),
                                 service: service.clone(),
                                 hint,
                             });
-                        },
+                        }
                         Err(err) => {
                             warn!("Error trying to parse round_id: {err:?}");
                         }
                     }
-                     
                 }
             }
         }
@@ -129,23 +132,19 @@ mod tests {
         let service_keys = meta.services.keys().collect::<Vec<&String>>();
         let service = &meta.services[service_keys[0]];
 
-        assert_eq!(
-             service_keys[0],
-             "service_1"
-        );
+        assert_eq!(service_keys[0], "service_1");
         assert_eq!(team, "10.1.52.1");
-        
+
         let round_hints = &service.0[team];
-        
+
         let round_7_results = round_hints.get("7").unwrap().as_array().unwrap();
-        
+
         assert_eq!(round_7_results[0].as_array().unwrap()[0], "user73");
         assert_eq!(round_7_results[1].as_array().unwrap()[0], "user5");
 
         let round_8_results = round_hints.get("8").unwrap().as_array().unwrap();
-        
+
         assert_eq!(round_8_results[0].as_array().unwrap()[0], "user96");
         assert_eq!(round_8_results[1].as_array().unwrap()[0], "user314");
-
     }
 }
