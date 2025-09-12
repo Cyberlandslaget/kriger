@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright Authors of kriger
 
+pub mod attackinglab;
 mod cini;
 pub mod dummy;
-pub mod faust;
 pub mod enowars;
+pub mod faust;
 
 use async_trait::async_trait;
 use dashmap::DashMap;
@@ -68,7 +69,12 @@ pub(crate) enum InnerFetcherConfig {
         /// The URL of the "flag ids" service endpoint. This is usually located at
         /// /scoreboard/attack.json
         url: String,
-    }
+    },
+    AttackingLab {
+        /// The URL of the "flag ids" service endpoint. This is usually located at
+        /// /scoreboard/attack.json
+        url: String,
+    },
 }
 
 impl InnerFetcherConfig {
@@ -78,9 +84,10 @@ impl InnerFetcherConfig {
             InnerFetcherConfig::Cini { url } => Box::new(cini::CiniFetcher::new(url)),
             InnerFetcherConfig::Faust { url, ip_format } => {
                 Box::new(faust::FaustFetcher::new(url, ip_format))
-            },
-            InnerFetcherConfig::Enowars { url } => {
-                Box::new(enowars::EnowarsFetcher::new(url))
+            }
+            InnerFetcherConfig::Enowars { url } => Box::new(enowars::EnowarsFetcher::new(url)),
+            InnerFetcherConfig::AttackingLab { url } => {
+                Box::new(attackinglab::AttackingLabFetcher::new(url))
             }
         }
     }
