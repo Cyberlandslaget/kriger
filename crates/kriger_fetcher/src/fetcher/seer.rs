@@ -32,12 +32,12 @@ pub struct ServiceInfo(HashMap<String, HashMap<String, serde_json::Value>>);
 // pub struct ServiceFlagInfo(HashMap<String, Vec<serde_json::Value>>);
 
 #[derive(Debug)]
-pub struct AttackingLabFetcher {
+pub struct SeerFetcher {
     client: reqwest::Client,
     url: String,
 }
 
-impl AttackingLabFetcher {
+impl SeerFetcher {
     pub fn new(url: String) -> Self {
         let client = reqwest::Client::builder()
             .pool_max_idle_per_host(0) // should disable pooling which fixes errors against some hosts
@@ -55,7 +55,7 @@ impl AttackingLabFetcher {
 }
 
 #[async_trait]
-impl Fetcher for AttackingLabFetcher {
+impl Fetcher for SeerFetcher {
     #[instrument(skip_all)]
     async fn fetch(
         &self,

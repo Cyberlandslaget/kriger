@@ -9,11 +9,11 @@ use thiserror::Error;
 
 // TODO: Port
 //mod dctf;
-mod attackinglab;
 mod cini;
 mod dummy;
 mod enowars;
 mod faust;
+mod seer;
 
 /// The submitter will be responsible for submitting the flags in bulk. See ADR-002.
 #[async_trait]
@@ -57,7 +57,7 @@ pub enum InnerSubmitterConfig {
     Enowars {
         host: String,
     },
-    AttackingLab {
+    Seer {
         host: String,
     },
 }
@@ -73,9 +73,7 @@ impl InnerSubmitterConfig {
             InnerSubmitterConfig::Enowars { host } => {
                 Box::new(enowars::EnowarsSubmitter::new(host))
             }
-            InnerSubmitterConfig::AttackingLab { host } => {
-                Box::new(attackinglab::AttackingLabSubmitter::new(host))
-            }
+            InnerSubmitterConfig::Seer { host } => Box::new(seer::SeerSubmitter::new(host)),
         }
     }
 }
