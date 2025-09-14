@@ -11,8 +11,9 @@ use thiserror::Error;
 //mod dctf;
 mod cini;
 mod dummy;
-mod faust;
 mod enowars;
+mod faust;
+mod seer;
 
 /// The submitter will be responsible for submitting the flags in bulk. See ADR-002.
 #[async_trait]
@@ -56,6 +57,9 @@ pub enum InnerSubmitterConfig {
     Enowars {
         host: String,
     },
+    Seer {
+        host: String,
+    },
 }
 
 impl InnerSubmitterConfig {
@@ -66,7 +70,10 @@ impl InnerSubmitterConfig {
                 Box::new(cini::CiniSubmitter::new(url, token))
             }
             InnerSubmitterConfig::Faust { host } => Box::new(faust::FaustSubmitter::new(host)),
-            InnerSubmitterConfig::Enowars { host } => Box::new(enowars::EnowarsSubmitter::new(host))
+            InnerSubmitterConfig::Enowars { host } => {
+                Box::new(enowars::EnowarsSubmitter::new(host))
+            }
+            InnerSubmitterConfig::Seer { host } => Box::new(seer::SeerSubmitter::new(host)),
         }
     }
 }
