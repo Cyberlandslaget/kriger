@@ -9,11 +9,31 @@ use std::collections::HashMap;
 pub mod requests;
 pub mod responses;
 
+pub enum UpgradeDecision {
+    Accepted,
+    Declined,
+    Pending
+}
+
+pub struct UpgradeSuggest {
+    pub team_id: String,
+    pub service_id: String,
+    pub version: String,
+    pub decision: UpgradeDecision,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Exploit {
     pub manifest: ExploitManifest,
     pub image: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ExecutionType {
+    Default,
+    Upgrade { version: String },
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -25,6 +45,10 @@ pub struct ExploitManifest {
     pub workers: Option<i32>,
     pub enabled: bool,
     pub resources: ExploitResources,
+    pub execution_type: ExecutionType,
+    /// Required failed ticks before a suggestion for upgrade.  
+    /// Default is 3 ticks.
+    pub upgrade_ticks: Option<i32>
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -42,6 +66,11 @@ pub struct ExploitResources {
 pub struct Service {
     pub name: String,
     pub has_hint: bool,
+
+    /// Order of versions
+    /// Useful when new exploits are found at different times
+    /// And we want to change the order of suggestions.
+    pub upgrade_versions: Vec<String>
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -52,6 +81,13 @@ pub struct Team {
     /// A map of service IP addresses. This is only used in situations where services have different
     /// IP addresses. If an entry does not exist, the [ip_address] field is used.
     pub services: HashMap<String, String>,
+
+    /// A map of service upgrades.
+    /// This is used in situations where team(s) has patched default exploit for a service.
+    ///
+    /// key: name of service
+    /// value: upgrade version
+    pub service_upgrades: HashMap<String, String>
 }
 
 #[derive(Debug, Serialize_repr, Deserialize_repr, PartialEq)]
