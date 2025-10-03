@@ -11,8 +11,9 @@ use color_eyre::eyre::{Context, Result};
 use futures::StreamExt;
 use k8s_openapi::api::apps::v1::{Deployment, DeploymentSpec};
 use k8s_openapi::api::core::v1::{
-    Capabilities, Container, EnvVar, LocalObjectReference, PodSpec, PodTemplateSpec,
-    ResourceRequirements, SecurityContext,
+    Affinity, Capabilities, Container, EnvVar, LocalObjectReference, NodeAffinity,
+    NodeSelectorRequirement, NodeSelectorTerm, PodSpec, PodTemplateSpec, PreferredSchedulingTerm,
+    ResourceRequirements, SecurityContext, Toleration,
 };
 use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta};
@@ -237,6 +238,31 @@ async fn reconcile(
                 }]),
                 automount_service_account_token: Some(false),
                 enable_service_links: Some(false),
+                tolerations: Some(vec![Toleration {
+                    key: Some("kriger/unschedulable".to_string()),
+                    operator: Some("Exists".to_string()),
+                    effect: Some("NoSchedule".to_string()),
+                    ..Default::default()
+                }]),
+                affinity: Some(Affinity {
+                    node_affinity: Some(NodeAffinity {
+                        preferred_during_scheduling_ignored_during_execution: Some(vec![
+                            PreferredSchedulingTerm {
+                                preference: NodeSelectorTerm {
+                                    match_expressions: Some(vec![NodeSelectorRequirement {
+                                        key: "kriger/exploit-runner".to_string(),
+                                        operator: "Exists".to_string(),
+                                        ..Default::default()
+                                    }]),
+                                    ..Default::default()
+                                },
+                                weight: 100,
+                            },
+                        ]),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
                 ..Default::default()
             }),
             ..Default::default()
