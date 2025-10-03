@@ -5,7 +5,7 @@ mod cini;
 pub mod dummy;
 pub mod enowars;
 pub mod faust;
-pub mod seer;
+pub mod saar;
 
 use async_trait::async_trait;
 use dashmap::DashMap;
@@ -70,7 +70,7 @@ pub(crate) enum InnerFetcherConfig {
         /// /scoreboard/attack.json
         url: String,
     },
-    Seer {
+    Saar {
         /// The URL of the "flag ids" service endpoint. This is usually located at
         /// /scoreboard/attack.json
         url: String,
@@ -86,7 +86,7 @@ impl InnerFetcherConfig {
                 Box::new(faust::FaustFetcher::new(url, ip_format))
             }
             InnerFetcherConfig::Enowars { url } => Box::new(enowars::EnowarsFetcher::new(url)),
-            InnerFetcherConfig::Seer { url } => Box::new(seer::SeerFetcher::new(url)),
+            InnerFetcherConfig::Saar { url } => Box::new(saar::SaarFetcher::new(url)),
         }
     }
 }

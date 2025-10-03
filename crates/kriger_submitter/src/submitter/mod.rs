@@ -13,7 +13,7 @@ mod cini;
 mod dummy;
 mod enowars;
 mod faust;
-mod seer;
+mod saar;
 
 /// The submitter will be responsible for submitting the flags in bulk. See ADR-002.
 #[async_trait]
@@ -57,7 +57,7 @@ pub enum InnerSubmitterConfig {
     Enowars {
         host: String,
     },
-    Seer {
+    Saar {
         host: String,
     },
 }
@@ -73,7 +73,7 @@ impl InnerSubmitterConfig {
             InnerSubmitterConfig::Enowars { host } => {
                 Box::new(enowars::EnowarsSubmitter::new(host))
             }
-            InnerSubmitterConfig::Seer { host } => Box::new(seer::SeerSubmitter::new(host)),
+            InnerSubmitterConfig::Saar { host } => Box::new(saar::SaarSubmitter::new(host)),
         }
     }
 }

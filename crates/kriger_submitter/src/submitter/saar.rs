@@ -11,13 +11,13 @@ use tokio::net::TcpStream;
 use tokio::sync::RwLock;
 use tracing::{debug, instrument, warn};
 
-pub(crate) struct SeerSubmitter {
+pub(crate) struct SaarSubmitter {
     host: String,
     stream: RwLock<Option<BufStream<TcpStream>>>,
 }
 
 #[async_trait]
-impl Submitter for SeerSubmitter {
+impl Submitter for SaarSubmitter {
     #[instrument(skip_all, fields(flag_count = flags.len()))]
     async fn submit(
         &self,
@@ -46,7 +46,7 @@ impl Submitter for SeerSubmitter {
     }
 }
 
-impl SeerSubmitter {
+impl SaarSubmitter {
     pub fn new(host: String) -> Self {
         Self {
             host,
