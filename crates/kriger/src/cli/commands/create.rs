@@ -135,7 +135,7 @@ fn create_manifest(name: &str, service: String) -> cli::models::ExploitManifest 
             workers: Some(4),
             enabled: true,
             resources: cli::models::ExploitResources {
-                cpu_request: Some("1".to_string()),
+                cpu_request: Some("0.2".to_string()),
                 mem_request: Some("256Mi".to_string()),
                 cpu_limit: "2".to_string(),
                 mem_limit: "512Mi".to_string(),
