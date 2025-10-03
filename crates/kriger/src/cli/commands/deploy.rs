@@ -34,6 +34,7 @@ async fn build_image(
         "buildx".into(),
         "build".into(),
         "--network=host".into(),
+        "--platform=linux/amd64".into(),
         "--push".into(),
         "--pull".into(),
         "--tag".into(),
