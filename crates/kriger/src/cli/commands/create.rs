@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright Authors of kriger
 
-use std::path::Path;
-
 use crate::cli::models::CliConfig;
 use crate::cli::{self, read_cli_config, with_spinner};
 use crate::cli::{args, emoji};
@@ -12,6 +10,9 @@ use console::style;
 use futures::TryStreamExt;
 use kriger_common::client::KrigerClient;
 use kriger_common::models;
+use regex::Regex;
+use std::path::Path;
+use std::sync::LazyLock;
 use tokio::runtime::Handle;
 use tokio::task;
 use tokio_util::compat::FuturesAsyncReadCompatExt;
@@ -19,12 +20,38 @@ use tokio_util::io::SyncIoBridge;
 
 const OCI_TEMPLATE_LAYER_MEDIA_TYPE: &str = "application/vnd.kriger.exploit.template.v1.tar+gzip";
 const DEFAULT_TEMPLATE_REGISTRY: &str = "ghcr.io";
+static EXPLOIT_NAME_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^[a-z1-9]+(-[a-z1-9]+)*$").unwrap());
 
 // TODO: Handle the error in a user friendly way
 pub(crate) async fn main(args: args::Create) -> eyre::Result<()> {
     let cli_config = read_cli_config().await?;
 
-    let exploit_name = inquire_text(args.name, "Exploit name:")?;
+    let orig_name = inquire_text(args.name, "Exploit name:")?;
+    let exploit_name = orig_name
+        .to_ascii_lowercase() // Basic attempts to make name pass requirements
+        .replace("_", "-")
+        .replace(" ", "-");
+
+    if orig_name != exploit_name {
+        println!(
+            "  {} {}",
+            emoji::INFORMATION,
+            style("Updated exploit name in attempt to pass requirements")
+                .yellow()
+                .bold(),
+        );
+    }
+
+    if !EXPLOIT_NAME_REGEX.is_match(&exploit_name) {
+        println!(
+            "  {} {} {exploit_name} {} {}",
+            emoji::WARNING,
+            style("Exploit name").yellow().bold(),
+            style("does not match expected format:").yellow().bold(),
+            EXPLOIT_NAME_REGEX.as_str()
+        );
+    }
 
     let exists = tokio::fs::metadata(&exploit_name)
         .await
