@@ -8,6 +8,7 @@ pub(crate) static PACKAGE: Emoji = Emoji("📦", "");
 pub(crate) static HAMMER: Emoji = Emoji("🔨", "");
 pub(crate) static SPARKLES: Emoji = Emoji("✨", "");
 pub(crate) static CROSS_MARK: Emoji = Emoji("❌", "");
+pub(crate) static WARNING: Emoji = Emoji("⚠️", "");
 pub(crate) static INFORMATION: Emoji = Emoji("ℹ️", "");
 pub(crate) static CHECK_MARK: Emoji = Emoji("✅", "");
 pub(crate) static CHEQUERED_FLAG: Emoji = Emoji("🏁", "");
